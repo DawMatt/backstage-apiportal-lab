@@ -1,0 +1,28 @@
+# Reference contract: catalog-info.yaml for an OpenAPI API entity
+#
+# Place this file alongside the OpenAPI spec file it describes.
+# The spec.definition.$text path is relative to this file's directory.
+#
+# Lab 1 file location: labs/lab-01-base-backstage/apis/museum/catalog-info.yaml
+#
+# Source: Redocly Museum API — https://github.com/Redocly/museum-openapi-example
+# Selected per Constitution Principle VII (Modern & Purposeful API Examples).
+
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: museum-api
+  description: >
+    A sample REST API for a fictional museum, demonstrating modern OpenAPI 3.1 design
+    practices. Covers special events, museum hours, and ticket purchasing. Used in Lab 1
+    to demonstrate OpenAPI registration in the Backstage catalog.
+  tags:
+    - rest
+    - openapi
+    - sample
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: user:default/guest
+  definition:
+    $text: ./openapi.yaml

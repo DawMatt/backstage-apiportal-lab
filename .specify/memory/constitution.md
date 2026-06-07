@@ -1,18 +1,22 @@
 <!--
 Sync Impact Report
 ==================
-Version change: N/A (initial) → 1.0.0
+Version change: 1.0.0 → 1.1.0
 Added sections:
-  - Core Principles (I through VI)
-  - Lab Structure Standards
-  - Development Workflow
-  - Governance
-Modified principles: N/A (initial constitution)
-Removed sections: N/A
+  - Principle VII. Modern & Purposeful API Examples
+Modified principles: None renamed
+Removed sections: None
 Templates reviewed:
   ✅ .specify/templates/plan-template.md — Constitution Check section is generic; no updates required
   ✅ .specify/templates/spec-template.md — No principle-specific references; no updates required
   ✅ .specify/templates/tasks-template.md — No principle-specific references; no updates required
+Instance files requiring updates (in-progress feature work):
+  ⚠ specs/001-lab-1-base-backstage/plan.md — Constitution Check table missing Principle VII; Petstore reference in Structure section
+  ⚠ specs/001-lab-1-base-backstage/research.md — Decision 4 selects Petstore (now prohibited); must be updated to Museum API
+  ⚠ specs/001-lab-1-base-backstage/spec.md — Assumptions section references "petstore or similar"
+  ⚠ specs/001-lab-1-base-backstage/contracts/catalog-info-openapi.yaml — named petstore-api
+  ⚠ specs/001-lab-1-base-backstage/data-model.md — references petstore in file paths and entity table
+  ⚠ specs/001-lab-1-base-backstage/quickstart.md — references "petstore" in search verification step
 Follow-up TODOs: None
 -->
 
@@ -76,6 +80,28 @@ Lab N MUST be completable if and only if labs 1 through N−1 have been complete
 **Rationale**: Progressive structure reduces cognitive load, provides natural checkpoints, and
 ensures each lab can be validated in isolation relative to its prerequisites.
 
+### VII. Modern & Purposeful API Examples
+
+Sample API specifications used in labs MUST reflect current, real-world API design practices.
+Dated "Hello World" examples — including the OpenAPI Petstore and any similarly trivial
+canonical placeholders — MUST NOT be used.
+
+Preferred sources for OpenAPI examples include community-recognised, well-designed references
+such as:
+- Redocly's Museum API: https://github.com/Redocly/museum-openapi-example
+- The Train Travel API: https://github.com/bump-sh-examples/train-travel-api
+
+Every sample API MUST meet all of the following criteria:
+- Self-contained: no external `$ref` dependencies that require network access at runtime.
+- No running backend required: the spec file alone is sufficient for Backstage to render it.
+- Demonstrates good API design (meaningful resource names, clear descriptions, realistic
+  data shapes) — not just syntactic correctness.
+- Freely available and open-source.
+
+**Rationale**: Petstore and similar placeholders teach registration mechanics without teaching
+good API design. Learners leave with a correct Backstage setup but no intuition for what a
+well-designed API looks like. Using purposeful examples makes both lessons land simultaneously.
+
 ## Lab Structure Standards
 
 Each lab MUST include the following documentation components:
@@ -116,4 +142,4 @@ Amendment procedure:
 
 All plan `Constitution Check` gates MUST reference the principles by Roman numeral and name.
 
-**Version**: 1.0.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-07
+**Version**: 1.1.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-07

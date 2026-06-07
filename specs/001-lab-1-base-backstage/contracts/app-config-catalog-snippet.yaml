@@ -1,0 +1,28 @@
+# Reference contract: catalog locations snippet for app-config.yaml
+#
+# Add the entries below to the `catalog:` section of your Backstage app's app-config.yaml.
+# Paths are relative to the Backstage app root directory
+# (labs/lab-01-base-backstage/backstage/).
+#
+# The resulting full path from the Backstage app root resolves as:
+#   ../../apis/museum/catalog-info.yaml
+#     → labs/lab-01-base-backstage/apis/museum/catalog-info.yaml
+#   ../../apis/streetlights/catalog-info.yaml
+#     → labs/lab-01-base-backstage/apis/streetlights/catalog-info.yaml
+#
+# Add this block inside the existing `catalog:` key in app-config.yaml.
+# Do not duplicate the `catalog:` key — merge with the existing block.
+
+catalog:
+  locations:
+    # --- Lab 1: Sample OpenAPI specification (Museum API — Redocly) ---
+    - type: file
+      target: ../../apis/museum/catalog-info.yaml
+      rules:
+        - allow: [API]
+
+    # --- Lab 1: Sample AsyncAPI specification (Streetlights event API) ---
+    - type: file
+      target: ../../apis/streetlights/catalog-info.yaml
+      rules:
+        - allow: [API]

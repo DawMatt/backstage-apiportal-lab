@@ -167,8 +167,10 @@ each registered API and confirming both APIs appear in search results.
   (16 GB RAM or equivalent is a reasonable baseline).
 - The developer has an internet connection for downloading prerequisites and Backstage packages
   during the setup phase; no ongoing internet connection is assumed after installation.
-- The sample OpenAPI specification will describe a simple REST API (e.g., a petstore or
-  similar well-known example) that is self-contained and requires no running backend.
+- The sample OpenAPI specification will be based on the Redocly Museum API
+  (https://github.com/Redocly/museum-openapi-example) — a well-designed OpenAPI 3.1 example
+  for a fictional museum. It is self-contained and requires no running backend. Dated
+  examples such as Petstore MUST NOT be used (Constitution Principle VII).
 - The sample AsyncAPI specification will describe a simple event-driven API (e.g., a
   user-signup event stream) that is similarly self-contained.
 - Lab 1 does not require user accounts, authentication, or role-based access control

@@ -1,0 +1,24 @@
+# Reference contract: catalog-info.yaml for an AsyncAPI API entity
+#
+# Place this file alongside the AsyncAPI spec file it describes.
+# The spec.definition.$text path is relative to this file's directory.
+#
+# Lab 1 file location: labs/lab-01-base-backstage/apis/streetlights/catalog-info.yaml
+
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: streetlights-api
+  description: >
+    A sample event-driven API for smart streetlights that publish light measurement events.
+    Used in Lab 1 to demonstrate AsyncAPI registration in the Backstage catalog.
+  tags:
+    - event-driven
+    - asyncapi
+    - sample
+spec:
+  type: asyncapi
+  lifecycle: experimental
+  owner: user:default/guest
+  definition:
+    $text: ./asyncapi.yaml
