@@ -35,12 +35,13 @@ package manager. It is free and installs in one command on both platforms.
 
 ## Decision 3: Backstage Version Strategy
 
-**Decision**: Pin to the current stable version of `@backstage/create-app` at the time
-the lab is authored. Document the exact version in the lab's prerequisites section.
+**Decision**: `@backstage/create-app@0.8.3` — pinned on 2026-06-07 via
+`npm view @backstage/create-app version`.
 
 **Rationale**: Backstage releases frequently (bi-weekly minor bumps). Using a pinned version
-ensures every student who follows the lab gets identical output. The lab README should include
-a "Version pinning" callout explaining how to use `npx @backstage/create-app@<version>`.
+ensures every student who follows the lab gets identical output. The lab README uses
+`npx @backstage/create-app@0.8.3` so all students scaffold the same app structure regardless
+of when they run the lab.
 
 **Alternatives considered**:
 - Always use latest: Causes drift; acceptance scenarios may fail as UI changes
@@ -103,7 +104,7 @@ relative paths from the Backstage app root:
 catalog:
   locations:
     - type: file
-      target: ../../apis/petstore/catalog-info.yaml
+      target: ../../apis/museum/catalog-info.yaml
     - type: file
       target: ../../apis/streetlights/catalog-info.yaml
 ```
