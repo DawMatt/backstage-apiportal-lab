@@ -1,7 +1,10 @@
 # Reference contract: catalog-info.yaml for an AsyncAPI API entity
 #
 # Place this file alongside the AsyncAPI spec file it describes.
-# The spec.definition.$text path is relative to this file's directory.
+#
+# IMPORTANT: The spec.definition.$text path is resolved relative to the URL of this file.
+# This requires the catalog location in app-config.yaml to use type:url (not type:file)
+# so that Backstage has a valid HTTPS base URL for $text resolution.
 #
 # Lab 1 file location: labs/lab-01-base-backstage/apis/streetlights/catalog-info.yaml
 

@@ -131,10 +131,10 @@ is gitignored in this repository — it is yours to experiment with.
 
 ```
 cd backstage
-yarn dev
+yarn start
 ```
 
-> **Windows variant**: `cd backstage; yarn dev` (semicolon instead of `&&` in PowerShell)
+> **Windows variant**: `cd backstage; yarn start` (semicolon instead of `&&` in PowerShell)
 
 **What this starts:**
 
@@ -160,8 +160,16 @@ Open your browser and navigate to:
 http://localhost:3000
 ```
 
-You should see the Backstage home screen — a page with a navigation sidebar on the left
-containing "Home", "Catalog", "APIs", and other items.
+You may first see a login screen with a **Guest** option:
+
+```
+Guest
+Enter as a Guest User.
+```
+
+Click **Enter** to proceed as a guest. 
+
+You will reach the Backstage home screen — a page with a navigation sidebar on the left containing "Home", "Catalog", "APIs", and other items.
 
 **If you see this screen, Backstage is running correctly. Proceed to Step 4.**
 
@@ -226,35 +234,60 @@ Key fields:
 
 ### Step 5: Register the Museum API
 
-To register the Museum API, you need to tell Backstage where its `catalog-info.yaml` lives.
-You do this by adding a `catalog.locations` entry to Backstage's configuration file.
+To register the Museum API, you need to make two edits to Backstage's configuration file.
 
 Open `labs/lab-01-base-backstage/backstage/app-config.yaml` in a text editor.
 
-Find the `catalog:` section (it already exists — look for it near the bottom of the file).
-Add the following entries **inside** the existing `catalog:` block:
+#### 5a — Allow Backstage to read from GitHub
+
+Backstage blocks external URL access by default. You need to tell it to allow raw file reads
+from GitHub. Find the existing `backend:` block, add a `reading` section to it if it doesn't already exist, then allow the host for our catalog files:
 
 ```yaml
-catalog:
-  locations:
+backend:
+  reading:
+    allow:
+      - host: raw.githubusercontent.com
+```
+
+> **Using a different host?** If your catalog files are hosted somewhere other than GitHub
+> (e.g., GitLab, Bitbucket, or your own server), add that host instead.
+
+#### 5b — Add the Museum API catalog location
+
+Find the existing `catalog:` block (near the bottom of the file). It already contains a
+`locations:` list with some default entries. Add the following new entry **at the bottom of
+that existing `locations:` list** (keeping the same indentation as the other entries):
+
+```yaml
     # --- Lab 1: Museum REST API (OpenAPI 3.1) ---
-    - type: file
-      target: ../../apis/museum/catalog-info.yaml
+    - type: url
+      target: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-01-base-backstage/apis/museum/catalog-info.yaml
       rules:
         - allow: [API]
 ```
 
-**Why the `../../` path?** The `app-config.yaml` is inside `backstage/`. The `apis/` folder
-is two levels up at `labs/lab-01-base-backstage/apis/`. Backstage resolves `file:` target
-paths relative to the location of `app-config.yaml`.
+> **Important — the URL must point to a branch where the files are committed.** The
+> example above uses the `main` branch of this repository (the published, stable version).
+> If you cloned this repo's `main` branch, this URL works as-is. If you are working from
+> a fork or a feature branch, replace `DawMatt/backstage-apiportal-lab/main` with
+> `YourName/YourRepo/your-branch-name`. You can verify the URL is correct by opening it
+> in a browser — it should show the raw YAML content of `catalog-info.yaml`.
 
-> **Windows note**: Use forward slashes in YAML paths even on Windows —
-> `../../apis/museum/catalog-info.yaml` not `..\..\apis\museum\catalog-info.yaml`.
+**Why `type: url`?** Backstage resolves `$text` references (used inside `catalog-info.yaml`
+to point to the spec file) relative to the entity's source URL. Using a `url:` type with a
+GitHub raw URL gives Backstage a valid HTTPS base, allowing the `$text: ./openapi.yaml`
+reference in the descriptor to load the OpenAPI spec correctly.
 
-Restart Backstage after saving (press `Ctrl+C` in the terminal, then run `yarn dev` again):
+> **Before restarting — verify the URL works.** Open the `target` URL in a browser. It must
+> return the raw YAML content of `catalog-info.yaml` (not a 404). If you see a 404, the
+> files are not yet on that branch. See the [Troubleshooting](#troubleshooting) section for
+> the **"no matching files found"** error if this happens after restart.
+
+Restart Backstage after saving (press `Ctrl+C` in the terminal, then run `yarn start` again):
 
 ```
-yarn dev
+yarn start
 ```
 
 ---
@@ -285,29 +318,25 @@ that Backstage's catalog supports multiple API paradigms, not just REST.
 asynchronous event-driven APIs. A good developer portal needs to show developers all of
 their APIs in one place, regardless of the communication style.
 
-Add a second entry to the `catalog.locations` section in `app-config.yaml`:
+Add a second entry to the `catalog.locations` list in `app-config.yaml`, immediately after
+the Museum API entry you added in Step 5:
 
 ```yaml
-catalog:
-  locations:
-    # --- Lab 1: Museum REST API (OpenAPI 3.1) ---
-    - type: file
-      target: ../../apis/museum/catalog-info.yaml
-      rules:
-        - allow: [API]
-
     # --- Lab 1: Streetlights Event API (AsyncAPI 2.6) ---
-    - type: file
-      target: ../../apis/streetlights/catalog-info.yaml
+    - type: url
+      target: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-01-base-backstage/apis/streetlights/catalog-info.yaml
       rules:
         - allow: [API]
 ```
+
+> **Using a fork or feature branch?** Update the URL the same way you did for the Museum
+> API — replace `DawMatt/backstage-apiportal-lab/main` with your own repo and branch.
 
 Note that `spec.type: asyncapi` in the Streetlights descriptor tells Backstage to render
 the spec as an AsyncAPI document (showing channels, messages, and schemas) rather than as
 a REST API.
 
-Restart Backstage again (`Ctrl+C`, then `yarn dev`).
+Restart Backstage again (`Ctrl+C`, then `yarn start`).
 
 ---
 
@@ -426,23 +455,68 @@ Common mistake: using tabs instead of spaces. YAML requires spaces only.
 
 ### APIs not appearing after restarting Backstage
 
-If you restart `yarn dev` but the APIs do not appear in the catalog:
+If you restart `yarn start` but the APIs do not appear in the catalog:
 
-1. **Check the path**: Verify that the `target` value in `app-config.yaml` exactly matches
-   the path to your `catalog-info.yaml` file. The path is relative to `app-config.yaml`'s
-   own location inside `backstage/`.
-
-   Expected paths:
+1. **Check the URL**: Verify that the `target` URL in `app-config.yaml` is a valid raw
+   content URL that resolves to your `catalog-info.yaml` file. For GitHub, raw URLs look
+   like:
    ```
-   ../../apis/museum/catalog-info.yaml
-   ../../apis/streetlights/catalog-info.yaml
+   https://raw.githubusercontent.com/[owner]/[repo]/[branch]/path/to/catalog-info.yaml
    ```
+   Open the URL in a browser — it should return the raw YAML text of the file. If you see
+   a 404 or a GitHub "file not found" page, the branch name is wrong or the files have not
+   been committed to that branch yet.
 
 2. **Check the YAML structure**: Ensure the new entries are inside the existing `catalog:`
    block and `locations:` list — not duplicating the `catalog:` key.
 
 3. **Check the terminal**: Look for error messages starting with `[1]` (backend) in the
-   `yarn dev` output. Error messages will name the file that failed to parse.
+   `yarn start` output. Error messages will name the file or URL that failed to load.
+
+### "Reading from '...' is not allowed" error
+
+If you see this error in the `yarn start` terminal output, Backstage is blocking the URL
+because it is not on the allowed-hosts list. Add the host to the `backend.reading.allow`
+section in `app-config.yaml`:
+
+```yaml
+backend:
+  reading:
+    allow:
+      - host: raw.githubusercontent.com
+```
+
+Restart `yarn start` after saving.
+
+### "no matching files found" error
+
+If you see a warning like:
+
+```
+catalog warn Unable to read url, no matching files found for https://raw.githubusercontent.com/...
+```
+
+in the `yarn start` terminal output, it means the GitHub raw URL returned a 404 — either because
+the branch name in the URL is wrong, or because the files have not yet been committed and pushed
+to that branch on GitHub.
+
+**To fix**: Open the `target` URL from your `app-config.yaml` directly in a browser. If you see a
+GitHub 404 page (not raw YAML), update the URL to point to the correct branch:
+
+- If you are following this lab from the published `main` branch, the default URLs work as-is.
+- If you cloned a feature branch or a fork, replace `DawMatt/backstage-apiportal-lab/main` in
+  the URL with `YourName/YourRepo/your-branch-name`.
+
+The URL must return the raw YAML content of `catalog-info.yaml` before Backstage can load it.
+
+### Why `type: url` instead of `type: file`?
+
+Backstage's `catalog-info.yaml` uses `$text: ./openapi.yaml` to load the API spec from a
+file next to the descriptor. This `$text` reference is resolved relative to the entity's
+source location. When Backstage loads an entity from a `type: file` location, it stores
+the source as a plain filesystem path, which cannot be used as a URL base. Using
+`type: url` with a GitHub raw URL gives Backstage a proper HTTPS URL, allowing `$text`
+to resolve correctly.
 
 ### `npx @backstage/create-app` fails on Windows
 
@@ -450,7 +524,7 @@ If you restart `yarn dev` but the APIs do not appear in the catalog:
 - Ensure Node.js and npm are on your PATH: `npm --version`
 - If you see a permission error, try running the terminal as Administrator
 
-### `yarn dev` exits immediately
+### `yarn start` exits immediately
 
 This usually means a dependency is missing. Run `yarn install` inside the `backstage/`
-directory, then try `yarn dev` again.
+directory, then try `yarn start` again.

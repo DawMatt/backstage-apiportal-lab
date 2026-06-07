@@ -36,37 +36,57 @@ npx @backstage/create-app@<version>
 
 ```bash
 cd backstage
-yarn dev
+yarn start
 ```
 
-- [ ] `yarn dev` starts without errors
-- [ ] Browser at `http://localhost:3000` shows the Backstage home screen
+- [ ] `yarn start` starts without errors
+- [ ] Browser at `http://localhost:3000` shows the Guest login screen
+- [ ] Click **Enter** on the Guest login screen to reach the Backstage home screen
+- [ ] Backstage home screen is visible (navigation sidebar with Home, Catalog, APIs, etc.)
 - [ ] No console errors in the terminal
 
-**Verification checkpoint (US1 complete)**: Backstage home screen visible.
+**Verification checkpoint (US1 complete)**: Backstage home screen visible after clicking Enter on the Guest login screen.
 
 ---
 
 ## Step 3 — Configure Catalog Locations (US2 + US3 setup)
 
-Edit `labs/lab-01-base-backstage/backstage/app-config.yaml` and merge in:
+Edit `labs/lab-01-base-backstage/backstage/app-config.yaml` with two changes:
+
+**Change 1** — Add `reading.allow` inside the existing `backend:` block:
 
 ```yaml
-catalog:
-  locations:
-    - type: file
-      target: ../../apis/museum/catalog-info.yaml
+backend:
+  reading:
+    allow:
+      - host: raw.githubusercontent.com
+```
+
+**Change 2** — Add these two entries **inside the existing `catalog: > locations:` list**:
+
+```yaml
+    # --- Lab 1: Museum REST API (OpenAPI 3.1) ---
+    - type: url
+      target: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-01-base-backstage/apis/museum/catalog-info.yaml
       rules:
         - allow: [API]
-    - type: file
-      target: ../../apis/streetlights/catalog-info.yaml
+
+    # --- Lab 1: Streetlights Event API (AsyncAPI 2.6) ---
+    - type: url
+      target: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-01-base-backstage/apis/streetlights/catalog-info.yaml
       rules:
         - allow: [API]
 ```
 
-Restart `yarn dev` (Ctrl+C then `yarn dev` again).
+> **Important — verify the URL resolves before restarting.** Open each URL in a browser;
+> it must return the raw YAML content of the file. The example above uses the `main` branch.
+> If validating from a feature branch before merging, replace `main` with the branch name
+> (e.g., `001-lab-1-base-backstage`). A 404 means the files are not yet on that branch.
 
-- [ ] `app-config.yaml` saved with catalog locations added
+Restart `yarn start` (Ctrl+C then `yarn start` again).
+
+- [ ] `app-config.yaml` saved with `reading.allow` and catalog locations added
+- [ ] Each target URL opens in a browser and returns raw YAML content (not a 404)
 - [ ] Backstage restarts without errors
 
 ---

@@ -1,28 +1,40 @@
-# Reference contract: catalog locations snippet for app-config.yaml
+# Reference contract: app-config.yaml changes for Lab 1 catalog registration
 #
-# Add the entries below to the `catalog:` section of your Backstage app's app-config.yaml.
-# Paths are relative to the Backstage app root directory
-# (labs/lab-01-base-backstage/backstage/).
+# Two changes are needed in app-config.yaml:
 #
-# The resulting full path from the Backstage app root resolves as:
-#   ../../apis/museum/catalog-info.yaml
-#     → labs/lab-01-base-backstage/apis/museum/catalog-info.yaml
-#   ../../apis/streetlights/catalog-info.yaml
-#     → labs/lab-01-base-backstage/apis/streetlights/catalog-info.yaml
+# CHANGE 1: Add reading.allow to the backend: section.
+# Backstage blocks all external URL access by default. This allows FetchUrlReader
+# to read raw file content from GitHub (required for the type:url catalog entries below).
+# Add inside the existing backend: block:
 #
-# Add this block inside the existing `catalog:` key in app-config.yaml.
-# Do not duplicate the `catalog:` key — merge with the existing block.
+#   backend:
+#     reading:
+#       allow:
+#         - host: raw.githubusercontent.com
+#
+# If hosting catalog files on a different platform, add that host instead.
+#
+# CHANGE 2: Add the entries below INSIDE the existing catalog: > locations: list.
+# Do NOT duplicate the catalog: or locations: keys — append to the existing list.
+#
+# WHY type:url instead of type:file?
+# Backstage resolves $text references in catalog-info.yaml relative to the entity's source
+# URL. type:file locations store targets as plain filesystem paths, which cannot serve as a
+# URL base for $text resolution. type:url with a GitHub raw content URL gives Backstage a
+# valid HTTPS base, allowing $text: ./openapi.yaml to resolve correctly.
+#
+# Replace DawMatt/backstage-apiportal-lab/main with your own GitHub username, repository
+# name, and branch if using a fork or a different branch.
 
-catalog:
   locations:
     # --- Lab 1: Sample OpenAPI specification (Museum API — Redocly) ---
-    - type: file
-      target: ../../apis/museum/catalog-info.yaml
+    - type: url
+      target: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-01-base-backstage/apis/museum/catalog-info.yaml
       rules:
         - allow: [API]
 
     # --- Lab 1: Sample AsyncAPI specification (Streetlights event API) ---
-    - type: file
-      target: ../../apis/streetlights/catalog-info.yaml
+    - type: url
+      target: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-01-base-backstage/apis/streetlights/catalog-info.yaml
       rules:
         - allow: [API]
