@@ -14,6 +14,8 @@ Lab 1
 Lab 2
 
 - Add users, roles and teams.
+- APIs will be owned by individual teams.
+- Some APIs will be shared so all teams can see them. Others will only be visible to the owning team only.
 - Demonstrate that visibility of APIs will vary based upon the user signed in at the time.
 
 Lab 3
