@@ -56,6 +56,7 @@ initial package download; Backstage version pinned at lab authoring time for rep
 | V. Zero-Cost Operation | Node.js, Yarn, Backstage — all free and open-source; FR-009 enforces no paid dependencies | ✅ Pass |
 | VI. Progressive Lab Structure | Lab 1 is the foundation; no prior labs required; all subsequent labs build on this Backstage instance | ✅ Pass |
 | VII. Modern & Purposeful API Examples | Sample APIs are the Museum API (OpenAPI) and Streetlights (AsyncAPI) — both purposeful, well-designed, self-contained, and free; Petstore explicitly excluded | ✅ Pass |
+| VIII. Support Experimentation | README verification checkpoints test outcomes ("If you see this screen…") not prescribed steps; fork/branch substitution is explicitly documented in Steps 5–6; alternative host guidance included | ✅ Pass |
 
 No violations. Complexity Tracking section omitted.
 

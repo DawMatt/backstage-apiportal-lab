@@ -83,6 +83,13 @@ git clone <repository-url>
 cd backstage-apiportal-lab
 ```
 
+> **Using a fork or a feature branch?** Later in this lab (Step 5), Backstage will load the
+> sample API catalog files via GitHub raw URLs. Those URLs must point to a branch where the
+> files are already committed and pushed. If you are working from a fork or a non-`main`
+> branch, push your changes to GitHub before reaching Step 5, or the catalog entries will
+> return a 404 and the APIs will not appear. See the
+> [Troubleshooting](#troubleshooting) section for details.
+
 ---
 
 ## Step-by-step Instructions

@@ -165,8 +165,9 @@ each registered API and confirming both APIs appear in search results.
 
 - The developer has a modern computer capable of running Node.js applications locally
   (16 GB RAM or equivalent is a reasonable baseline).
-- The developer has an internet connection for downloading prerequisites and Backstage packages
-  during the setup phase; no ongoing internet connection is assumed after installation.
+- The developer has a stable internet connection throughout the lab. Internet is required for
+  downloading prerequisites and Backstage packages during setup, and for Backstage to load
+  catalog entries from GitHub raw URLs each time the dev server starts.
 - The sample OpenAPI specification will be based on the Redocly Museum API
   (https://github.com/Redocly/museum-openapi-example) — a well-designed OpenAPI 3.1 example
   for a fictional museum. It is self-contained and requires no running backend. Dated
