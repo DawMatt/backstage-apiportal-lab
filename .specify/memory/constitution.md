@@ -1,9 +1,9 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.0.0 → 1.1.0
+Version change: 1.1.0 → 1.2.0
 Added sections:
-  - Principle VII. Modern & Purposeful API Examples
+  - Principle VIII. Support Experimentation
 Modified principles: None renamed
 Removed sections: None
 Templates reviewed:
@@ -11,12 +11,7 @@ Templates reviewed:
   ✅ .specify/templates/spec-template.md — No principle-specific references; no updates required
   ✅ .specify/templates/tasks-template.md — No principle-specific references; no updates required
 Instance files requiring updates (in-progress feature work):
-  ⚠ specs/001-lab-1-base-backstage/plan.md — Constitution Check table missing Principle VII; Petstore reference in Structure section
-  ⚠ specs/001-lab-1-base-backstage/research.md — Decision 4 selects Petstore (now prohibited); must be updated to Museum API
-  ⚠ specs/001-lab-1-base-backstage/spec.md — Assumptions section references "petstore or similar"
-  ⚠ specs/001-lab-1-base-backstage/contracts/catalog-info-openapi.yaml — named petstore-api
-  ⚠ specs/001-lab-1-base-backstage/data-model.md — references petstore in file paths and entity table
-  ⚠ specs/001-lab-1-base-backstage/quickstart.md — references "petstore" in search verification step
+  ⚠ specs/001-lab-1-base-backstage/plan.md — Constitution Check table missing Principle VIII
 Follow-up TODOs: None
 -->
 
@@ -102,6 +97,19 @@ Every sample API MUST meet all of the following criteria:
 good API design. Learners leave with a correct Backstage setup but no intuition for what a
 well-designed API looks like. Using purposeful examples makes both lessons land simultaneously.
 
+### VIII. Support Experimentation
+
+Labs MUST be designed to support forking, adaptation, and deviation.
+Documentation MUST NOT assume users will follow every step exactly as written.
+Where users may reasonably substitute tools, configurations, or approaches, the lab SHOULD
+acknowledge this and explain the trade-offs rather than presenting one path as the only path.
+Verification steps MUST test outcomes, not prescribed implementation details.
+
+**Rationale**: Users fork this repository to adapt it to their own needs, teams, and
+constraints. A lab that only works when followed to the letter fails the majority of its
+audience. Outcome-based verification and acknowledged variation points make labs resilient
+to the experimentation that real learning requires.
+
 ## Lab Structure Standards
 
 Each lab MUST include the following documentation components:
@@ -142,4 +150,4 @@ Amendment procedure:
 
 All plan `Constitution Check` gates MUST reference the principles by Roman numeral and name.
 
-**Version**: 1.1.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-07
+**Version**: 1.2.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-07
