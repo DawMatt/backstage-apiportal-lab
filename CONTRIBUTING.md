@@ -18,6 +18,7 @@ why, and how to follow the workflow.
 - [Changing an Existing Lab](#changing-an-existing-lab)
 - [The Project Constitution](#the-project-constitution)
 - [Pull Request Checklist](#pull-request-checklist)
+- [Branch and Merge Conventions](#branch-and-merge-conventions)
 
 ---
 
@@ -202,6 +203,43 @@ review from someone on the other platform.
 
 ---
 
+### Step 8: Open a PR and merge
+
+Once validation is complete and all tasks in `tasks.md` are checked, open a pull request
+against `main`.
+
+**PR title** — Use the format `Lab N: <Short description>` or
+`[chore] <Short description>` for non-lab changes. Keep it under 72 characters.
+
+**PR description** — The description must include:
+
+- A one-paragraph summary of what the lab teaches (copy from `spec.md` if already written)
+- Validation result: platform(s) tested, time to complete, any issues found and fixed
+- A link or reference to the spec directory: `specs/<feature-dir>/`
+- Any known limitations or items deferred to a later lab
+
+**Review** — At least one maintainer review is required before merge. Reviews focus on
+constitution compliance, lab clarity, and technical correctness. Address all comments
+before requesting a re-review.
+
+**Merge strategy** — PRs are merged with a **squash merge** into `main`. All commits on
+the feature branch are collapsed into a single commit whose message should summarise the
+lab at a high level (title + brief body). Do not force-push to `main`.
+
+**After merge** — Once merged:
+
+1. Delete the feature branch. GitHub will offer to do this automatically; accept it.
+   Do not keep stale feature branches open after merge.
+2. Verify that the merge commit appears correctly in `git log --oneline main`.
+3. If the lab introduced new `specs/` artifacts, confirm they are present on `main`
+   (the squash commit must include the entire `specs/<feature-dir>/` tree).
+
+**Draft PRs** — You may open a draft PR earlier in the workflow (e.g., after Step 5) to
+get early feedback or to run any future CI checks. Mark it ready for review only after
+Step 7 is complete and the PR checklist below is satisfied.
+
+---
+
 ## Adding a New Lab
 
 1. Check `GOAL.md` for the intended scope of the next lab.
@@ -213,8 +251,8 @@ review from someone on the other platform.
    `## Verification`, `## Troubleshooting`.
 6. Confirm the lab starts from the state left by the previous lab and documents any
    dependencies on prior lab outputs.
-7. Open a PR. The PR description should include the spec summary and the verification
-   result (platform, time taken, any issues found).
+7. Validate manually (Step 7 above) on at least one platform.
+8. Open a PR and merge following Step 8 above.
 
 ---
 
@@ -262,3 +300,21 @@ Before submitting a PR for a new or changed lab, confirm:
 - [ ] No Petstore or similarly dated API examples are used (Constitution Principle VII)
 - [ ] Pre-committed API spec files are self-contained (no external `$ref`s)
 - [ ] The lab builds correctly on top of the previous lab's end state
+
+---
+
+## Branch and Merge Conventions
+
+| Item | Convention |
+|------|-----------|
+| Feature branch name | `NNN-lab-N-<short-name>` — matches the `specs/` directory |
+| Target branch | Always `main` |
+| Merge strategy | Squash merge; all feature commits collapsed into one |
+| Branch lifecycle | Delete feature branch immediately after merge |
+| Direct pushes to `main` | Not permitted; all changes go through a PR |
+| Force push | Never force-push to `main` |
+| Draft PRs | Allowed; mark ready for review only after Step 7 is complete |
+
+The numbered prefix on feature branches (`001-`, `002-`, …) corresponds to the lab
+number and keeps branches, spec directories, and lab directories aligned without
+requiring any additional tooling.
