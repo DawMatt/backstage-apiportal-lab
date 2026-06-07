@@ -171,8 +171,9 @@ each registered API and confirming both APIs appear in search results.
   (https://github.com/Redocly/museum-openapi-example) — a well-designed OpenAPI 3.1 example
   for a fictional museum. It is self-contained and requires no running backend. Dated
   examples such as Petstore MUST NOT be used (Constitution Principle VII).
-- The sample AsyncAPI specification will describe a simple event-driven API (e.g., a
-  user-signup event stream) that is similarly self-contained.
+- The sample AsyncAPI specification is the Streetlights AsyncAPI 2.6 example (the canonical
+  AsyncAPI reference from the AsyncAPI project). It describes smart streetlights publishing
+  light measurement events and is self-contained with no external `$ref` dependencies.
 - Lab 1 does not require user accounts, authentication, or role-based access control
   (those are introduced in Lab 2).
 - The Backstage version used will be current stable at the time of lab authoring; the lab
