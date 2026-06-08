@@ -35,7 +35,7 @@ later
 sample API specification files
 
 **Performance Goals**: Full lab completable within 60 minutes on a clean machine; Backstage
-dev server starts within 3 minutes after `yarn dev`
+dev server starts within 3 minutes after `yarn start`
 
 **Constraints**: Zero cost; cross-platform (Windows + macOS); internet required only for
 initial package download; Backstage version pinned at lab authoring time for reproducibility

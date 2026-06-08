@@ -189,4 +189,8 @@ Amendment procedure:
 
 All plan `Constitution Check` gates MUST reference the principles by Roman numeral and name.
 
+## Common Issues
+
+- Older documentation indicates Backstage is started using `yarn dev`. Instead use `yarn start`. 
+
 **Version**: 1.3.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-08

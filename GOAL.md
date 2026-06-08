@@ -41,3 +41,6 @@ Lab 5
 - The cost to run these labs must be $0. Do not require any pre-requisites that have a cost associated with them. 
 - Each lab will be its own speckit feature.
 - Each lab will build upon the environment created by the previous labs.
+- Ultimately these labs are teaching the users good API development practices. To help reinforce this the labs will use modern, well designed API examples such as Redocly's Museum API ( https://github.com/Redocly/museum-openapi-example ) or the Train Travel API ( https://github.com/bump-sh-examples/train-travel-api ).
+- Expect that users will fork this repository to adapt it to their own needs, teams, and constraints. A lab that only works when followed to the letter fails the majority of its audience. Explain what you are doing and why, to help make it easier for users to adapt steps to their needs.
+- Labs may use simplified security practices — including storing example credentials in configuration files committed to the repository — when doing so meaningfully simplifies completing the lab. Ensure learners leave understanding both the shortcut they took and the correct security path to take instead when implementing production.
