@@ -32,7 +32,7 @@ Backstage instance are documented as README instructions — they are not commit
 
 **Purpose**: Create the directory layout and skeleton files for the lab.
 
-- [ ] T001 Create lab directory structure: `labs/lab-02-users-roles/catalog/apis/` (mkdir -p equivalent; create .gitkeep if needed to track empty dirs)
+- [X] T001 Create lab directory structure: `labs/lab-02-users-roles/catalog/apis/` (mkdir -p equivalent; create .gitkeep if needed to track empty dirs)
 
 ---
 
@@ -45,7 +45,7 @@ in one or more sections.
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete — all phases write
 into sections of this README.
 
-- [ ] T002 Create `labs/lab-02-users-roles/README.md` skeleton containing the following
+- [X] T002 Create `labs/lab-02-users-roles/README.md` skeleton containing the following
   empty sections in order: Overview, Prerequisites, Security Note (placeholder — filled in
   US3), Step 1: Define Users and Teams (with a "Verification" sub-section placeholder),
   Step 2: Associate APIs with Owning Teams (with a "Verification" sub-section placeholder),
@@ -71,21 +71,21 @@ Kind: User → verify all four users appear. (Quickstart.md Step 1.)
 
 ### Implementation for User Story 1
 
-- [ ] T003 [P] [US1] Create `labs/lab-02-users-roles/catalog/teams.yaml` with two Group
+- [X] T003 [P] [US1] Create `labs/lab-02-users-roles/catalog/teams.yaml` with two Group
   entities: `museum-team` (members: alice, bob) and `streetlights-team` (members: charlie,
   diana) per data-model.md. Both groups must include `spec.children: []` and
   `spec.profile.displayName`. Use `apiVersion: backstage.io/v1alpha1`.
-- [ ] T004 [P] [US1] Create `labs/lab-02-users-roles/catalog/users.yaml` with four User
+- [X] T004 [P] [US1] Create `labs/lab-02-users-roles/catalog/users.yaml` with four User
   entities: alice (memberOf: museum-team), bob (memberOf: museum-team), charlie
   (memberOf: streetlights-team), diana (memberOf: streetlights-team) per data-model.md.
   Include `spec.profile.displayName` and `spec.profile.email` (fictional values) for each.
-- [ ] T005 [US1] Write README "Step 1: Define Users and Teams" section (depends on T003,
+- [X] T005 [US1] Write README "Step 1: Define Users and Teams" section (depends on T003,
   T004): Explain what User and Group entities are and why both `members` on the Group and
   `memberOf` on the User are required (R-001). Provide the `app-config.yaml` catalog
   location snippets for `teams.yaml` and `users.yaml` with correct `rules` (R-005). Include
   platform notes for any path differences. Explain why the `examples/org.yaml` guest user
   will still appear and that it does not affect the demo.
-- [ ] T006 [US1] Write README "Verification — Step 1" sub-section: numbered steps matching
+- [X] T006 [US1] Write README "Verification — Step 1" sub-section: numbered steps matching
   quickstart.md Step 1 (catalog → Group filter, check museum-team members, catalog → User
   filter, check alice group membership). Include ✅ Pass and ❌ Fail + fix instructions.
 
@@ -104,21 +104,21 @@ correct team. Navigate to each team's page → verify owned APIs are listed.
 
 ### Implementation for User Story 2
 
-- [ ] T007 [P] [US2] Create `labs/lab-02-users-roles/catalog/apis/museum-api.yaml` as the
+- [X] T007 [P] [US2] Create `labs/lab-02-users-roles/catalog/apis/museum-api.yaml` as the
   updated Museum API descriptor (copy of Lab 1 version) with `spec.owner:
   group:default/museum-team` added per data-model.md and R-002. Use fully-qualified group
   ref. Keep `spec.definition` as a GitHub raw URL (type:url pattern per R-005 note on
   $text limitation).
-- [ ] T008 [P] [US2] Create `labs/lab-02-users-roles/catalog/apis/streetlights-api.yaml`
+- [X] T008 [P] [US2] Create `labs/lab-02-users-roles/catalog/apis/streetlights-api.yaml`
   as the updated Streetlights API descriptor with `spec.owner:
   group:default/streetlights-team` added per data-model.md and R-002. Use fully-qualified
   group ref.
-- [ ] T009 [US2] Write README "Step 2: Associate APIs with Owning Teams" section (depends
+- [X] T009 [US2] Write README "Step 2: Associate APIs with Owning Teams" section (depends
   on T007, T008): Explain why `spec.owner` uses a fully-qualified group ref (R-002).
   Provide `app-config.yaml` catalog location snippets for both updated API descriptors
   (R-005). Include a note explaining that the Lab 1 API entries must be removed from
   `app-config.yaml` to avoid duplicate entities, and how to identify duplicates.
-- [ ] T010 [US2] Write README "Verification — Step 2" sub-section: numbered steps matching
+- [X] T010 [US2] Write README "Verification — Step 2" sub-section: numbered steps matching
   quickstart.md Step 2 (API catalog → Owner field, team page → Owned APIs). Include ✅
   Pass and ❌ Fail + fix instructions. The Fail path MUST explicitly address duplicate
   entities: if both Lab 1 and Lab 2 API entries are registered simultaneously, Backstage
@@ -141,19 +141,19 @@ user:default/alice`, restart Backstage, sign in, verify profile shows "Alice Che
 
 ### Implementation for User Story 3
 
-- [ ] T011 [US3] Write README "Security Note" section (Constitution Principle IX — must
+- [X] T011 [US3] Write README "Security Note" section (Constitution Principle IX — must
   appear before Step 3): Mark with a `> ⚠️ Lab only` callout. Explain that
   `userEntityRef` in `app-config.local.yaml` is a local development convenience that
   bypasses real authentication. State that `app-config.local.yaml` is gitignored. Provide
   the production alternative: configure an enterprise identity provider (OIDC, SAML, or
   LDAP). Note that any credentials or values in this file are fictional example values only.
-- [ ] T012 [US3] Write README "Step 3: Configure Sign-In" section (depends on T011):
+- [X] T012 [US3] Write README "Step 3: Configure Sign-In" section (depends on T011):
   Provide the `app-config.local.yaml` snippet with `auth.providers.guest.userEntityRef:
   user:default/alice` (R-003). Explain that this file is gitignored by default. Explain
   the race-condition caveat from R-003 (wait for catalog to fully load before clicking
   Sign In). Include platform notes for locating the Backstage root directory on Windows
   and macOS. Explain how to switch between users (edit the value, restart `yarn start`).
-- [ ] T013 [US3] Write README "Verification — Step 3" sub-section: numbered steps matching
+- [X] T013 [US3] Write README "Verification — Step 3" sub-section: numbered steps matching
   quickstart.md Step 3 (configure alice, restart, sign in, verify profile shows
   "Alice Chen"). Include ✅ Pass and ❌ Fail + fix instructions (catalog must have loaded
   alice entity before sign-in; check app-config.local.yaml is in Backstage root).
@@ -174,7 +174,7 @@ between Team A and Team B users.
 
 ### Implementation for User Story 4
 
-- [ ] T014 [P] [US4] Write README "Step 4: Enable Ownership-Based Visibility" section:
+- [X] T014 [P] [US4] Write README "Step 4: Enable Ownership-Based Visibility" section:
   Provide the full TypeScript source for `packages/backend/src/extensions/permissionPolicy.ts`
   as a code block (from R-004, confirmed for Backstage 1.51.0). Include a table of import
   sources (package names and stability) from R-004. Explain the behavioural note: ALL
@@ -182,11 +182,11 @@ between Team A and Team B users.
   simplification. Provide the diff/snippet for `packages/backend/src/index.ts` showing
   removal of the allow-all import and addition of the custom policy import. Explain why
   non-catalog permissions continue to return ALLOW.
-- [ ] T015 [US4] Write README "Verification — Steps 4 and 5" sub-section (depends on
+- [X] T015 [US4] Write README "Verification — Steps 4 and 5" sub-section (depends on
   T014): numbered steps matching quickstart.md Steps 4–5 (sign in as Alice → only Museum
   API; sign in as Charlie → only Streetlights API; attempt to navigate directly to the
   other team's API URL). Include ✅ Pass and ❌ Fail + fix instructions for each.
-- [ ] T016 [US4] Write README "Edge Cases" sub-section documenting (from spec.md edge
+- [X] T016 [US4] Write README "Edge Cases" sub-section documenting (from spec.md edge
   cases): multi-team membership behaviour with this policy, how to identify and fix broken
   entity references, what happens when auth is not yet configured, and what the catalog
   shows for unowned APIs under the ownership policy.
@@ -199,23 +199,23 @@ between Team A and Team B users.
 
 **Purpose**: Final review, cross-platform verification, and completion of shared README sections.
 
-- [ ] T017 [P] Write README "Troubleshooting" section covering the three required failure
+- [X] T017 [P] Write README "Troubleshooting" section covering the three required failure
   modes from FR-007: (1) auth configuration errors — `userEntityRef` user not in catalog,
   sign-in shows wrong name; (2) missing catalog entity references — broken `spec.owner`
   refs, missing `memberOf`/`members` causing one-directional relations; (3) permission
   configuration mistakes — allow-all still active, policy import path errors.
-- [ ] T018 [P] Write README "Overview" section (can be written any time after T002):
+- [X] T018 [P] Write README "Overview" section (can be written any time after T002):
   What the lab demonstrates (named Backstage features: catalog User/Group entities,
   `spec.owner`, guest auth `userEntityRef`, permissions framework), what the developer
   will have at the end, and the "builds on Lab 1" framing. Max one screen of prose.
-- [ ] T019 [P] Write README "Prerequisites" section: Lab 1 completion (link), `yarn start`
+- [X] T019 [P] Write README "Prerequisites" section: Lab 1 completion (link), `yarn start`
   working, repository pushed to a public GitHub branch (so catalog URLs are resolvable),
   and a code editor. No new tools required.
-- [ ] T020 Review full README against Constitution: confirm Principle II (why each step
+- [X] T020 Review full README against Constitution: confirm Principle II (why each step
   exists is explained), Principle III (platform variants for Windows/macOS), Principle VIII
   (outcome-based verification, alternative paths acknowledged in auth section), Principle IX
   (Security Note present, fictional values labelled, production alternative provided).
-- [ ] T021 Populate README "Summary Checklist" section from quickstart.md's seven-item
+- [X] T021 Populate README "Summary Checklist" section from quickstart.md's seven-item
   summary checklist, confirming each item is covered by the lab steps. This is the final
   at-a-glance verification the student can use after completing all four steps.
 

@@ -1,0 +1,25 @@
+# Lab 2 — Streetlights API catalog descriptor (updated from Lab 1)
+#
+# Changes from Lab 1:
+#   - spec.owner added: group:default/streetlights-team
+#   - spec.lifecycle changed from experimental to production
+#   - spec.definition.$text now uses a full GitHub raw URL (required when the
+#     descriptor and the spec file are not in the same directory)
+
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: streetlights-api
+  description: >
+    A sample event-driven API for smart streetlights that publish light measurement events.
+    Used in Lab 1 to demonstrate AsyncAPI registration in the Backstage catalog.
+  tags:
+    - event-driven
+    - asyncapi
+    - sample
+spec:
+  type: asyncapi
+  lifecycle: production
+  owner: group:default/streetlights-team
+  definition:
+    $text: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-01-base-backstage/apis/streetlights/asyncapi.yaml

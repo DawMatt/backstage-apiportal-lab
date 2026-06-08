@@ -1,0 +1,25 @@
+# Lab 2 — Museum API catalog descriptor (updated from Lab 1)
+#
+# Changes from Lab 1:
+#   - spec.owner added: group:default/museum-team
+#   - spec.lifecycle changed from experimental to production
+#   - spec.definition.$text now uses a full GitHub raw URL (required when the
+#     descriptor and the spec file are not in the same directory)
+
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: museum-api
+  description: >
+    A sample REST API for a fictional museum, demonstrating modern OpenAPI 3.1 design
+    practices. Covers special events, museum hours, and ticket purchasing.
+  tags:
+    - rest
+    - openapi
+    - sample
+spec:
+  type: openapi
+  lifecycle: production
+  owner: group:default/museum-team
+  definition:
+    $text: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-01-base-backstage/apis/museum/openapi.yaml
