@@ -131,16 +131,23 @@ UI) before clicking "Sign In".
 
 ---
 
-## R-004: Custom Permission Policy — Catalog Ownership Filtering
+## R-004: Custom Permission Policy — Two-Tier API Visibility
 
 **Decision**: Replace `@backstage/plugin-permission-backend-module-allow-all-policy` with a
-custom `CatalogOwnershipPolicy` module registered via `policyExtensionPoint`.
+custom `CatalogOwnershipPolicy` module that implements a two-tier visibility model:
+- Non-API catalog entities (User, Group, System, Domain, etc.) are always visible to all
+  authenticated users — no restriction.
+- API entities annotated with `example.com/visibility: shared` are visible to all
+  authenticated users.
+- All other API entities (private APIs) are visible only to members of the owning team,
+  using the `isEntityOwner` conditional condition.
 
-**Rationale**: The allow-all policy (default in Backstage scaffolded apps) makes everything
-visible to all users. The custom policy uses `isEntityOwner` from the catalog backend's alpha
-exports to produce a conditional decision: entities whose `spec.owner` matches the user's
-ownership refs are allowed; all others are denied. Non-catalog permissions continue to be
-allowed unconditionally so that scaffolding, TechDocs, and search still function.
+**Rationale**: The spec requires that users and groups remain fully visible to all
+authenticated users (for team discoverability), while APIs are split between shared (e.g.
+platform APIs) and private (team-owned APIs). Using Backstage's `PermissionCriteria` with
+`anyOf` and `not` operators on conditional decisions enables this distinction without
+loading entity data into the policy itself — the catalog backend evaluates the conditions
+server-side after the policy returns.
 
 **Implementation pattern** (confirmed for Backstage 1.51.0):
 
@@ -171,9 +178,21 @@ class CatalogOwnershipPolicy implements PermissionPolicy {
     if (isResourcePermission(request.permission, 'catalog-entity')) {
       return createCatalogConditionalDecision(
         request.permission,
-        catalogConditions.isEntityOwner({
-          claims: user?.info.ownershipEntityRefs ?? [],
-        }),
+        {
+          anyOf: [
+            // Non-API entities (User, Group, etc.) — always visible to all users
+            { not: catalogConditions.isEntityKind({ kinds: ['API'] }) },
+            // Shared APIs — visible to all users regardless of team membership
+            catalogConditions.hasAnnotation({
+              annotation: 'example.com/visibility',
+              value: 'shared',
+            }),
+            // Private APIs — visible only to members of the owning team
+            catalogConditions.isEntityOwner({
+              claims: user?.info.ownershipEntityRefs ?? [],
+            }),
+          ],
+        },
       );
     }
     return { result: AuthorizeResult.ALLOW };
@@ -205,17 +224,21 @@ export default createBackendModule({
 | `catalogConditions`, `createCatalogConditionalDecision` | `@backstage/plugin-catalog-backend/alpha` | Alpha |
 
 **Alternatives considered**:
-- Writing a separate permission backend plugin package: unnecessary complexity. A TypeScript
-  module in the existing backend package is sufficient for a tutorial.
-- Filtering only `API` kind entities: requires loading and inspecting the entity kind at policy
-  evaluation time, which adds complexity not present in the standard permission API. The broader
-  `isEntityOwner` approach is simpler and more educational — it shows the full ownership model.
+- Writing a separate permission backend plugin package: unnecessary complexity for a tutorial.
+- Using `isEntityOwner` for all catalog entities (original approach): makes User and Group
+  entities team-scoped, which prevents users from discovering other teams. Excluded because
+  the spec explicitly requires User/Group entities to remain unrestricted.
+- Using a `platform-team` group with all users as members: gives all users ownership of
+  shared APIs but conflates org-hierarchy membership with visibility semantics. The annotation
+  approach is cleaner and more instructive — it teaches that ownership ≠ visibility.
+- Using `hasTag` instead of `hasAnnotation`: tags are simpler to write in YAML, but
+  `hasAnnotation` with an explicit annotation key and value is more self-documenting and
+  mirrors real-world Backstage annotation patterns. The annotation approach is preferred.
 
-**Behaviour note for README**: With this policy, ALL catalog entities (not just APIs) become
-team-scoped. Users will also not see each other's User and Group profiles unless they are the
-owner. The lab README should acknowledge this as a simplification and note that production
-policies typically have finer-grained rules (e.g., public visibility for User/Group entities,
-restricted visibility for APIs).
+**Behaviour note for README**: With this policy, API visibility is explicitly two-tier.
+The README should explain that the `anyOf` logic means an API is visible if ANY of the
+three conditions is true — not owner AND shared. This is a key teaching point about how
+`PermissionCriteria` composition works.
 
 ---
 
@@ -244,7 +267,7 @@ catalog:
       target: https://raw.githubusercontent.com/<user>/<repo>/<branch>/labs/lab-02-users-roles/catalog/users.yaml
       rules:
         - allow: [User]
-    # --- Lab 2: Updated API descriptors with ownership ---
+    # --- Lab 2: Private API descriptors with ownership ---
     - type: url
       target: https://raw.githubusercontent.com/<user>/<repo>/<branch>/labs/lab-02-users-roles/catalog/apis/museum-api.yaml
       rules:
@@ -253,8 +276,54 @@ catalog:
       target: https://raw.githubusercontent.com/<user>/<repo>/<branch>/labs/lab-02-users-roles/catalog/apis/streetlights-api.yaml
       rules:
         - allow: [API]
+    # --- Lab 2: Shared API (visible to all users) ---
+    - type: url
+      target: https://raw.githubusercontent.com/<user>/<repo>/<branch>/labs/lab-02-users-roles/catalog/apis/train-travel-api.yaml
+      rules:
+        - allow: [API]
 ```
 
 **Note on duplicate API entries**: The Lab 1 catalog-info.yaml entries for the Museum and
 Streetlights APIs should be removed from `app-config.yaml` when the Lab 2 updated versions
 are added, to avoid duplicate API entities in the catalog.
+
+---
+
+## R-006: Shared API Annotation Convention
+
+**Decision**: Mark shared (platform) APIs with the annotation
+`example.com/visibility: shared` in their `catalog-info.yaml` `metadata.annotations` block.
+The permission policy reads this annotation via `catalogConditions.hasAnnotation` to grant
+unconditional visibility.
+
+**Rationale**: Backstage's `catalogConditions.hasAnnotation` accepts both a key and an
+optional value for exact matching. Using a custom annotation in the `example.com/` domain
+(a fictional but conventional domain name for lab purposes) teaches learners that Backstage
+annotations are just key-value metadata — any string key is valid. Keeping the annotation
+in the catalog descriptor (not in a separate config file) means visibility is co-located
+with the entity definition, making it easy to audit which APIs are shared.
+
+**Format** (applied to shared API `catalog-info.yaml`):
+```yaml
+metadata:
+  name: train-travel-api
+  annotations:
+    example.com/visibility: shared   # Makes this API visible to all authenticated users
+```
+
+**Alternatives considered**:
+- Using `backstage.io/` namespace for the annotation: reserved for official Backstage
+  annotations. Custom annotations should use a separate domain (e.g., `example.com/`).
+- Using metadata tags (`tags: [shared]`): simpler YAML, but Backstage tags are freeform
+  strings without namespacing. `hasAnnotation` with a namespaced key is more explicit and
+  mirrors real-world Backstage annotation patterns (e.g., `jira.com/project-key`).
+- Using a shared-membership group: adding all users to a `platform-team` group would give
+  everyone `isEntityOwner` access to the shared API. This conflates org membership with
+  visibility rules, and would need to be updated whenever a new user is added. The annotation
+  approach is declarative and does not require touching user/group entities.
+
+**Train Travel API source**: The shared API uses the Train Travel API from
+`https://github.com/bump-sh-examples/train-travel-api` — an approved example per
+Constitution Principle VII. The `spec.definition` in the catalog-info.yaml should point
+to the raw GitHub URL of the OpenAPI spec file in that repository. Verify the URL is
+accessible before committing.

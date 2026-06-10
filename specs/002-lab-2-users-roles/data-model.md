@@ -11,7 +11,8 @@ Namespace is `default` throughout. Names follow kebab-case convention.
 
 ### Group Entities
 
-Two groups represent the two teams in the lab. Each group owns one API from Lab 1.
+Three groups: two team groups (with members, owning private APIs) and one platform group
+(no members, owning the shared API).
 
 #### `group:default/museum-team`
 
@@ -38,6 +39,23 @@ Owns: `api:default/museum-api`
 | `spec.members` | `[charlie, diana]` |
 
 Owns: `api:default/streetlights-api`
+
+#### `group:default/platform-team`
+
+| Field | Value |
+|-------|-------|
+| `metadata.name` | `platform-team` |
+| `metadata.namespace` | `default` |
+| `spec.type` | `team` |
+| `spec.profile.displayName` | `Platform Team` |
+| `spec.children` | `[]` (no sub-teams) |
+| `spec.members` | `[]` (no members — organisational unit only) |
+
+Owns: `api:default/train-travel-api` (shared API — visible to all users via annotation)
+
+**Note**: This group has no human members. Its purpose is to provide a valid `spec.owner`
+value for the shared API. Visibility of the shared API is controlled by the
+`example.com/visibility: shared` annotation on the API entity, not by group membership.
 
 ---
 
@@ -83,31 +101,53 @@ Four users — two per team. All user details are fictional example values.
 
 ---
 
-### API Entities (updated from Lab 1)
+### API Entities
 
-The Lab 1 API descriptors are updated to add `spec.owner`. All other fields remain unchanged
-from Lab 1. These are the replacement catalog-info.yaml files — the Lab 1 versions should be
-deregistered from `app-config.yaml` when the Lab 2 versions are registered.
+Lab 2 introduces three API entities: two private (visible only to the owning team) and one
+shared (visible to all authenticated users). The Lab 1 API descriptors for museum-api and
+streetlights-api are updated to add `spec.owner`; the train-travel-api is new. Lab 1 versions
+of museum-api and streetlights-api should be deregistered from `app-config.yaml` when Lab 2
+versions are registered.
 
-#### `api:default/museum-api`
+#### `api:default/museum-api` — *Private*
 
 | Field | Value |
 |-------|-------|
 | `metadata.name` | `museum-api` (unchanged from Lab 1) |
+| `metadata.annotations` | none (no visibility annotation = private) |
 | `spec.owner` | `group:default/museum-team` **(new in Lab 2)** |
 | `spec.type` | `openapi` |
 | `spec.lifecycle` | `production` |
 | `spec.definition.$text` | GitHub raw URL to museum openapi.yaml (from Lab 1) |
 
-#### `api:default/streetlights-api`
+Visible to: `museum-team` members only (Alice, Bob).
+
+#### `api:default/streetlights-api` — *Private*
 
 | Field | Value |
 |-------|-------|
 | `metadata.name` | `streetlights-api` (unchanged from Lab 1) |
+| `metadata.annotations` | none (no visibility annotation = private) |
 | `spec.owner` | `group:default/streetlights-team` **(new in Lab 2)** |
 | `spec.type` | `asyncapi` |
 | `spec.lifecycle` | `production` |
 | `spec.definition.$text` | GitHub raw URL to streetlights asyncapi.yaml (from Lab 1) |
+
+Visible to: `streetlights-team` members only (Charlie, Diana).
+
+#### `api:default/train-travel-api` — *Shared*
+
+| Field | Value |
+|-------|-------|
+| `metadata.name` | `train-travel-api` **(new in Lab 2)** |
+| `metadata.annotations['example.com/visibility']` | `shared` **(marks this API as visible to all)** |
+| `spec.owner` | `group:default/platform-team` |
+| `spec.type` | `openapi` |
+| `spec.lifecycle` | `production` |
+| `spec.definition.$text` | GitHub raw URL to Train Travel API OpenAPI spec (from bump-sh-examples) |
+
+Visible to: all authenticated users (Alice, Bob, Charlie, Diana).
+Source: https://github.com/bump-sh-examples/train-travel-api
 
 ---
 
@@ -131,8 +171,17 @@ packages already present in Backstage 1.51.0.
 
 | Element | Description |
 |---------|-------------|
-| `CatalogOwnershipPolicy` | Implements `PermissionPolicy`; restricts catalog reads to entity owners |
+| `CatalogOwnershipPolicy` | Implements `PermissionPolicy`; applies two-tier visibility to catalog reads |
 | Module export | `createBackendModule` for `pluginId: 'permission'`, `moduleId: 'permission-policy'` |
+
+**Two-tier logic** (applied when `isResourcePermission(request.permission, 'catalog-entity')`):
+
+| Condition | Result |
+|-----------|--------|
+| Entity kind is NOT `API` | ALLOW (Users, Groups, etc. are unrestricted) |
+| API has annotation `example.com/visibility: shared` | ALLOW (shared platform APIs) |
+| API is owned by the signed-in user's team | ALLOW (private APIs for team members) |
+| None of the above | DENY |
 
 ### `packages/backend/src/index.ts` (modified)
 
@@ -149,12 +198,15 @@ packages already present in Backstage 1.51.0.
 museum-team (Group)
   ├── hasMember → alice (User)
   ├── hasMember → bob (User)
-  └── ownerOf → museum-api (API)
+  └── ownerOf → museum-api (API) [private — visible to museum-team only]
 
 streetlights-team (Group)
   ├── hasMember → charlie (User)
   ├── hasMember → diana (User)
-  └── ownerOf → streetlights-api (API)
+  └── ownerOf → streetlights-api (API) [private — visible to streetlights-team only]
+
+platform-team (Group, no members)
+  └── ownerOf → train-travel-api (API) [shared — visible to all users via annotation]
 
 alice (User)
   └── memberOf → museum-team (Group)
@@ -172,3 +224,16 @@ diana (User)
 The `ownerOf` relation is derived by Backstage from `spec.owner` on the API entity.
 The `hasMember`/`memberOf` relations are derived from the `members` list on the Group entity
 and the `memberOf` list on the User entity (both must be present for bidirectional resolution).
+Shared vs. private visibility is determined by the `example.com/visibility: shared` annotation
+on the API entity — it is independent of the `ownerOf` relation.
+
+**Effective visibility summary**:
+
+| User | Sees | Does not see |
+|------|------|--------------|
+| Alice (museum-team) | train-travel-api, museum-api | streetlights-api |
+| Bob (museum-team) | train-travel-api, museum-api | streetlights-api |
+| Charlie (streetlights-team) | train-travel-api, streetlights-api | museum-api |
+| Diana (streetlights-team) | train-travel-api, streetlights-api | museum-api |
+
+All users and groups are visible to all authenticated users regardless of team membership.

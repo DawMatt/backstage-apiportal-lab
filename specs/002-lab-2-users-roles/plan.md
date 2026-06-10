@@ -1,6 +1,6 @@
 # Implementation Plan: Lab 2 — Users, Roles, and API Visibility
 
-**Branch**: `002-lab-2-users-roles` | **Date**: 2026-06-08 | **Spec**: [spec.md](spec.md)
+**Branch**: `002-lab-2-users-roles` | **Date**: 2026-06-08 (Updated: 2026-06-10) | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/002-lab-2-users-roles/spec.md`
 
@@ -9,9 +9,12 @@
 Lab 2 builds directly on the running Backstage 1.51.0 instance from Lab 1. It introduces
 User and Group catalog entities, assigns API ownership to those groups, and configures
 identity-aware sign-in using the guest auth provider already present in the Backstage
-install. The lab then replaces the default allow-all permission policy with a custom policy
-that restricts catalog visibility to entities owned by the signed-in user's team. The result
-is a demonstrable difference in what two users from different teams can see in the API catalog.
+install. A third API — a shared platform API visible to all authenticated users — is added
+alongside the two team-owned private APIs from Lab 1. The lab then replaces the default
+allow-all permission policy with a custom two-tier policy: APIs marked as shared are visible
+to everyone, private APIs are visible only to members of the owning team, and all other
+catalog entry types (User, Group, etc.) remain unrestricted. The result is a demonstrable
+difference in what two users from different teams can see in the API catalog.
 All changes are local, zero-cost, and cross-platform.
 
 ## Technical Context
@@ -41,8 +44,9 @@ completed Lab 1. No additional Backstage startup time beyond Lab 1 baseline.
 on Backstage startup; builds on Lab 1's Backstage instance; all auth simplifications
 labelled per Constitution Principle IX.
 
-**Scale/Scope**: 2 teams (groups), 4 users (2 per team), 2 APIs (from Lab 1), 1 permission
-policy.
+**Scale/Scope**: 3 teams (2 with members + 1 platform team), 4 users (2 per team), 3 APIs
+(2 private — one per team — and 1 shared platform API), 1 permission policy (two-tier:
+shared vs. private for APIs; unrestricted for all other entity kinds).
 
 ## Constitution Check
 
@@ -50,13 +54,13 @@ policy.
 
 | Principle | Gate | Status |
 |-----------|------|--------|
-| I. Feature-Focused Learning | Lab demonstrates concrete Backstage features: catalog User/Group entities, `spec.owner` assignment, guest auth identity configuration, and the permissions framework with a custom policy | ✅ Pass |
+| I. Feature-Focused Learning | Lab demonstrates concrete Backstage features: catalog User/Group entities, `spec.owner` assignment, guest auth identity configuration, catalog annotations, and the permissions framework with a two-tier custom policy (shared vs. private APIs, unrestricted non-API entities) | ✅ Pass |
 | II. Process-Oriented Documentation | README must explain WHY each step exists — why `spec.owner` matters, why the allow-all policy must be replaced, why the guest provider needs a `userEntityRef` | ✅ Pass |
 | III. Cross-Platform Compatibility | All changes are YAML and TypeScript; no platform-specific shell commands beyond Lab 1 baseline; `yarn start` start procedure unchanged | ✅ Pass |
 | IV. Self-Contained Prerequisites | No new tools required; Lab 1 completion is the only prerequisite; all npm packages already installed | ✅ Pass |
 | V. Zero-Cost Operation | Guest provider is bundled with Backstage (free); permission backend already installed; no new packages, accounts, or services needed | ✅ Pass |
 | VI. Progressive Lab Structure | Lab 2 requires Lab 1 completion; modifies the same Backstage instance; does not assume any state not established in Lab 1 | ✅ Pass |
-| VII. Modern & Purposeful API Examples | No new API examples introduced; Lab 1's Museum API and Streetlights API are reused and updated with ownership | ✅ Pass |
+| VII. Modern & Purposeful API Examples | The Train Travel API (bump-sh-examples) is added as the shared platform API. It meets all criteria: self-contained, no running backend, good API design, freely available. Lab 1's Museum and Streetlights APIs are reused as private team-owned APIs. | ✅ Pass |
 | VIII. Support Experimentation | README notes alternative auth providers (GitHub OAuth) and alternative permission granularities; verification tests outcomes, not exact config values | ✅ Pass |
 | IX. Pragmatic Security for Learning Environments | Guest provider with `userEntityRef` is a simplified local auth mechanism. README must include a "Security Note" section explaining that production deployments should use an enterprise identity provider (OIDC, SAML, LDAP). Credentials committed to the repo are fictional example values only. | ✅ Pass |
 
@@ -86,11 +90,14 @@ labs/
     ├── README.md                        # Lab documentation (overview, prereqs, steps,
     │                                    # verification, security note, troubleshooting)
     └── catalog/
-        ├── teams.yaml                   # Group entities: museum-team, streetlights-team
+        ├── teams.yaml                   # Group entities: museum-team, streetlights-team,
+        │                                # platform-team (no members; owns shared API)
         ├── users.yaml                   # User entities: alice, bob, charlie, diana
         └── apis/
-            ├── museum-api.yaml          # Updated catalog-info.yaml with spec.owner
-            └── streetlights-api.yaml   # Updated catalog-info.yaml with spec.owner
+            ├── museum-api.yaml          # Private API: spec.owner = museum-team
+            ├── streetlights-api.yaml    # Private API: spec.owner = streetlights-team
+            └── train-travel-api.yaml    # Shared API: spec.owner = platform-team +
+                                         # annotation example.com/visibility: shared
 ```
 
 Changes to the student's Backstage instance (guided by README, not committed to repo):
@@ -99,10 +106,13 @@ Changes to the student's Backstage instance (guided by README, not committed to 
 # In the student's Backstage instance (labs/lab-01-base-backstage/backstage/):
 app-config.local.yaml                   # New: guest provider userEntityRef setting
 app-config.yaml                         # Modified: add catalog locations for Lab 2 files
+                                        # (remove Lab 1 API entries to avoid duplicates)
 packages/backend/src/
 ├── index.ts                            # Modified: remove allow-all, add custom policy
 └── extensions/
-    └── permissionPolicy.ts             # New: CatalogOwnershipPolicy implementation
+    └── permissionPolicy.ts             # New: two-tier CatalogOwnershipPolicy
+                                        # (shared APIs open to all; private APIs owner-gated;
+                                        # non-API entities unrestricted)
 ```
 
 **Structure Decision**: Tutorial-documentation layout, consistent with Lab 1. All student-

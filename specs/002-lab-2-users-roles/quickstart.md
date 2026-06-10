@@ -14,26 +14,30 @@
 1. Start Backstage: `yarn start` in `labs/lab-01-base-backstage/backstage/`
 2. Open `http://localhost:3000`
 3. Navigate to **Catalog** → filter by **Kind: Group**
-4. Verify `museum-team` and `streetlights-team` appear
+4. Verify `museum-team`, `streetlights-team`, and `platform-team` appear
 5. Click `museum-team` → verify `alice` and `bob` are listed as members
 6. Click `streetlights-team` → verify `charlie` and `diana` are listed as members
-7. Navigate to **Catalog** → filter by **Kind: User**
-8. Verify all four users appear
-9. Click `alice` → verify group membership shows `museum-team`
+7. Click `platform-team` → verify no members are listed (this is expected — platform-team
+   is an organisational unit with no individual members)
+8. Navigate to **Catalog** → filter by **Kind: User**
+9. Verify all four users appear
+10. Click `alice` → verify group membership shows `museum-team`
 
-✅ **Pass**: All four users and two groups visible with correct memberships
+✅ **Pass**: All four users and three groups visible with correct memberships
 ❌ **Fail**: Check that catalog locations for `teams.yaml` and `users.yaml` are in `app-config.yaml`
   and that the YAML files are accessible at the configured URLs
 
 ### Step 2 — API Ownership
 
 1. Navigate to **Catalog** → filter by **Kind: API**
-2. Click the Museum API entry
-3. Verify the **Owner** field shows `museum-team`
-4. Click the Streetlights API entry
-5. Verify the **Owner** field shows `streetlights-team`
+2. Verify three APIs are visible: Museum API, Streetlights API, Train Travel API
+3. Click the Museum API entry → verify the **Owner** field shows `museum-team`
+4. Click the Streetlights API entry → verify the **Owner** field shows `streetlights-team`
+5. Click the Train Travel API entry → verify the **Owner** field shows `platform-team`
+   and the `example.com/visibility: shared` annotation is present
 6. Navigate to the `museum-team` Group page → verify the Museum API appears under **Owned APIs**
 7. Navigate to the `streetlights-team` Group page → verify the Streetlights API appears under **Owned APIs**
+8. Navigate to the `platform-team` Group page → verify the Train Travel API appears under **Owned APIs**
 
 ✅ **Pass**: Each API shows its owning team; each team's page lists its owned API
 ❌ **Fail**: Check that the updated API catalog-info.yaml files (with `spec.owner`) are registered
@@ -60,13 +64,17 @@
 ### Step 4 — Verify Museum Team Visibility (Alice)
 
 1. Signed in as Alice, navigate to **Catalog** → filter by **Kind: API**
-2. Verify **only** the Museum API is visible (Streetlights API should not appear)
-3. Attempt to navigate directly to the Streetlights API URL — Backstage should show an error
+2. Verify the **Train Travel API** is visible (shared — should appear for all users)
+3. Verify the **Museum API** is visible (private — Alice is in museum-team)
+4. Verify the **Streetlights API** is NOT visible (private — Alice is not in streetlights-team)
+5. Attempt to navigate directly to the Streetlights API URL — Backstage should show an error
    or "Not Found" rather than the API detail page
 
-✅ **Pass**: Alice sees only the Museum API
+✅ **Pass**: Alice sees Train Travel API and Museum API; Streetlights API is absent
 ❌ **Fail**: Check that the custom permission policy is registered in `packages/backend/src/index.ts`
-  and that the allow-all policy module import has been removed
+  and that the allow-all policy module import has been removed.
+  If Alice cannot see the Train Travel API, verify that `train-travel-api.yaml` has the
+  `example.com/visibility: shared` annotation and is registered in `app-config.yaml`.
 
 ### Step 5 — Switch to Streetlights Team User and Verify Different Visibility
 
@@ -75,17 +83,33 @@
 3. Wait for catalog to load, then click **Sign In** → **Enter as Guest**
 4. Verify profile shows **Charlie Davis**
 5. Navigate to **Catalog** → filter by **Kind: API**
-6. Verify **only** the Streetlights API is visible (Museum API should not appear)
+6. Verify the **Train Travel API** is visible (shared — visible to all users)
+7. Verify the **Streetlights API** is visible (private — Charlie is in streetlights-team)
+8. Verify the **Museum API** is NOT visible (private — Charlie is not in museum-team)
 
-✅ **Pass**: Charlie sees only the Streetlights API — visibility differs from Alice
+✅ **Pass**: Charlie sees Train Travel API and Streetlights API; Museum API is absent
+  (Different API set from Alice confirms two-tier visibility is working)
 ❌ **Fail**: Check that `charlie` exists in the catalog with `memberOf: [streetlights-team]`
+
+### Step 6 — Verify Users and Groups Remain Visible to All Users
+
+1. While signed in as Charlie, navigate to **Catalog** → filter by **Kind: Group**
+2. Verify `museum-team`, `streetlights-team`, and `platform-team` all appear
+3. Navigate to **Catalog** → filter by **Kind: User**
+4. Verify all four users (alice, bob, charlie, diana) appear
+
+✅ **Pass**: Non-API catalog entries are visible to all authenticated users
+❌ **Fail**: Check the permission policy — the `not(isEntityKind(['API']))` arm must be
+  present to allow User/Group entries through
 
 ## Summary Checklist
 
-- [ ] Museum Team and Streetlights Team appear in the catalog with correct members
+- [ ] Museum Team, Streetlights Team, and Platform Team appear in the catalog with correct members
 - [ ] All four users (alice, bob, charlie, diana) appear in the catalog
-- [ ] Museum API shows `museum-team` as owner
-- [ ] Streetlights API shows `streetlights-team` as owner
-- [ ] Signed in as Alice → only Museum API visible
-- [ ] Signed in as Charlie → only Streetlights API visible
+- [ ] Museum API shows `museum-team` as owner (private)
+- [ ] Streetlights API shows `streetlights-team` as owner (private)
+- [ ] Train Travel API shows `platform-team` as owner with `example.com/visibility: shared` annotation
+- [ ] Signed in as Alice → Train Travel API and Museum API visible; Streetlights API absent
+- [ ] Signed in as Charlie → Train Travel API and Streetlights API visible; Museum API absent
+- [ ] Signed in as either user → all groups and users are visible in the catalog
 - [ ] Switching between users produces demonstrably different API catalog views

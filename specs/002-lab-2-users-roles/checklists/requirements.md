@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-06-07
-**Updated**: 2026-06-08
+**Updated**: 2026-06-10
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -36,4 +36,9 @@
   built-in development sign-in provider. Constitution Principle IX governs this choice —
   the lab will include a "Security Note" section explaining the simplified approach and
   pointing to production alternatives (SSO via OIDC/SAML/LDAP).
+- Spec updated (2026-06-10): two-tier API visibility model added (shared vs. private APIs).
+  US4, FR-003, FR-005, SC-004, Key Entities, Edge Cases, and Assumptions all updated to
+  reflect that: (a) some APIs are shared and visible to all authenticated users; (b) other
+  APIs are private and visible only to the owning team; (c) all non-API catalog entry types
+  (User, Group, etc.) remain unrestricted.
 - All checklist items pass. Spec is ready for `/speckit-plan`.
