@@ -125,13 +125,13 @@ indentation as the other entries):
 Save `app-config.yaml`, then restart Backstage:
 
 ```
-yarn dev
+yarn start
 ```
 
 | Platform | Command |
 |----------|---------|
-| macOS / Linux | `yarn dev` |
-| Windows (PowerShell) | `yarn dev` |
+| macOS / Linux | `yarn start` |
+| Windows (PowerShell) | `yarn start` |
 
 Wait for the catalog to finish loading before proceeding — you will see the Catalog page
 populate with entries when it is ready.
@@ -228,7 +228,7 @@ Lab 1):
 ### 2b — Restart Backstage
 
 ```
-yarn dev
+yarn start
 ```
 
 ### ✅ Verification — Step 2
@@ -273,7 +273,7 @@ file called `app-config.local.yaml` with the following content:
 
 ```yaml
 # Lab only — see Security Note above.
-# Change userEntityRef and restart yarn dev to sign in as a different user.
+# Change userEntityRef and restart yarn start to sign in as a different user.
 auth:
   providers:
     guest:
@@ -302,7 +302,7 @@ auth:
 ### 3b — Restart Backstage and sign in
 
 ```
-yarn dev
+yarn start
 ```
 
 Wait for the catalog to finish loading (you will see entities on the Catalog page), then:
@@ -452,7 +452,7 @@ backend.add(import('./extensions/permissionPolicy'));
 ### 4c — Restart Backstage
 
 ```
-yarn dev
+yarn start
 ```
 
 ### ✅ Verification — Steps 4 and 5
@@ -460,7 +460,7 @@ yarn dev
 **Sign in as Alice (Museum Team):**
 
 1. Ensure `app-config.local.yaml` has `userEntityRef: user:default/alice`
-2. Restart Backstage (`Ctrl+C`, then `yarn dev`), wait for catalog to load
+2. Restart Backstage (`Ctrl+C`, then `yarn start`), wait for catalog to load
 3. Click **Sign In** → **Enter as Guest**
 4. Verify the profile shows **Alice Chen**
 5. Navigate to **Catalog** → **Kind: API**
@@ -480,7 +480,7 @@ yarn dev
 **Switch to Charlie (Streetlights Team):**
 
 1. Edit `app-config.local.yaml`: change `userEntityRef` to `user:default/charlie`
-2. Restart Backstage (`Ctrl+C`, then `yarn dev`), wait for catalog to load
+2. Restart Backstage (`Ctrl+C`, then `yarn start`), wait for catalog to load
 3. Click **Sign In** → **Enter as Guest**
 4. Verify the profile shows **Charlie Davis**
 5. Navigate to **Catalog** → **Kind: API**
@@ -608,7 +608,7 @@ Remove the Lab 1 entries from `app-config.yaml` (the entries pointing to
    `user:default/alice` — not `alice` or `default/alice`.
 
 4. **Restart required**: Changes to `app-config.local.yaml` require a full restart
-   (`Ctrl+C`, then `yarn dev`). Hot-reloading does not pick up local config changes.
+   (`Ctrl+C`, then `yarn start`). Hot-reloading does not pick up local config changes.
 
 ---
 
@@ -629,7 +629,7 @@ If both APIs remain visible to all users after enabling the custom policy:
 
 3. **Verify TypeScript compiles**: If there is a TypeScript error in
    `permissionPolicy.ts`, the backend may silently fall back to no policy or exit
-   during startup. Check the terminal output for TypeScript errors after `yarn dev`.
+   during startup. Check the terminal output for TypeScript errors after `yarn start`.
 
 4. **Permissions must be enabled in `app-config.yaml`**: Verify the following is present
    (it should already be there from the scaffolded app):

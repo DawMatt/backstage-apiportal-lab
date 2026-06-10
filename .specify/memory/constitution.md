@@ -191,6 +191,6 @@ All plan `Constitution Check` gates MUST reference the principles by Roman numer
 
 ## Common Issues
 
-- Older documentation indicates Backstage is started using `yarn dev`. Instead use `yarn start`. 
+- `yarn dev` does not exist. Use `yarn start` instead. 
 
 **Version**: 1.3.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-08
