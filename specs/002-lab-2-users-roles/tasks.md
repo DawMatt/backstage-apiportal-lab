@@ -69,7 +69,7 @@ groups appear with correct members. Navigate to Catalog → Kind: User → verif
 
 ### Implementation for User Story 1
 
-- [ ] T003 [US1] Update `labs/lab-02-users-roles/catalog/teams.yaml` to add a third Group
+- [X] T003 [US1] Update `labs/lab-02-users-roles/catalog/teams.yaml` to add a third Group
   entity: `platform-team` per data-model.md. The platform-team has `spec.type: team`,
   `spec.profile.displayName: "Platform Team"`, `spec.children: []`, and `spec.members: []`
   (no members — it is a pure organisational unit). Include an explanatory comment explaining
@@ -78,14 +78,14 @@ groups appear with correct members. Navigate to Catalog → Kind: User → verif
   group membership. Keep the existing museum-team and streetlights-team entries unchanged.
 - [X] T004 [P] [US1] `labs/lab-02-users-roles/catalog/users.yaml` already contains the four
   User entities with correct `memberOf` and display names. No changes required.
-- [ ] T005 [US1] Update README "Step 1: Define Users and Teams" section in
+- [X] T005 [US1] Update README "Step 1: Define Users and Teams" section in
   `labs/lab-02-users-roles/README.md` (depends on T003): Update the section to mention
   `platform-team` and explain its role as a no-member organisational unit that owns shared
   platform APIs. Update the directory tree comment in the app-config.yaml snippet to note
   that `teams.yaml` now contains three groups. Update Step 1 Verification to check for
   `platform-team` in the catalog (step: click platform-team → verify no members listed →
   note this is expected).
-- [ ] T006 [US1] Update README "✅ Verification — Step 1" sub-section in
+- [X] T006 [US1] Update README "✅ Verification — Step 1" sub-section in
   `labs/lab-02-users-roles/README.md` to match quickstart.md Step 1: add step to verify
   `platform-team` appears in the catalog; add step to click `platform-team` and confirm it
   shows no members with an explanatory note that this is intentional. Update the ✅ Pass
@@ -114,7 +114,7 @@ Navigate to each team's page → verify owned APIs are listed. (Quickstart.md St
 - [X] T008 [P] [US2] `labs/lab-02-users-roles/catalog/apis/streetlights-api.yaml` already
   contains the updated Streetlights API descriptor with `spec.owner: group:default/streetlights-team`.
   This API is intentionally *private* — no annotation needed. No changes required.
-- [ ] T009 [P] [US2] Create `labs/lab-02-users-roles/catalog/apis/train-travel-api.yaml` as
+- [X] T009 [P] [US2] Create `labs/lab-02-users-roles/catalog/apis/train-travel-api.yaml` as
   the new shared platform API catalog descriptor per data-model.md (R-006). Set:
   - `metadata.name: train-travel-api`
   - `metadata.annotations['example.com/visibility']: shared`
@@ -127,7 +127,7 @@ Navigate to each team's page → verify owned APIs are listed. (Quickstart.md St
     Lab 1, NOT `$text` inline embedding). Add a comment at the top explaining this is the
     shared platform API visible to all authenticated users via the `example.com/visibility: shared`
     annotation.
-- [ ] T010 [US2] Rewrite README "Step 2: Associate APIs with Owning Teams" section in
+- [X] T010 [US2] Rewrite README "Step 2: Associate APIs with Owning Teams" section in
   `labs/lab-02-users-roles/README.md` (depends on T007, T008, T009): Introduce the
   shared vs. private API concept — explain that APIs in this lab fall into two categories:
   *shared* (visible to all authenticated users, regardless of team) and *private* (visible
@@ -140,7 +140,7 @@ Navigate to each team's page → verify owned APIs are listed. (Quickstart.md St
   this is important in production (not every change to visibility should require changing
   group membership). Keep the existing explanation about removing Lab 1 entries to avoid
   duplicates.
-- [ ] T011 [US2] Update README "✅ Verification — Step 2" sub-section in
+- [X] T011 [US2] Update README "✅ Verification — Step 2" sub-section in
   `labs/lab-02-users-roles/README.md` to match quickstart.md Step 2: verify three APIs
   appear in the catalog; verify Train Travel API shows `platform-team` as owner and displays
   the `example.com/visibility: shared` annotation in the catalog UI; verify `platform-team`
@@ -189,7 +189,7 @@ Steps 4–6.)
 
 ### Implementation for User Story 4
 
-- [ ] T015 [US4] Rewrite README "Step 4: Enable Ownership-Based Visibility" introductory
+- [X] T015 [US4] Rewrite README "Step 4: Enable Ownership-Based Visibility" introductory
   section ("Why this step matters") in `labs/lab-02-users-roles/README.md`: update to
   explain the two-tier model instead of the single-tier model. Remove the existing "Note"
   block that says "ALL catalog entities become team-scoped" (this is no longer true).
@@ -198,26 +198,26 @@ Steps 4–6.)
   (2) APIs annotated with `example.com/visibility: shared` are visible to all authenticated
   users; (3) all other APIs are visible only to members of the owning team via `isEntityOwner`.
   Explain that `anyOf` means an entity passes if ANY condition is true — not all of them.
-- [ ] T016 [P] [US4] Update README Step 4a "permissionPolicy.ts" code block in
+- [X] T016 [P] [US4] Update README Step 4a "permissionPolicy.ts" code block in
   `labs/lab-02-users-roles/README.md`: Replace the existing TypeScript with the two-tier
   implementation from R-004. The new policy uses `createCatalogConditionalDecision` with
   `anyOf: [{ not: isEntityKind(['API']) }, hasAnnotation({annotation: 'example.com/visibility', value: 'shared'}), isEntityOwner({claims: ...})]`.
   Update the import sources table (no new packages — all symbols are already present in
   R-004 import table). Add inline code comments explaining each arm of the `anyOf` logic.
-- [ ] T017 [US4] Update README "✅ Verification — Steps 4 and 5" sub-section in
+- [X] T017 [US4] Update README "✅ Verification — Steps 4 and 5" sub-section in
   `labs/lab-02-users-roles/README.md` to match quickstart.md Steps 4 and 5:
   Alice (museum-team): verify Train Travel API AND Museum API are visible; verify
   Streetlights API is absent. Charlie (streetlights-team): verify Train Travel API AND
   Streetlights API are visible; verify Museum API is absent. Update ✅ Pass lines to
   reflect the shared API always being present. Update ❌ Fail guidance to include checking
   for missing `example.com/visibility: shared` annotation if train-travel-api is not visible.
-- [ ] T018 [US4] Add README "✅ Verification — Step 6 (User and Group visibility)" sub-section
+- [X] T018 [US4] Add README "✅ Verification — Step 6 (User and Group visibility)" sub-section
   in `labs/lab-02-users-roles/README.md` matching quickstart.md Step 6: while signed in as
   Charlie (or any user), navigate to Catalog → Kind: Group → verify all three groups appear;
   navigate to Catalog → Kind: User → verify all four users appear. Explain that this confirms
   the `not(isEntityKind(['API']))` arm of the permission policy is working correctly.
   Include ✅ Pass and ❌ Fail guidance pointing to the policy's first `anyOf` arm.
-- [ ] T019 [US4] Update README "Edge Cases" sub-section in
+- [X] T019 [US4] Update README "Edge Cases" sub-section in
   `labs/lab-02-users-roles/README.md`: Keep the existing four edge cases (multi-team
   membership, broken entity references, sign-in before auth configured, unowned APIs). Update
   the "unowned API" edge case to clarify that under the two-tier policy, an unowned API
@@ -237,7 +237,7 @@ visibility) is achievable and demonstrable.
 
 **Purpose**: Final review, cross-platform verification, and completion of shared README sections.
 
-- [ ] T020 Update README "Overview" section in `labs/lab-02-users-roles/README.md`: update the
+- [X] T020 Update README "Overview" section in `labs/lab-02-users-roles/README.md`: update the
   "What this lab teaches" bullet list to include: annotations as a visibility mechanism
   (`example.com/visibility: shared`), and the two-tier permission policy (`anyOf` logic with
   shared vs. private APIs). Update the "What you will have at the end" paragraph to describe
@@ -245,7 +245,7 @@ visibility) is achievable and demonstrable.
   train-travel shared), and the two-tier visibility outcome (both users see train-travel-api
   plus their team's private API).
 - [X] T021 [P] README "Prerequisites" section is complete and correct. No changes required.
-- [ ] T022 Update README "Summary Checklist" section in `labs/lab-02-users-roles/README.md`
+- [X] T022 Update README "Summary Checklist" section in `labs/lab-02-users-roles/README.md`
   to match the 9-item checklist from quickstart.md:
   1. Museum Team in catalog with alice and bob
   2. Streetlights Team in catalog with charlie and diana
@@ -257,7 +257,7 @@ visibility) is achievable and demonstrable.
   8. Signed in as Alice → Train Travel API and Museum API visible; Streetlights API absent
   9. Signed in as Charlie → Train Travel API and Streetlights API visible; Museum API absent
   10. Either user → all groups and users are visible in the catalog
-- [ ] T023 Add README "Troubleshooting" entry for shared API misconfiguration in
+- [X] T023 Add README "Troubleshooting" entry for shared API misconfiguration in
   `labs/lab-02-users-roles/README.md`: add a new sub-section
   "### Train Travel API not visible to all users" covering: (1) verify the
   `example.com/visibility: shared` annotation is present and correctly spelled in
@@ -265,7 +265,7 @@ visibility) is achievable and demonstrable.
   exactly (case-sensitive, dot in domain); (3) verify the catalog location for
   `train-travel-api.yaml` is registered in `app-config.yaml`; (4) verify Backstage was
   restarted after adding the annotation.
-- [ ] T024 Review full README against Constitution in `labs/lab-02-users-roles/README.md`:
+- [X] T024 Review full README against Constitution in `labs/lab-02-users-roles/README.md`:
   confirm Principle I (new features explicitly named: annotations, two-tier policy),
   Principle II (Step 4 explains WHY the `anyOf` policy structure matters — not just what
   it does), Principle VIII (outcome-based verification — tests confirm API visibility

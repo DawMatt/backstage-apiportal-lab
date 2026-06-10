@@ -10,18 +10,24 @@
 
 - How Backstage models people and teams using `User` and `Group` catalog entities
 - How `spec.owner` connects an API in the catalog to its owning team
+- How catalog annotations can control API visibility independently of ownership
 - How to configure Backstage's built-in guest auth provider to sign in as a specific
   named catalog user
-- How to replace Backstage's default allow-all permission policy with a custom policy
-  that restricts each user's view of the catalog to APIs owned by their team
+- How to replace Backstage's default allow-all permission policy with a custom **two-tier**
+  policy: shared APIs visible to all users, private APIs visible only to the owning team,
+  and all other catalog entries (users, groups) unrestricted
 
 **What you will have at the end:**
 
-The same Backstage instance from Lab 1, extended with two teams (Museum Team and
-Streetlights Team), four named users, and a custom permission policy. When signed in as
-Alice (Museum Team), only the Museum API is visible. When signed in as Charlie
-(Streetlights Team), only the Streetlights API is visible — a demonstrable, side-by-side
-difference driven by team ownership and Backstage's permissions framework.
+The same Backstage instance from Lab 1, extended with three teams (Museum Team,
+Streetlights Team, and Platform Team), four named users, three APIs, and a custom
+permission policy. The Train Travel API (owned by Platform Team) is marked as shared and
+visible to everyone. The Museum API is private — visible only to Museum Team. The
+Streetlights API is private — visible only to Streetlights Team. When signed in as Alice,
+she sees the Train Travel API and the Museum API. When signed in as Charlie, he sees the
+Train Travel API and the Streetlights API. Both users can browse all teams and users in
+the catalog. This two-tier result is driven by team ownership, a catalog annotation, and
+Backstage's permissions framework.
 
 ---
 
@@ -89,9 +95,15 @@ This repository already contains the catalog descriptor files for Lab 2:
 
 ```
 labs/lab-02-users-roles/catalog/
-├── teams.yaml          ← Two Group entities: museum-team, streetlights-team
+├── teams.yaml          ← Three Group entities: museum-team, streetlights-team, platform-team
 └── users.yaml          ← Four User entities: alice, bob, charlie, diana
 ```
+
+> **What is platform-team?** `platform-team` is a Group entity with no individual members.
+> It exists as the owner of shared platform APIs — APIs that all authenticated users can see
+> regardless of which team they belong to. Visibility of those APIs is controlled by an
+> annotation on the API entity itself, not by group membership. You will configure this in
+> Step 2.
 
 Open `labs/lab-01-base-backstage/backstage/app-config.yaml` in a text editor and add the
 following entries to the end of the existing `catalog.locations` list (keeping the same
@@ -140,14 +152,17 @@ populate with entries when it is ready.
 
 1. Open `http://localhost:3000`
 2. Navigate to **Catalog** → in the **Kind** filter, select **Group**
-3. Verify `museum-team` and `streetlights-team` both appear
+3. Verify all three groups appear: `museum-team`, `streetlights-team`, and `platform-team`
 4. Click **museum-team** → verify the members listed are **alice** and **bob**
 5. Click **streetlights-team** → verify the members listed are **charlie** and **diana**
-6. Navigate to **Catalog** → **Kind: User**
-7. Verify all four users appear: **alice**, **bob**, **charlie**, **diana**
-8. Click **alice** → verify her group membership shows **museum-team**
+6. Click **platform-team** → verify it shows **no members** (this is expected — see the
+   note above about why platform-team has no individual members)
+7. Navigate to **Catalog** → **Kind: User**
+8. Verify all four users appear: **alice**, **bob**, **charlie**, **diana**
+9. Click **alice** → verify her group membership shows **museum-team**
 
-✅ **Pass**: All four users and both teams appear with correct memberships.
+✅ **Pass**: All four users and all three groups appear with correct memberships. Platform
+Team showing no members is correct and expected.
 
 ❌ **Fail**: Check that both `teams.yaml` and `users.yaml` URL entries are in your
 `app-config.yaml` with the correct branch URL. Open each target URL in a browser to
@@ -165,10 +180,24 @@ for more.
 
 ### Why this step matters
 
-In Lab 1, both APIs had `spec.owner: user:default/guest` — a placeholder. Ownership in
-Backstage is what connects an API to a team. The permissions framework checks ownership
-when deciding whether a signed-in user can see an entity. Without ownership set, the
-permission policy written in Step 4 cannot distinguish who should see what.
+In Lab 1, both APIs had `spec.owner: user:default/guest` — a placeholder. Lab 2 introduces
+a proper ownership model and a key concept for the visibility demonstration: APIs can be
+either **private** (visible only to the owning team) or **shared** (visible to all
+authenticated users). The distinction is made using a catalog annotation.
+
+**Two API visibility tiers**:
+
+| API | Owner | Visibility | How it works |
+|-----|-------|-----------|--------------|
+| Museum API | `museum-team` | **Private** | No visibility annotation — only museum-team members can see it |
+| Streetlights API | `streetlights-team` | **Private** | No visibility annotation — only streetlights-team members can see it |
+| Train Travel API | `platform-team` | **Shared** | Annotated with `example.com/visibility: shared` — visible to all users |
+
+**Why separate ownership from visibility?** In a real organisation, a team may be
+*responsible* for an API without wanting to restrict who can *discover* it. Platform
+APIs (authentication, logging, infrastructure) are typically owned by a platform team but
+discoverable by everyone. Using an annotation to control visibility means you can change
+who can see an API without changing who owns it or adding users to groups.
 
 **Why fully-qualified group refs?** Backstage entity references use the format
 `kind:namespace/name`. Using `group:default/museum-team` (rather than just `museum-team`)
@@ -176,10 +205,15 @@ is explicit and predictable across multiple namespaces.
 
 ### 2a — Replace the Lab 1 API entries with Lab 2 entries
 
-The Lab 2 API descriptor files (`museum-api.yaml` and `streetlights-api.yaml`) are
-copies of the Lab 1 descriptors with two changes:
-- `spec.owner` set to the owning team's fully-qualified group ref
-- `spec.lifecycle` updated from `experimental` to `production`
+The Lab 2 catalog directory now contains three API descriptor files:
+
+```
+labs/lab-02-users-roles/catalog/apis/
+├── museum-api.yaml          ← Private: spec.owner = museum-team (no visibility annotation)
+├── streetlights-api.yaml    ← Private: spec.owner = streetlights-team (no visibility annotation)
+└── train-travel-api.yaml    ← Shared:  spec.owner = platform-team +
+                                          annotation example.com/visibility: shared
+```
 
 Open `app-config.yaml` and make the following changes to the `catalog.locations` list:
 
@@ -206,18 +240,24 @@ Lab 1):
 > entity and will use whichever version it loaded last. Remove the Lab 1 entries to avoid
 > this ambiguity.
 
-**Add** these Lab 2 entries in their place:
+**Add** these three Lab 2 entries in their place:
 
 ```yaml
-    # --- Lab 2: Museum REST API (with ownership) ---
+    # --- Lab 2: Museum REST API (private — museum-team only) ---
     - type: url
       target: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-02-users-roles/catalog/apis/museum-api.yaml
       rules:
         - allow: [API]
 
-    # --- Lab 2: Streetlights Event API (with ownership) ---
+    # --- Lab 2: Streetlights Event API (private — streetlights-team only) ---
     - type: url
       target: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-02-users-roles/catalog/apis/streetlights-api.yaml
+      rules:
+        - allow: [API]
+
+    # --- Lab 2: Train Travel API (shared — visible to all authenticated users) ---
+    - type: url
+      target: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-02-users-roles/catalog/apis/train-travel-api.yaml
       rules:
         - allow: [API]
 ```
@@ -234,24 +274,31 @@ yarn start
 ### ✅ Verification — Step 2
 
 1. Navigate to **Catalog** → **Kind: API**
-2. Click **Museum API** → verify the **Owner** field shows **museum-team**
-3. Click **Streetlights API** → verify the **Owner** field shows **streetlights-team**
-4. Navigate to the **museum-team** Group page → verify **Museum API** appears under
-   **Owned APIs** (or the Relations / Ownership section)
-5. Navigate to the **streetlights-team** Group page → verify **Streetlights API** appears
-   there
+2. Verify **three APIs** appear: Museum API, Streetlights API, and Train Travel API
+3. Click **Museum API** → verify the **Owner** field shows **museum-team**
+4. Click **Streetlights API** → verify the **Owner** field shows **streetlights-team**
+5. Click **Train Travel API** → verify the **Owner** field shows **platform-team**
+   and the **Annotations** section includes `example.com/visibility: shared`
+6. Navigate to the **museum-team** Group page → verify **Museum API** appears under
+   **Owned APIs**
+7. Navigate to the **streetlights-team** Group page → verify **Streetlights API** appears
+8. Navigate to the **platform-team** Group page → verify **Train Travel API** appears
 
-✅ **Pass**: Each API shows its owning team; each team's page lists its owned API.
+✅ **Pass**: All three APIs show their owning teams; the Train Travel API has the shared
+annotation; each team's page lists its owned API(s).
 
 ❌ **Fail — duplicate APIs**: If you see two Museum API entries (or two Streetlights API
 entries), the Lab 1 entries were not removed from `app-config.yaml`. Remove them and
 restart. See
 [Troubleshooting — Duplicate API entries](#duplicate-api-entries-in-the-catalog).
 
-❌ **Fail — Owner field not shown**: Check that the updated `museum-api.yaml` and
-`streetlights-api.yaml` URLs are in your `app-config.yaml` (not the original Lab 1 paths).
-Open each target URL in a browser to verify it returns the Lab 2 YAML with
-`spec.owner: group:default/...`.
+❌ **Fail — Train Travel API missing**: Check that the `train-travel-api.yaml` URL entry
+is in your `app-config.yaml`. Open the target URL in a browser to confirm it returns YAML
+content (not a 404).
+
+❌ **Fail — Owner field not shown**: Check that the updated API `yaml` URLs are in your
+`app-config.yaml` (not the original Lab 1 paths). Open each target URL in a browser to
+verify it returns the Lab 2 YAML with `spec.owner: group:default/...`.
 
 ---
 
@@ -307,14 +354,16 @@ yarn start
 
 Wait for the catalog to finish loading (you will see entities on the Catalog page), then:
 
-1. Click **Sign In** (or the user icon in the top-right corner)
+1. Click **Sign In** (shown on the Backstage home page if not already signed in)
 2. Click **Enter as Guest**
 
 ### ✅ Verification — Step 3
 
-After signing in, look at the user profile area in the top-right of the Backstage UI.
+After signing in, confirm your identity:
+- Click the **Settings** icon in the **bottom-left** of the Backstage sidebar
+- Your profile page will show the signed-in user's display name and email
 
-✅ **Pass**: The profile shows **Alice Chen** (or the display name of the configured user).
+✅ **Pass**: The profile page shows **Alice Chen** (or the display name of the configured user).
 
 ❌ **Fail — "Sign in failed" or generic guest identity shown**: Verify that:
 - `app-config.local.yaml` is in the correct directory (next to `app-config.yaml`)
@@ -327,29 +376,34 @@ After signing in, look at the user profile area in the top-right of the Backstag
 
 ---
 
-## Step 4: Enable Ownership-Based Visibility
+## Step 4: Enable Two-Tier API Visibility
 
 ### Why this step matters
 
 By default, Backstage uses an **allow-all** permission policy: every signed-in user can
-see every catalog entity, regardless of ownership. To demonstrate that Alice sees only
-the Museum API and Charlie sees only the Streetlights API, you need to replace the
-allow-all policy with a custom policy that uses `isEntityOwner` to filter catalog
-visibility based on the signed-in user's team membership.
+see every catalog entity. To demonstrate the two-tier visibility model you configured in
+Step 2, you need to replace the allow-all policy with a custom policy that enforces these
+rules:
 
-The custom policy works as follows:
-- For any **catalog entity** permission (a `catalog-entity` resource permission),
-  return a **conditional decision**: allow access only if the entity's `spec.owner`
-  matches one of the requesting user's `ownershipEntityRefs` (their user ref and all
-  their team refs)
-- For **all other** permissions (scaffolding, TechDocs, search, etc.), return **ALLOW**
-  unconditionally — so the rest of Backstage continues to function normally
+| Rule | Entity type | Condition | Result |
+|------|-------------|-----------|--------|
+| 1 | Any non-API entity (User, Group, etc.) | Always | ✅ Allow |
+| 2 | Any API with `example.com/visibility: shared` | Always | ✅ Allow |
+| 3 | Any API owned by the signed-in user's team | User is a team member | ✅ Allow |
+| 4 | Any other API | — | ❌ Deny |
 
-> **Note**: With this policy, ALL catalog entities (not just APIs) become team-scoped.
-> Users will not see each other's User or Group profile pages unless they are in the
-> same team. This is an intentional simplification for the lab. In a production policy,
-> you would typically allow public read access to User and Group entities while
-> restricting access to sensitive entities (APIs, services) by ownership.
+The policy uses `anyOf` logic: an entity is visible if **any** of rules 1–3 is true.
+This means User and Group catalog entries are always visible to all users (rule 1), shared
+APIs are visible to everyone (rule 2), and private APIs are filtered by team membership
+(rule 3).
+
+> **Why keep User and Group entries visible to everyone?** If you restrict visibility of
+> User and Group entities, users can't browse teams or see who owns what. The whole point
+> of an API portal is discoverability — keeping the org chart open while controlling API
+> visibility is a common and deliberate production pattern.
+
+For all non-catalog permissions (scaffolding, TechDocs, search, etc.), the policy returns
+**ALLOW** unconditionally — so the rest of Backstage continues to function normally.
 
 ### 4a — Create the permission policy file
 
@@ -384,11 +438,30 @@ class CatalogOwnershipPolicy implements PermissionPolicy {
     if (isResourcePermission(request.permission, 'catalog-entity')) {
       return createCatalogConditionalDecision(
         request.permission,
-        catalogConditions.isEntityOwner({
-          claims: user?.info.ownershipEntityRefs ?? [],
-        }),
+        {
+          anyOf: [
+            // Rule 1: Non-API entities (User, Group, etc.) are always visible to all users.
+            // This keeps the org chart and team pages open for everyone.
+            { not: catalogConditions.isEntityKind({ kinds: ['API'] }) },
+
+            // Rule 2: APIs annotated as shared are visible to all authenticated users,
+            // regardless of which team they belong to.
+            catalogConditions.hasAnnotation({
+              annotation: 'example.com/visibility',
+              value: 'shared',
+            }),
+
+            // Rule 3: Private APIs are visible only to members of the owning team.
+            // The user's ownershipEntityRefs contains their user ref plus all their
+            // group refs, resolved from the catalog User entity's memberOf list.
+            catalogConditions.isEntityOwner({
+              claims: user?.info.ownershipEntityRefs ?? [],
+            }),
+          ],
+        },
       );
     }
+    // All non-catalog permissions (scaffolding, TechDocs, search) are unconditionally allowed.
     return { result: AuthorizeResult.ALLOW };
   }
 }
@@ -455,61 +528,107 @@ backend.add(import('./extensions/permissionPolicy'));
 yarn start
 ```
 
-### ✅ Verification — Steps 4 and 5
+### ✅ Verification — Steps 4, 5, and 6
 
 **Sign in as Alice (Museum Team):**
 
 1. Ensure `app-config.local.yaml` has `userEntityRef: user:default/alice`
 2. Restart Backstage (`Ctrl+C`, then `yarn start`), wait for catalog to load
 3. Click **Sign In** → **Enter as Guest**
-4. Verify the profile shows **Alice Chen**
+4. Click the **Settings** icon in the bottom-left sidebar → verify the profile shows **Alice Chen**
 5. Navigate to **Catalog** → **Kind: API**
-6. Verify **only** the **Museum API** is visible — the Streetlights API should not appear
-7. Try navigating directly to the Streetlights API URL (copy it from a previous session
+6. Verify the **Train Travel API** is visible (rule 2: shared annotation)
+7. Verify the **Museum API** is visible (rule 3: Alice is in museum-team)
+8. Verify the **Streetlights API** is **NOT** visible (rule 3 fails: Alice is not in streetlights-team)
+9. Try navigating directly to the Streetlights API URL (copy it from a previous session
    if you have it) — Backstage should show "Not Found" or an error, not the API detail page
 
-✅ **Pass (Alice)**: Only the Museum API is visible.
+✅ **Pass (Alice)**: Train Travel API and Museum API are visible. Streetlights API is absent.
 
-❌ **Fail — both APIs still visible**: Verify that:
+❌ **Fail — all APIs still visible**: Verify that:
 - The `allow-all-policy` import was removed from `index.ts` (not just commented out)
 - The `permissionPolicy.ts` file is at exactly
   `packages/backend/src/extensions/permissionPolicy.ts`
 - Backstage was restarted after both file changes
 - See [Troubleshooting — Permission policy not applying](#permission-policy-not-applying)
 
+❌ **Fail — Train Travel API not visible to Alice**: The `example.com/visibility: shared`
+annotation may be missing or misspelled in `train-travel-api.yaml`. See
+[Troubleshooting — Train Travel API not visible to all users](#train-travel-api-not-visible-to-all-users).
+
 **Switch to Charlie (Streetlights Team):**
 
 1. Edit `app-config.local.yaml`: change `userEntityRef` to `user:default/charlie`
 2. Restart Backstage (`Ctrl+C`, then `yarn start`), wait for catalog to load
 3. Click **Sign In** → **Enter as Guest**
-4. Verify the profile shows **Charlie Davis**
+4. Click the **Settings** icon → verify the profile shows **Charlie Davis**
 5. Navigate to **Catalog** → **Kind: API**
-6. Verify **only** the **Streetlights API** is visible — the Museum API should not appear
+6. Verify the **Train Travel API** is visible (shared — same as Alice saw)
+7. Verify the **Streetlights API** is visible (Charlie is in streetlights-team)
+8. Verify the **Museum API** is **NOT** visible (Charlie is not in museum-team)
 
-✅ **Pass (Charlie)**: Only the Streetlights API is visible.
-✅ **Lab complete**: Alice and Charlie see demonstrably different API catalogs — different
-   visibility produced solely by team ownership and the permissions framework.
+✅ **Pass (Charlie)**: Train Travel API and Streetlights API are visible. Museum API is absent.
+✅ **The key result**: Alice and Charlie both see the Train Travel API (shared), but each
+   sees only their own team's private API — a two-tier visibility difference produced by
+   ownership, annotations, and the permissions framework.
 
-❌ **Fail**: Check that `charlie` exists in the catalog with `memberOf: streetlights-team`
+❌ **Fail**: Check that `charlie` exists in the catalog with `memberOf: [streetlights-team]`
 (Step 1 verification) and that the Streetlights API has `spec.owner: group:default/streetlights-team`
 (Step 2 verification).
+
+**Verify User and Group visibility (either user):**
+
+While signed in as Alice or Charlie, confirm that non-API catalog entries are unrestricted:
+
+1. Navigate to **Catalog** → **Kind: Group**
+2. Verify all three groups are visible: `museum-team`, `streetlights-team`, `platform-team`
+3. Navigate to **Catalog** → **Kind: User**
+4. Verify all four users are visible: `alice`, `bob`, `charlie`, `diana`
+
+✅ **Pass**: All users and groups are visible regardless of the signed-in user's team.
+   This confirms rule 1 of the policy is working correctly.
+
+❌ **Fail — users or groups not visible**: The `not(isEntityKind(['API']))` arm of the
+policy is not executing correctly. Verify the TypeScript matches the code above exactly,
+particularly the `anyOf` structure and the `{ not: ... }` wrapper around `isEntityKind`.
 
 ### Edge Cases
 
 **What if a user is a member of multiple teams?**
-With this policy, a user who is a member of both `museum-team` and `streetlights-team`
-would see the APIs owned by *both* teams. Backstage adds all group refs to the user's
-`ownershipEntityRefs`, and `isEntityOwner` checks if any of them match. In this lab, each
-user belongs to exactly one team to keep the demonstration unambiguous. If you want to
-experiment with multi-team membership, add a user to both teams' `members` lists and the
-user's `memberOf` list, restart, and sign in as that user.
+A user who is a member of both `museum-team` and `streetlights-team` would see the private
+APIs owned by *both* teams, plus any shared APIs. Backstage adds all group refs to the
+user's `ownershipEntityRefs`, and `isEntityOwner` checks if any of them match. In this
+lab, each user belongs to exactly one team to keep the demonstration unambiguous. If you
+want to experiment with multi-team membership, add a user to both teams' `members` lists
+and the user's `memberOf` list, restart, and sign in as that user.
 
-**What if a catalog entity has no `spec.owner`?**
-An entity with no `spec.owner` has no ownership refs. The `isEntityOwner` condition will
-return `false` for every user — meaning no signed-in user can see it. If you register an
-API without setting `spec.owner` and find it invisible to everyone after enabling the
-custom policy, that is why. Assign an owner or add a special case to your policy to
-handle un-owned entities.
+**What if a private API has no `spec.owner`?**
+An API entity with no `spec.owner` and no `example.com/visibility: shared` annotation has
+no ownership refs and is not marked shared. The policy will deny it for every user —
+meaning no signed-in user can see it. If you register an API without setting `spec.owner`
+and find it invisible to everyone after enabling the custom policy, that is why. Either
+assign an owner or add the shared annotation.
+
+**What if the shared annotation is accidentally omitted from an API intended to be shared?**
+Without the `example.com/visibility: shared` annotation, the Train Travel API would only
+be visible to members of `platform-team` — which has no members, so it would be invisible
+to everyone. If the shared API disappears from both Alice's and Charlie's catalog views
+after enabling the policy, verify that `train-travel-api.yaml` has:
+```yaml
+metadata:
+  annotations:
+    example.com/visibility: shared
+```
+The annotation key is case-sensitive and must match exactly. See
+[Troubleshooting — Train Travel API not visible to all users](#train-travel-api-not-visible-to-all-users).
+
+**What about visibility of User, Group, and other non-API catalog entries?**
+The policy's first rule (`not(isEntityKind(['API']))`) passes for any entity that is not an
+API — including User, Group, Component, System, Domain, and Location entities. These are
+always visible to all authenticated users, regardless of team membership or annotations.
+This is intentional: restricting User/Group visibility would prevent users from browsing
+teams and understanding the org structure. To verify: navigate to Catalog → Kind: Group
+while signed in as any user and confirm all three groups appear.
 
 **What if a User or Group entity referenced by `spec.owner` or `spec.memberOf` does not
 exist in the catalog?**
@@ -522,9 +641,11 @@ in `app-config.yaml`.
 **What if the developer tries to sign in before authentication is configured?**
 If you click "Enter as Guest" without `app-config.local.yaml` present, Backstage will
 sign you in as an anonymous guest (no user identity). The permissions policy will receive
-an empty `ownershipEntityRefs` list and deny access to all catalog entities — you will
-see an empty catalog. Create `app-config.local.yaml` with a valid `userEntityRef` and
-restart before trying to demonstrate visibility differences.
+an empty `ownershipEntityRefs` list, so rule 3 will deny all private APIs. Rule 2 will
+still pass for shared APIs (the annotation check does not require user identity), so the
+Train Travel API should still be visible even for an anonymous guest. Create
+`app-config.local.yaml` with a valid `userEntityRef` and restart to see team-specific
+visibility.
 
 ---
 
@@ -534,11 +655,14 @@ Use this checklist to confirm you have completed every step of the lab:
 
 - [ ] Museum Team (`museum-team`) appears in the catalog with alice and bob as members
 - [ ] Streetlights Team (`streetlights-team`) appears in the catalog with charlie and diana as members
+- [ ] Platform Team (`platform-team`) appears in the catalog with no members (expected)
 - [ ] All four users (alice, bob, charlie, diana) appear in the catalog
-- [ ] Museum API shows `museum-team` as its owner
-- [ ] Streetlights API shows `streetlights-team` as its owner
-- [ ] Signed in as Alice → only the Museum API is visible in the catalog
-- [ ] Signed in as Charlie → only the Streetlights API is visible in the catalog
+- [ ] Museum API shows `museum-team` as its owner (private — no visibility annotation)
+- [ ] Streetlights API shows `streetlights-team` as its owner (private — no visibility annotation)
+- [ ] Train Travel API shows `platform-team` as its owner, with `example.com/visibility: shared` annotation
+- [ ] Signed in as Alice → Train Travel API and Museum API are visible; Streetlights API is absent
+- [ ] Signed in as Charlie → Train Travel API and Streetlights API are visible; Museum API is absent
+- [ ] Signed in as either user → all three groups and all four users are visible in the catalog
 
 All boxes checked? You have completed Lab 2.
 
@@ -609,6 +733,38 @@ Remove the Lab 1 entries from `app-config.yaml` (the entries pointing to
 
 4. **Restart required**: Changes to `app-config.local.yaml` require a full restart
    (`Ctrl+C`, then `yarn start`). Hot-reloading does not pick up local config changes.
+
+---
+
+### Train Travel API not visible to all users
+
+If the Train Travel API is not visible to Alice, Charlie, or any authenticated user after
+enabling the custom permission policy:
+
+1. **Check the annotation key and value**: Open
+   `labs/lab-02-users-roles/catalog/apis/train-travel-api.yaml` and verify:
+   ```yaml
+   metadata:
+     annotations:
+       example.com/visibility: shared
+   ```
+   The key is `example.com/visibility` (dot between `example` and `com`, forward-slash
+   separator) and the value is `shared` (lowercase). Both are case-sensitive.
+
+2. **Check the catalog location is registered**: Verify `app-config.yaml` includes a
+   location entry for `train-travel-api.yaml` with `rules: - allow: [API]`.
+
+3. **Check the policy annotation check**: In `permissionPolicy.ts`, verify the
+   `hasAnnotation` condition matches exactly:
+   ```typescript
+   catalogConditions.hasAnnotation({
+     annotation: 'example.com/visibility',
+     value: 'shared',
+   })
+   ```
+
+4. **Restart required**: Any change to catalog YAML files or TypeScript source requires
+   a full restart (`Ctrl+C`, then `yarn start`).
 
 ---
 
