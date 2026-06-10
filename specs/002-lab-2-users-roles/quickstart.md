@@ -1,6 +1,6 @@
 # Quickstart Verification: Lab 2 — Users, Roles, and API Visibility
 
-**Branch**: `002-lab-2-users-roles` | **Date**: 2026-06-08
+**Branch**: `002-lab-2-users-roles` | **Date**: 2026-06-08 (Updated: 2026-06-11)
 
 ## Prerequisites
 
@@ -27,21 +27,28 @@
 ❌ **Fail**: Check that catalog locations for `teams.yaml` and `users.yaml` are in `app-config.yaml`
   and that the YAML files are accessible at the configured URLs
 
-### Step 2 — API Ownership
+### Step 2 — API Ownership and Visibility Metadata
 
 1. Navigate to **Catalog** → filter by **Kind: API**
 2. Verify three APIs are visible: Museum API, Streetlights API, Train Travel API
-3. Click the Museum API entry → verify the **Owner** field shows `museum-team`
-4. Click the Streetlights API entry → verify the **Owner** field shows `streetlights-team`
-5. Click the Train Travel API entry → verify the **Owner** field shows `platform-team`
-   and the `example.com/visibility: shared` annotation is present
+3. Click the **Museum API** entry → verify:
+   - The **Owner** field shows `museum-team`
+   - The **Tags** section shows `private`
+4. Click the **Streetlights API** entry → verify:
+   - The **Owner** field shows `streetlights-team`
+   - The **Tags** section shows `private`
+5. Click the **Train Travel API** entry → verify:
+   - The **Owner** field shows `platform-team`
+   - The **Tags** section shows `shared`
 6. Navigate to the `museum-team` Group page → verify the Museum API appears under **Owned APIs**
 7. Navigate to the `streetlights-team` Group page → verify the Streetlights API appears under **Owned APIs**
 8. Navigate to the `platform-team` Group page → verify the Train Travel API appears under **Owned APIs**
 
-✅ **Pass**: Each API shows its owning team; each team's page lists its owned API
-❌ **Fail**: Check that the updated API catalog-info.yaml files (with `spec.owner`) are registered
-  in `app-config.yaml` and that the Lab 1 versions are removed to avoid duplicates
+✅ **Pass**: Each API shows its owning team and its visibility tag (`private` or `shared`)
+  on its catalog page; each team's page lists its owned API
+❌ **Fail**: Check that the updated API catalog-info.yaml files (with `spec.owner`,
+  `example.com/visibility` annotations, and visibility tags) are registered in
+  `app-config.yaml` and that the Lab 1 versions are removed to avoid duplicates
 
 ### Step 3 — Sign In as Museum Team User
 
@@ -106,9 +113,9 @@
 
 - [ ] Museum Team, Streetlights Team, and Platform Team appear in the catalog with correct members
 - [ ] All four users (alice, bob, charlie, diana) appear in the catalog
-- [ ] Museum API shows `museum-team` as owner (private)
-- [ ] Streetlights API shows `streetlights-team` as owner (private)
-- [ ] Train Travel API shows `platform-team` as owner with `example.com/visibility: shared` annotation
+- [ ] Museum API shows `museum-team` as owner and **private** in its tags
+- [ ] Streetlights API shows `streetlights-team` as owner and **private** in its tags
+- [ ] Train Travel API shows `platform-team` as owner and **shared** in its tags
 - [ ] Signed in as Alice → Train Travel API and Museum API visible; Streetlights API absent
 - [ ] Signed in as Charlie → Train Travel API and Streetlights API visible; Museum API absent
 - [ ] Signed in as either user → all groups and users are visible in the catalog

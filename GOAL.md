@@ -17,6 +17,7 @@ Lab 2
 - APIs will be owned by individual teams.
 - Demonstrate that visibility of APIs will vary based upon the user signed in at the time.
 - Some APIs will be shared so all teams can see them. Others will only be visible to the owning team.
+- Important API metadata (e.g. whether it is shared) must be visible on the API page.
 - Visibility of other catalog entry types, including users and groups, will remain allow all.
 
 Lab 3

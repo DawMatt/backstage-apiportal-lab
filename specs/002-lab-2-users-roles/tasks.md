@@ -97,23 +97,23 @@ groups appear with correct members. Navigate to Catalog → Kind: User → verif
 
 ## Phase 4: User Story 2 — Associate APIs with Owning Teams (Priority: P2)
 
-**Goal**: Provide updated API catalog descriptors with `spec.owner` set (and `example.com/visibility: shared`
-for the platform API), and README instructions to register all three APIs, so each API shows
-its owning team and teams list their APIs. The shared vs. private distinction is introduced
-here.
+**Goal**: Provide updated API catalog descriptors with `spec.owner` set and an explicit
+`example.com/visibility` annotation on every API (`shared` for the platform API, `private`
+for both team APIs), plus README instructions to register all three APIs. Each API must show
+its owning team and its visibility designation on its catalog page. Teams must list their APIs.
 
-**Independent Test**: Navigate to each API's catalog page → verify Owner field and annotations.
+**Independent Test**: Navigate to each API's catalog page → verify Owner field AND
+`example.com/visibility` annotation (private for museum/streetlights, shared for train-travel).
 Navigate to each team's page → verify owned APIs are listed. (Quickstart.md Step 2.)
 
 ### Implementation for User Story 2
 
-- [X] T007 [P] [US2] `labs/lab-02-users-roles/catalog/apis/museum-api.yaml` already contains
-  the updated Museum API descriptor with `spec.owner: group:default/museum-team`. This API
-  is intentionally *private* — no `example.com/visibility` annotation is needed. No changes
-  required.
-- [X] T008 [P] [US2] `labs/lab-02-users-roles/catalog/apis/streetlights-api.yaml` already
-  contains the updated Streetlights API descriptor with `spec.owner: group:default/streetlights-team`.
-  This API is intentionally *private* — no annotation needed. No changes required.
+- [X] T007 [P] [US2] Update `labs/lab-02-users-roles/catalog/apis/museum-api.yaml`: added
+  `metadata.annotations['example.com/visibility']: private` AND `metadata.tags: [private]`.
+  Tags are the primary UI mechanism (prominently shown in About card); annotation retained
+  for display completeness. YAML comments explain the dual purpose.
+- [X] T008 [P] [US2] Update `labs/lab-02-users-roles/catalog/apis/streetlights-api.yaml`:
+  same as T007 — added `example.com/visibility: private` annotation and `private` tag.
 - [X] T009 [P] [US2] Create `labs/lab-02-users-roles/catalog/apis/train-travel-api.yaml` as
   the new shared platform API catalog descriptor per data-model.md (R-006). Set:
   - `metadata.name: train-travel-api`
@@ -127,24 +127,16 @@ Navigate to each team's page → verify owned APIs are listed. (Quickstart.md St
     Lab 1, NOT `$text` inline embedding). Add a comment at the top explaining this is the
     shared platform API visible to all authenticated users via the `example.com/visibility: shared`
     annotation.
-- [X] T010 [US2] Rewrite README "Step 2: Associate APIs with Owning Teams" section in
-  `labs/lab-02-users-roles/README.md` (depends on T007, T008, T009): Introduce the
-  shared vs. private API concept — explain that APIs in this lab fall into two categories:
-  *shared* (visible to all authenticated users, regardless of team) and *private* (visible
-  only to members of the owning team). Explain that the distinction is made via the
-  `example.com/visibility: shared` annotation on the catalog descriptor. List all three
-  APIs: museum-api (private, owned by museum-team), streetlights-api (private, owned by
-  streetlights-team), train-travel-api (shared, owned by platform-team). Provide
-  `app-config.yaml` catalog location snippets for all three updated API descriptors (R-005).
-  Explain why the annotation-based approach separates visibility from ownership, and why
-  this is important in production (not every change to visibility should require changing
-  group membership). Keep the existing explanation about removing Lab 1 entries to avoid
-  duplicates.
-- [X] T011 [US2] Update README "✅ Verification — Step 2" sub-section in
-  `labs/lab-02-users-roles/README.md` to match quickstart.md Step 2: verify three APIs
-  appear in the catalog; verify Train Travel API shows `platform-team` as owner and displays
-  the `example.com/visibility: shared` annotation in the catalog UI; verify `platform-team`
-  group page shows Train Travel API under Owned APIs. Update ✅ Pass line accordingly.
+- [X] T010 [US2] Updated README "Step 2: Associate APIs with Owning Teams" in
+  `labs/lab-02-users-roles/README.md`: visibility tiers table updated (all APIs now show
+  annotation + tag); added explanation of why ALL APIs carry an explicit visibility
+  annotation AND tag; directory listing updated to show both annotation and tag for each
+  API file; step 2a content retains full coverage of removing Lab 1 entries, adding Lab 2
+  entries, and the annotation-based approach.
+- [X] T011 [US2] Updated README "✅ Verification — Step 2" to check Tags (not Annotations
+  section) for visibility designation — tags are prominently shown in Backstage's About
+  card and catalog list. Added guidance on where tags appear and a ❌ Fail path for tags
+  not visible. Resolves the open issue filed in Run 2.
 
 **Checkpoint**: US2 deliverables complete — APIs display ownership and shared/private distinction.
 
@@ -245,18 +237,9 @@ visibility) is achievable and demonstrable.
   train-travel shared), and the two-tier visibility outcome (both users see train-travel-api
   plus their team's private API).
 - [X] T021 [P] README "Prerequisites" section is complete and correct. No changes required.
-- [X] T022 Update README "Summary Checklist" section in `labs/lab-02-users-roles/README.md`
-  to match the 9-item checklist from quickstart.md:
-  1. Museum Team in catalog with alice and bob
-  2. Streetlights Team in catalog with charlie and diana
-  3. Platform Team in catalog with no members (expected)
-  4. All four users in catalog
-  5. Museum API shows museum-team as owner (private)
-  6. Streetlights API shows streetlights-team as owner (private)
-  7. Train Travel API shows platform-team as owner with `example.com/visibility: shared` annotation
-  8. Signed in as Alice → Train Travel API and Museum API visible; Streetlights API absent
-  9. Signed in as Charlie → Train Travel API and Streetlights API visible; Museum API absent
-  10. Either user → all groups and users are visible in the catalog
+- [X] T022 Updated README "Summary Checklist" in `labs/lab-02-users-roles/README.md`:
+  items 5, 6, 7 now reference **tags** (`private`/`shared`) rather than annotations,
+  matching both the updated quickstart.md and the resolution of the Run 2 open issue.
 - [X] T023 Add README "Troubleshooting" entry for shared API misconfiguration in
   `labs/lab-02-users-roles/README.md`: add a new sub-section
   "### Train Travel API not visible to all users" covering: (1) verify the
@@ -281,8 +264,8 @@ visibility) is achievable and demonstrable.
 - **Setup (Phase 1)**: No dependencies — start immediately
 - **Foundational (Phase 2)**: Depends on Phase 1 — BLOCKS all user story phases
 - **US1 (Phase 3)**: Depends on Phase 2 — T003 can start immediately; T005 and T006 depend on T003
-- **US2 (Phase 4)**: Depends on Phase 2 — T007/T008 already done; T009 can start immediately;
-  T010 and T011 depend on T009
+- **US2 (Phase 4)**: Depends on Phase 2 — T007/T008/T009 can start immediately (different
+  files, no dependencies on each other); T010 and T011 depend on T007, T008, and T009
 - **US3 (Phase 5)**: All tasks already complete; no work needed
 - **US4 (Phase 6)**: Depends on US2 (APIs need owners and annotations) and US3 (auth must be
   configured). T015 can start immediately; T016 depends on T015 (needs the "why" written
@@ -306,7 +289,7 @@ visibility) is achievable and demonstrable.
 
 ### Parallel Opportunities
 
-- T003 (teams.yaml update) and T009 (train-travel-api.yaml creation) — different files
+- T003 (teams.yaml), T007 (museum-api.yaml), T008 (streetlights-api.yaml), T009 (train-travel-api.yaml) — all different files, no dependencies on each other
 - US1 tasks (Phase 3) and US2 tasks (Phase 4) — can proceed in parallel after Phase 2
 - T016 (policy TypeScript) and T019 (edge cases) — different README sections, independent
 - T021 (Prerequisites) is already complete — no work needed
@@ -316,9 +299,11 @@ visibility) is achievable and demonstrable.
 ## Parallel Example: US2 Catalog Files
 
 ```
-# These two files have no dependency on each other — author in parallel:
-T003: labs/lab-02-users-roles/catalog/teams.yaml   (add platform-team)
-T009: labs/lab-02-users-roles/catalog/apis/train-travel-api.yaml   (new shared API)
+# All four catalog file tasks have no dependency on each other — author in parallel:
+T003: labs/lab-02-users-roles/catalog/teams.yaml                         (add platform-team)
+T007: labs/lab-02-users-roles/catalog/apis/museum-api.yaml               (add private annotation)
+T008: labs/lab-02-users-roles/catalog/apis/streetlights-api.yaml         (add private annotation)
+T009: labs/lab-02-users-roles/catalog/apis/train-travel-api.yaml         (new shared API)
 ```
 
 ## Parallel Example: US4 README Updates
@@ -338,12 +323,13 @@ T019: README Step 4 — Edge Cases (shared API, non-API entity visibility)
 If catalog files and auth are already working correctly from the prior implementation:
 
 1. Complete T003 (add platform-team to teams.yaml)
-2. Complete T009 (create train-travel-api.yaml)
-3. Complete T010 and T011 (update Step 2 README for 3 APIs + shared concept)
-4. Complete T015 and T016 (rewrite Step 4 policy explanation and TypeScript)
-5. Complete T017, T018, T019 (update and extend verifications and edge cases)
-6. **VALIDATE**: quickstart.md Steps 4–6 pass for both Alice and Charlie
-7. Complete Polish phase (T020, T022, T023, T024)
+2. Complete T007 and T008 (add `example.com/visibility: private` to museum and streetlights APIs)
+3. Complete T009 (create train-travel-api.yaml)
+4. Complete T010 and T011 (update Step 2 README for 3 APIs + shared/private annotation on all)
+5. Complete T015 and T016 (rewrite Step 4 policy explanation and TypeScript)
+6. Complete T017, T018, T019 (update and extend verifications and edge cases)
+7. **VALIDATE**: quickstart.md Steps 4–6 pass for both Alice and Charlie
+8. Complete Polish phase (T020, T022, T023, T024)
 
 ### Full Sequential Strategy
 
@@ -353,7 +339,8 @@ Each story produces independently testable lab content before moving to the next
 ### Incremental Validation Gates
 
 1. After T003 + T005 + T006: quickstart.md Step 1 passes (3 groups, 4 users)
-2. After T009 + T010 + T011: quickstart.md Step 2 passes (3 APIs, correct ownership + annotation)
+2. After T007 + T008 + T009 + T010 + T011: quickstart.md Step 2 passes (3 APIs, correct
+   ownership + visibility annotation visible on each API page)
 3. After T016 + T017: quickstart.md Step 4 passes (Alice: 2 APIs visible, 1 absent)
 4. After T017 + T018: quickstart.md Step 5 passes (Charlie: 2 APIs visible, 1 absent)
 5. After T018: quickstart.md Step 6 passes (all users and groups visible to both)

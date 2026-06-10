@@ -1,6 +1,6 @@
 # Implementation Plan: Lab 2 — Users, Roles, and API Visibility
 
-**Branch**: `002-lab-2-users-roles` | **Date**: 2026-06-08 (Updated: 2026-06-10) | **Spec**: [spec.md](spec.md)
+**Branch**: `002-lab-2-users-roles` | **Date**: 2026-06-08 (Updated: 2026-06-11) | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/002-lab-2-users-roles/spec.md`
 
@@ -10,12 +10,14 @@ Lab 2 builds directly on the running Backstage 1.51.0 instance from Lab 1. It in
 User and Group catalog entities, assigns API ownership to those groups, and configures
 identity-aware sign-in using the guest auth provider already present in the Backstage
 install. A third API — a shared platform API visible to all authenticated users — is added
-alongside the two team-owned private APIs from Lab 1. The lab then replaces the default
-allow-all permission policy with a custom two-tier policy: APIs marked as shared are visible
-to everyone, private APIs are visible only to members of the owning team, and all other
-catalog entry types (User, Group, etc.) remain unrestricted. The result is a demonstrable
-difference in what two users from different teams can see in the API catalog.
-All changes are local, zero-cost, and cross-platform.
+alongside the two team-owned private APIs from Lab 1. All three API catalog descriptors
+carry an explicit `example.com/visibility` annotation (`shared` or `private`) so any user
+viewing an API's catalog page can immediately see its visibility designation. The lab then
+replaces the default allow-all permission policy with a custom two-tier policy: APIs
+annotated `shared` are visible to everyone, `private` APIs are visible only to members of
+the owning team, and all other catalog entry types (User, Group, etc.) remain unrestricted.
+The result is a demonstrable difference in what two users from different teams can see in
+the API catalog. All changes are local, zero-cost, and cross-platform.
 
 ## Technical Context
 
@@ -94,8 +96,10 @@ labs/
         │                                # platform-team (no members; owns shared API)
         ├── users.yaml                   # User entities: alice, bob, charlie, diana
         └── apis/
-            ├── museum-api.yaml          # Private API: spec.owner = museum-team
-            ├── streetlights-api.yaml    # Private API: spec.owner = streetlights-team
+            ├── museum-api.yaml          # Private API: spec.owner = museum-team +
+            │                            # annotation example.com/visibility: private
+            ├── streetlights-api.yaml    # Private API: spec.owner = streetlights-team +
+            │                            # annotation example.com/visibility: private
             └── train-travel-api.yaml    # Shared API: spec.owner = platform-team +
                                          # annotation example.com/visibility: shared
 ```

@@ -4,7 +4,7 @@
 
 **Created**: 2026-06-07
 
-**Status**: Draft (Updated: 2026-06-10)
+**Status**: Draft (Updated: 2026-06-11)
 
 **Input**: User description: "Add users, roles and teams. Demonstrate that visibility of APIs will vary based upon the user signed in at the time."
 
@@ -57,6 +57,11 @@ the APIs it owns are listed.
    displays its owning team in the catalog.
 2. **Given** APIs are owned by teams, **When** the developer views a team's catalog page,
    **Then** the team's owned APIs are listed on that page.
+3. **Given** an API has been designated as shared or private, **When** the developer views
+   that API's catalog page, **Then** the visibility designation (shared or private) is
+   clearly shown as part of the API's metadata — so any user viewing the page can immediately
+   understand whether this API is available to all authenticated users or restricted to the
+   owning team.
 
 ---
 
@@ -172,6 +177,11 @@ are visible only to members of that team.
   catalog descriptor files for users and groups MUST reside under `labs/lab-02-users-roles/`.
 - **FR-010**: Instructions MUST include platform-specific variants for any steps that
   differ between Windows and macOS.
+- **FR-011**: Each API's catalog page MUST display the API's visibility designation
+  (shared or private) as a visible metadata field, so that any user viewing the page can
+  immediately determine whether the API is available to all authenticated users or is
+  restricted to the owning team. This designation must be present regardless of whether
+  the viewing user has access to the API.
 
 ### Key Entities
 
@@ -201,6 +211,9 @@ are visible only to members of that team.
   the Backstage catalog with accurate membership data.
 - **SC-003**: Each sample API in the catalog displays an owning team, and navigating from
   that team to its owned APIs requires no more than two clicks.
+- **SC-007**: The visibility designation (shared or private) is visible as a labeled
+  metadata field on every API's catalog page, requiring no additional navigation or clicks
+  to find.
 - **SC-004**: A developer signed in as a member of Team A sees all shared APIs and Team A's
   private APIs but not Team B's private APIs — and vice versa for a developer signed in as
   a member of Team B. The difference is directly attributable to the two-tier visibility

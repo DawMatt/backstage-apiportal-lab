@@ -289,38 +289,65 @@ are added, to avoid duplicate API entities in the catalog.
 
 ---
 
-## R-006: Shared API Annotation Convention
+## R-006: API Visibility Annotation Convention
 
-**Decision**: Mark shared (platform) APIs with the annotation
-`example.com/visibility: shared` in their `catalog-info.yaml` `metadata.annotations` block.
-The permission policy reads this annotation via `catalogConditions.hasAnnotation` to grant
-unconditional visibility.
+**Decision**: All API catalog descriptors carry an explicit `example.com/visibility`
+annotation — `shared` for the platform API and `private` for team-owned APIs. The permission
+policy reads only the `shared` value (via `catalogConditions.hasAnnotation`) to grant
+unconditional visibility; the `private` value is for display purposes only.
 
-**Rationale**: Backstage's `catalogConditions.hasAnnotation` accepts both a key and an
-optional value for exact matching. Using a custom annotation in the `example.com/` domain
-(a fictional but conventional domain name for lab purposes) teaches learners that Backstage
-annotations are just key-value metadata — any string key is valid. Keeping the annotation
-in the catalog descriptor (not in a separate config file) means visibility is co-located
-with the entity definition, making it easy to audit which APIs are shared.
+**Rationale**: Displaying the visibility designation on every API's entity page (FR-011)
+requires an annotation on all APIs, not just the shared one. A consistent annotation key
+(`example.com/visibility`) with two explicit values (`shared` / `private`) is easier to
+understand and audit than the absence of an annotation implying a default. The annotation
+appears in Backstage's **Annotations** section on the entity page, making it immediately
+visible to any user who opens an API's catalog page.
 
-**Format** (applied to shared API `catalog-info.yaml`):
+The permission policy only needs `hasAnnotation({ value: 'shared' })` to distinguish shared
+from private — adding `private` on the other APIs does not change policy behaviour, since
+private APIs are already gated by `isEntityOwner`.
+
+**Format** (applied to all API `catalog-info.yaml` files):
 ```yaml
+# Shared platform API — visible to all authenticated users
 metadata:
   name: train-travel-api
+  tags:
+    - shared        # prominently shown in Backstage's About card
   annotations:
-    example.com/visibility: shared   # Makes this API visible to all authenticated users
+    example.com/visibility: shared   # read by the permission policy
+
+# Private team API — visible only to owning team members
+metadata:
+  name: museum-api
+  tags:
+    - private       # prominently shown in Backstage's About card
+  annotations:
+    example.com/visibility: private  # for display only; policy uses isEntityOwner
 ```
+
+**Why both tags AND annotations?** During lab testing, the Backstage Annotations section
+was not easily discoverable by learners. Tags are displayed as coloured chips directly in
+the About card and in the catalog entity list — they are immediately visible without
+navigating to a separate section. The annotation is retained for the permission policy
+(which uses `hasAnnotation` to detect shared APIs) and for documentation completeness.
+The tag is the primary UI mechanism for making visibility status visible (FR-011).
 
 **Alternatives considered**:
 - Using `backstage.io/` namespace for the annotation: reserved for official Backstage
   annotations. Custom annotations should use a separate domain (e.g., `example.com/`).
-- Using metadata tags (`tags: [shared]`): simpler YAML, but Backstage tags are freeform
-  strings without namespacing. `hasAnnotation` with a namespaced key is more explicit and
-  mirrors real-world Backstage annotation patterns (e.g., `jira.com/project-key`).
+- Using only tags (no annotation): tags are visible but freeform. `hasAnnotation` with a
+  namespaced key is required for the permission policy and mirrors real-world patterns
+  (e.g., `jira.com/project-key`). Both mechanisms serve different purposes — tags for
+  display, annotation for policy evaluation.
 - Using a shared-membership group: adding all users to a `platform-team` group would give
   everyone `isEntityOwner` access to the shared API. This conflates org membership with
   visibility rules, and would need to be updated whenever a new user is added. The annotation
   approach is declarative and does not require touching user/group entities.
+- Omitting the annotation on private APIs: the permission policy works without it, but
+  then users cannot tell from the API page whether an API is shared or private. FR-011
+  requires the designation to be visible on the page — both the annotation and the tag on
+  private APIs are necessary for this.
 
 **Train Travel API source**: The shared API uses the Train Travel API from
 `https://github.com/bump-sh-examples/train-travel-api` — an approved example per

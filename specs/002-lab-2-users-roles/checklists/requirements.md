@@ -41,4 +41,9 @@
   reflect that: (a) some APIs are shared and visible to all authenticated users; (b) other
   APIs are private and visible only to the owning team; (c) all non-API catalog entry types
   (User, Group, etc.) remain unrestricted.
+- Spec updated (2026-06-11): added FR-011 and SC-007 requiring that the shared/private
+  visibility designation is displayed as a visible metadata field on every API's catalog
+  page. US2 acceptance scenario 3 added to cover this requirement. This ensures the
+  visibility status is discoverable by any user viewing an API, not only enforced invisibly
+  by the permissions framework.
 - All checklist items pass. Spec is ready for `/speckit-plan`.

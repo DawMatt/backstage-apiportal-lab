@@ -1,6 +1,6 @@
 # Data Model: Lab 2 — Users, Roles, and API Visibility
 
-**Branch**: `002-lab-2-users-roles` | **Date**: 2026-06-08
+**Branch**: `002-lab-2-users-roles` | **Date**: 2026-06-08 (Updated: 2026-06-11)
 
 ## Catalog Entities
 
@@ -114,7 +114,8 @@ versions are registered.
 | Field | Value |
 |-------|-------|
 | `metadata.name` | `museum-api` (unchanged from Lab 1) |
-| `metadata.annotations` | none (no visibility annotation = private) |
+| `metadata.tags` | `[rest, openapi, sample, private]` — `private` tag makes visibility visible in UI |
+| `metadata.annotations['example.com/visibility']` | `private` **(retained for display; does not affect permission policy)** |
 | `spec.owner` | `group:default/museum-team` **(new in Lab 2)** |
 | `spec.type` | `openapi` |
 | `spec.lifecycle` | `production` |
@@ -122,12 +123,18 @@ versions are registered.
 
 Visible to: `museum-team` members only (Alice, Bob).
 
+**Note**: Tags are prominently displayed in Backstage's About card and in the catalog list.
+The `private` tag makes the visibility designation immediately visible to team members who
+can access the API page. The annotation is kept for documentation completeness; the
+permission policy restricts access via `isEntityOwner` (not via the annotation value).
+
 #### `api:default/streetlights-api` — *Private*
 
 | Field | Value |
 |-------|-------|
 | `metadata.name` | `streetlights-api` (unchanged from Lab 1) |
-| `metadata.annotations` | none (no visibility annotation = private) |
+| `metadata.tags` | `[event-driven, asyncapi, sample, private]` — `private` tag makes visibility visible in UI |
+| `metadata.annotations['example.com/visibility']` | `private` **(retained for display; does not affect permission policy)** |
 | `spec.owner` | `group:default/streetlights-team` **(new in Lab 2)** |
 | `spec.type` | `asyncapi` |
 | `spec.lifecycle` | `production` |
@@ -135,12 +142,16 @@ Visible to: `museum-team` members only (Alice, Bob).
 
 Visible to: `streetlights-team` members only (Charlie, Diana).
 
+**Note**: Same approach as museum-api — the `private` tag surfaces the visibility
+designation in Backstage's UI; the annotation is for display completeness.
+
 #### `api:default/train-travel-api` — *Shared*
 
 | Field | Value |
 |-------|-------|
 | `metadata.name` | `train-travel-api` **(new in Lab 2)** |
-| `metadata.annotations['example.com/visibility']` | `shared` **(marks this API as visible to all)** |
+| `metadata.tags` | `[rest, openapi, sample, shared]` — `shared` tag makes visibility visible in UI |
+| `metadata.annotations['example.com/visibility']` | `shared` **(read by permission policy to grant unconditional access)** |
 | `spec.owner` | `group:default/platform-team` |
 | `spec.type` | `openapi` |
 | `spec.lifecycle` | `production` |
@@ -224,8 +235,10 @@ diana (User)
 The `ownerOf` relation is derived by Backstage from `spec.owner` on the API entity.
 The `hasMember`/`memberOf` relations are derived from the `members` list on the Group entity
 and the `memberOf` list on the User entity (both must be present for bidirectional resolution).
-Shared vs. private visibility is determined by the `example.com/visibility: shared` annotation
-on the API entity — it is independent of the `ownerOf` relation.
+Shared vs. private access control is determined by the `example.com/visibility: shared`
+annotation on the API entity — it is independent of the `ownerOf` relation. All three API
+entities carry an explicit `example.com/visibility` annotation (`shared` or `private`) so
+that any user viewing an API's catalog page can immediately see its visibility designation.
 
 **Effective visibility summary**:
 
