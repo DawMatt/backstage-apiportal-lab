@@ -4,7 +4,7 @@
 
 **Created**: 2026-06-07
 
-**Status**: Draft (Updated: 2026-06-11)
+**Status**: Implemented (Updated: 2026-06-11 — FR-011, SC-007, US2 AS3 refined)
 
 **Input**: User description: "Add users, roles and teams. Demonstrate that visibility of APIs will vary based upon the user signed in at the time."
 
@@ -57,11 +57,12 @@ the APIs it owns are listed.
    displays its owning team in the catalog.
 2. **Given** APIs are owned by teams, **When** the developer views a team's catalog page,
    **Then** the team's owned APIs are listed on that page.
-3. **Given** an API has been designated as shared or private, **When** the developer views
-   that API's catalog page, **Then** the visibility designation (shared or private) is
-   clearly shown as part of the API's metadata — so any user viewing the page can immediately
-   understand whether this API is available to all authenticated users or restricted to the
-   owning team.
+3. **Given** an API has been designated as shared or private via the metadata field that
+   the permission policy evaluates, **When** any user who can view that API's catalog page
+   does so, **Then** the visibility designation (shared or private) is clearly shown — and
+   this displayed designation is read directly from the same metadata the policy evaluates,
+   so that a change to that metadata is automatically reflected in the display without any
+   additional update step.
 
 ---
 
@@ -178,10 +179,14 @@ are visible only to members of that team.
 - **FR-010**: Instructions MUST include platform-specific variants for any steps that
   differ between Windows and macOS.
 - **FR-011**: Each API's catalog page MUST display the API's visibility designation
-  (shared or private) as a visible metadata field, so that any user viewing the page can
-  immediately determine whether the API is available to all authenticated users or is
-  restricted to the owning team. This designation must be present regardless of whether
-  the viewing user has access to the API.
+  (shared or private) as a visible metadata field, so that any user who can view that page
+  can immediately determine whether the API is available to all authenticated users or is
+  restricted to the owning team. The displayed designation MUST be derived directly from
+  the same metadata field that the permission policy evaluates — it MUST NOT be maintained
+  as a separate copy (for example, a tag or label that mirrors the policy-driving field),
+  because copies can diverge and display a designation that no longer matches the enforced
+  policy. If the underlying policy metadata is updated, the displayed designation MUST
+  reflect that change automatically, with no additional manual update required.
 
 ### Key Entities
 
@@ -211,9 +216,11 @@ are visible only to members of that team.
   the Backstage catalog with accurate membership data.
 - **SC-003**: Each sample API in the catalog displays an owning team, and navigating from
   that team to its owned APIs requires no more than two clicks.
-- **SC-007**: The visibility designation (shared or private) is visible as a labeled
-  metadata field on every API's catalog page, requiring no additional navigation or clicks
-  to find.
+- **SC-007**: The visibility designation (shared or private) is visible on every API's
+  catalog page without additional navigation or clicks, and is derived from the same
+  metadata field the permission policy reads. When the policy-driving metadata is changed,
+  the displayed designation updates automatically — no secondary field requires
+  synchronisation.
 - **SC-004**: A developer signed in as a member of Team A sees all shared APIs and Team A's
   private APIs but not Team B's private APIs — and vice versa for a developer signed in as
   a member of Team B. The difference is directly attributable to the two-tier visibility
@@ -238,6 +245,11 @@ are visible only to members of that team.
   does not require third-party plugins. The permission policy will apply only to API
   catalog entries; all other entity kinds (User, Group, System, Domain, etc.) will remain
   unrestricted.
+- FR-011 requires that the displayed visibility designation is read from the same metadata
+  field the permission policy evaluates, not from a secondary copy. The implication is
+  that any implementation using a separate display field (e.g., a tag or label that mirrors
+  the policy field) does not satisfy FR-011, even if the two fields are currently in sync.
+  The display mechanism must read the policy-driving field directly.
 - No GitHub account or any external service is required for authentication. The development
   sign-in provider is entirely local. A GitHub account may still be useful if the developer
   wishes to host catalog descriptors on GitHub (as in Lab 1), but it is not required for

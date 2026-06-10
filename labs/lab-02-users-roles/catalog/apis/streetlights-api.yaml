@@ -5,8 +5,8 @@
 #   - spec.lifecycle changed from experimental to production
 #   - spec.definition.$text now uses a full GitHub raw URL (required when the
 #     descriptor and the spec file are not in the same directory)
-#   - example.com/visibility: private annotation added (display + permission policy)
-#   - 'private' tag added for prominent display in the Backstage catalog UI
+#   - example.com/visibility: private annotation added (display + permission policy;
+#     this is the single source of truth — no separate tag mirrors it)
 
 apiVersion: backstage.io/v1alpha1
 kind: API
@@ -19,12 +19,11 @@ metadata:
     - event-driven
     - asyncapi
     - sample
-    - private
   annotations:
     # This annotation marks the API as private (team-restricted).
-    # The custom permission policy restricts access via isEntityOwner — only
-    # streetlights-team members can see this API. The annotation is for display: it makes
-    # the visibility designation visible to anyone viewing this API's catalog page.
+    # It is both the policy-driving field (the permission policy uses isEntityOwner for
+    # access control) and the displayed designation (visible in Backstage's Annotations
+    # section on this API's catalog page). No separate tag mirrors this value.
     # Note: example.com is a fictional annotation domain used for lab purposes only.
     example.com/visibility: private
 spec:

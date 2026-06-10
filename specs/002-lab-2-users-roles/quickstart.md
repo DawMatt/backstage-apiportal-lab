@@ -33,19 +33,19 @@
 2. Verify three APIs are visible: Museum API, Streetlights API, Train Travel API
 3. Click the **Museum API** entry → verify:
    - The **Owner** field shows `museum-team`
-   - The **Tags** section shows `private`
+   - The **Annotations** section shows `example.com/visibility: private`
 4. Click the **Streetlights API** entry → verify:
    - The **Owner** field shows `streetlights-team`
-   - The **Tags** section shows `private`
+   - The **Annotations** section shows `example.com/visibility: private`
 5. Click the **Train Travel API** entry → verify:
    - The **Owner** field shows `platform-team`
-   - The **Tags** section shows `shared`
+   - The **Annotations** section shows `example.com/visibility: shared`
 6. Navigate to the `museum-team` Group page → verify the Museum API appears under **Owned APIs**
 7. Navigate to the `streetlights-team` Group page → verify the Streetlights API appears under **Owned APIs**
 8. Navigate to the `platform-team` Group page → verify the Train Travel API appears under **Owned APIs**
 
-✅ **Pass**: Each API shows its owning team and its visibility tag (`private` or `shared`)
-  on its catalog page; each team's page lists its owned API
+✅ **Pass**: Each API shows its owning team and its `example.com/visibility` annotation
+  (`private` or `shared`) in the Annotations section; each team's page lists its owned API
 ❌ **Fail**: Check that the updated API catalog-info.yaml files (with `spec.owner`,
   `example.com/visibility` annotations, and visibility tags) are registered in
   `app-config.yaml` and that the Lab 1 versions are removed to avoid duplicates
@@ -62,11 +62,15 @@
 2. Restart Backstage: `Ctrl+C` then `yarn start`
 3. Wait for catalog to load (UI shows catalog entries before clicking Sign In)
 4. Click **Sign In** → click **Enter as Guest**
-5. Verify the top-right user icon / profile shows **Alice Chen**
+5. Click the **Settings** icon (bottom-left sidebar) → verify profile shows **Alice Chen**
+6. Click **alice** (the user name on the profile page) → verify **museum-team** is listed
+   under her group memberships on the catalog entity page
 
-✅ **Pass**: Signed in as Alice (Museum Team member)
+✅ **Pass**: Profile shows Alice Chen AND her catalog page lists museum-team as her group
 ❌ **Fail**: Check that `alice` exists in the catalog (Step 1 must pass first); ensure
-  `app-config.local.yaml` is in the Backstage root directory
+  `app-config.local.yaml` is in the Backstage root directory; if alice appears but has no
+  group, verify `users.yaml` has `memberOf: [museum-team]` and `teams.yaml` has alice in
+  museum-team's `members` list
 
 ### Step 4 — Verify Museum Team Visibility (Alice)
 
@@ -113,9 +117,9 @@
 
 - [ ] Museum Team, Streetlights Team, and Platform Team appear in the catalog with correct members
 - [ ] All four users (alice, bob, charlie, diana) appear in the catalog
-- [ ] Museum API shows `museum-team` as owner and **private** in its tags
-- [ ] Streetlights API shows `streetlights-team` as owner and **private** in its tags
-- [ ] Train Travel API shows `platform-team` as owner and **shared** in its tags
+- [ ] Museum API shows `museum-team` as owner and `example.com/visibility: private` in Annotations
+- [ ] Streetlights API shows `streetlights-team` as owner and `example.com/visibility: private` in Annotations
+- [ ] Train Travel API shows `platform-team` as owner and `example.com/visibility: shared` in Annotations
 - [ ] Signed in as Alice → Train Travel API and Museum API visible; Streetlights API absent
 - [ ] Signed in as Charlie → Train Travel API and Streetlights API visible; Museum API absent
 - [ ] Signed in as either user → all groups and users are visible in the catalog

@@ -189,17 +189,22 @@ authenticated users). The distinction is made using a catalog annotation.
 
 | API | Owner | Visibility | How it works |
 |-----|-------|-----------|--------------|
-| Museum API | `museum-team` | **Private** | Annotated `example.com/visibility: private`, tagged `private` — only museum-team members can see it |
-| Streetlights API | `streetlights-team` | **Private** | Annotated `example.com/visibility: private`, tagged `private` — only streetlights-team members can see it |
-| Train Travel API | `platform-team` | **Shared** | Annotated `example.com/visibility: shared`, tagged `shared` — visible to all users |
+| Museum API | `museum-team` | **Private** | Annotated `example.com/visibility: private` — only museum-team members can see it |
+| Streetlights API | `streetlights-team` | **Private** | Annotated `example.com/visibility: private` — only streetlights-team members can see it |
+| Train Travel API | `platform-team` | **Shared** | Annotated `example.com/visibility: shared` — visible to all users |
 
-**Why annotate and tag every API, not just the shared one?** The permission policy only
+**Why annotate every API, not just the shared one?** The permission policy only
 reads the `shared` annotation to grant unconditional access — private APIs are restricted
 by ownership alone, so the `private` annotation does not affect access control. However,
-applying an explicit `example.com/visibility` annotation and a corresponding tag to every
-API makes the visibility designation immediately readable on each API's catalog page. A
-developer browsing the catalog can see at a glance whether any API is shared or
-team-restricted, without having to infer it from the absence of an annotation.
+applying an explicit `example.com/visibility` annotation to every API makes the visibility
+designation immediately readable on each API's catalog page. A developer browsing the
+catalog can see at a glance whether any API is shared or team-restricted, without having
+to infer it from the absence of an annotation.
+
+**Why not use tags to display visibility?** The `example.com/visibility` annotation is the
+field the permission policy evaluates. Using the same field for display means that if you
+change an API's visibility, both the policy enforcement and the displayed designation update
+together automatically — a single change, no secondary field to keep in sync.
 
 **Why separate ownership from visibility?** In a real organisation, a team may be
 *responsible* for an API without wanting to restrict who can *discover* it. Platform
@@ -218,11 +223,11 @@ The Lab 2 catalog directory now contains three API descriptor files:
 ```
 labs/lab-02-users-roles/catalog/apis/
 ├── museum-api.yaml          ← Private API — owner: museum-team,
-│                               annotation example.com/visibility: private, tag: private
+│                               annotation example.com/visibility: private
 ├── streetlights-api.yaml    ← Private API — owner: streetlights-team,
-│                               annotation example.com/visibility: private, tag: private
+│                               annotation example.com/visibility: private
 └── train-travel-api.yaml    ← Shared API  — owner: platform-team,
-                                annotation example.com/visibility: shared, tag: shared
+                                annotation example.com/visibility: shared
 ```
 
 Open `app-config.yaml` and make the following changes to the `catalog.locations` list:
@@ -287,25 +292,26 @@ yarn start
 2. Verify **three APIs** appear: Museum API, Streetlights API, and Train Travel API
 3. Click **Museum API** → verify:
    - The **Owner** field shows **museum-team**
-   - The **Tags** section shows **private**
+   - The **Annotations** section shows `example.com/visibility: private`
 4. Click **Streetlights API** → verify:
    - The **Owner** field shows **streetlights-team**
-   - The **Tags** section shows **private**
+   - The **Annotations** section shows `example.com/visibility: private`
 5. Click **Train Travel API** → verify:
    - The **Owner** field shows **platform-team**
-   - The **Tags** section shows **shared**
+   - The **Annotations** section shows `example.com/visibility: shared`
 6. Navigate to the **museum-team** Group page → verify **Museum API** appears under
    **Owned APIs**
 7. Navigate to the **streetlights-team** Group page → verify **Streetlights API** appears
 8. Navigate to the **platform-team** Group page → verify **Train Travel API** appears
 
-> **Where are the Tags?** In Backstage's entity detail page, tags appear in the **About**
-> card — typically as coloured chips near the top of the entity page, below the description.
-> If you don't see a Tags section, the YAML file may not have been loaded yet. Restart
-> Backstage and wait for the catalog to fully load.
+> **Where are the Annotations?** In Backstage's entity detail page, annotations appear in
+> the **Annotations** card — typically on the right-hand side of the entity page, below the
+> About card. If the Annotations section is not visible, the YAML file may not have been
+> loaded yet. Restart Backstage and wait for the catalog to fully load.
 
-✅ **Pass**: All three APIs show their owning team and their visibility tag (`shared` or
-`private`); each team's page lists its owned API(s).
+✅ **Pass**: All three APIs show their owning team and the `example.com/visibility`
+annotation (`shared` or `private`) in the Annotations section; each team's page lists its
+owned API(s).
 
 ❌ **Fail — duplicate APIs**: If you see two Museum API entries (or two Streetlights API
 entries), the Lab 1 entries were not removed from `app-config.yaml`. Remove them and
@@ -320,10 +326,10 @@ content (not a 404).
 `app-config.yaml` (not the original Lab 1 paths). Open each target URL in a browser to
 verify it returns the Lab 2 YAML with `spec.owner: group:default/...`.
 
-❌ **Fail — Tags not visible**: Ensure the Lab 2 catalog files have been committed and
-pushed to GitHub. Open the raw GitHub URL for `museum-api.yaml` in a browser and verify
-it shows the `tags:` block including `private`. If the URL still returns the old version,
-the push may not have completed.
+❌ **Fail — Annotations not visible**: Ensure the Lab 2 catalog files have been committed
+and pushed to GitHub. Open the raw GitHub URL for `museum-api.yaml` in a browser and verify
+it shows the `annotations:` block including `example.com/visibility: private`. If the URL
+still returns the old version, the push may not have completed.
 
 ---
 
@@ -385,10 +391,15 @@ Wait for the catalog to finish loading (you will see entities on the Catalog pag
 ### ✅ Verification — Step 3
 
 After signing in, confirm your identity:
-- Click the **Settings** icon in the **bottom-left** of the Backstage sidebar
-- Your profile page will show the signed-in user's display name and email
+1. Click the **Settings** icon in the **bottom-left** of the Backstage sidebar
+2. Your profile page will show the signed-in user's display name and email
+3. Click **alice** (the user name shown on the profile page) → Backstage navigates to
+   Alice's catalog entity page
+4. Verify that **museum-team** is listed under her group memberships
 
-✅ **Pass**: The profile page shows **Alice Chen** (or the display name of the configured user).
+✅ **Pass**: The profile shows **Alice Chen**, and her catalog page shows **museum-team**
+as her group. This confirms that authentication resolved Alice's team membership correctly —
+the permissions framework will use this membership to filter API visibility in Step 4.
 
 ❌ **Fail — "Sign in failed" or generic guest identity shown**: Verify that:
 - `app-config.local.yaml` is in the correct directory (next to `app-config.yaml`)
@@ -682,9 +693,9 @@ Use this checklist to confirm you have completed every step of the lab:
 - [ ] Streetlights Team (`streetlights-team`) appears in the catalog with charlie and diana as members
 - [ ] Platform Team (`platform-team`) appears in the catalog with no members (expected)
 - [ ] All four users (alice, bob, charlie, diana) appear in the catalog
-- [ ] Museum API shows `museum-team` as owner and **private** in its tags
-- [ ] Streetlights API shows `streetlights-team` as owner and **private** in its tags
-- [ ] Train Travel API shows `platform-team` as owner and **shared** in its tags
+- [ ] Museum API shows `museum-team` as owner and `example.com/visibility: private` in Annotations
+- [ ] Streetlights API shows `streetlights-team` as owner and `example.com/visibility: private` in Annotations
+- [ ] Train Travel API shows `platform-team` as owner and `example.com/visibility: shared` in Annotations
 - [ ] Signed in as Alice → Train Travel API and Museum API are visible; Streetlights API is absent
 - [ ] Signed in as Charlie → Train Travel API and Streetlights API are visible; Museum API is absent
 - [ ] Signed in as either user → all three groups and all four users are visible in the catalog

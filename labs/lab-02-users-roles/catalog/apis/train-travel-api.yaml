@@ -17,11 +17,12 @@ metadata:
     - rest
     - openapi
     - sample
-    - shared
   annotations:
     # This annotation marks the API as shared — visible to all authenticated users.
-    # The custom permission policy reads this annotation via catalogConditions.hasAnnotation
-    # and grants unconditional read access regardless of team membership.
+    # It is both the policy-driving field (the permission policy reads it via
+    # catalogConditions.hasAnnotation to grant unconditional access) and the displayed
+    # designation (visible in Backstage's Annotations section on this API's catalog page).
+    # No separate tag mirrors this value.
     # Note: example.com is a fictional annotation domain used for lab purposes.
     # In a real Backstage deployment, use your organisation's own annotation domain.
     example.com/visibility: shared

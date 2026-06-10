@@ -114,8 +114,8 @@ versions are registered.
 | Field | Value |
 |-------|-------|
 | `metadata.name` | `museum-api` (unchanged from Lab 1) |
-| `metadata.tags` | `[rest, openapi, sample, private]` — `private` tag makes visibility visible in UI |
-| `metadata.annotations['example.com/visibility']` | `private` **(retained for display; does not affect permission policy)** |
+| `metadata.tags` | `[rest, openapi, sample]` |
+| `metadata.annotations['example.com/visibility']` | `private` — displayed in the Annotations section; the permission policy applies `isEntityOwner` access control |
 | `spec.owner` | `group:default/museum-team` **(new in Lab 2)** |
 | `spec.type` | `openapi` |
 | `spec.lifecycle` | `production` |
@@ -123,18 +123,18 @@ versions are registered.
 
 Visible to: `museum-team` members only (Alice, Bob).
 
-**Note**: Tags are prominently displayed in Backstage's About card and in the catalog list.
-The `private` tag makes the visibility designation immediately visible to team members who
-can access the API page. The annotation is kept for documentation completeness; the
-permission policy restricts access via `isEntityOwner` (not via the annotation value).
+**Note**: The `example.com/visibility: private` annotation is the single source of truth for
+the visibility designation. It appears in Backstage's Annotations section on the entity page
+(FR-011). The permission policy restricts access via `isEntityOwner` (not via the annotation
+value for private APIs — the annotation is for display). No separate tag mirrors this value.
 
 #### `api:default/streetlights-api` — *Private*
 
 | Field | Value |
 |-------|-------|
 | `metadata.name` | `streetlights-api` (unchanged from Lab 1) |
-| `metadata.tags` | `[event-driven, asyncapi, sample, private]` — `private` tag makes visibility visible in UI |
-| `metadata.annotations['example.com/visibility']` | `private` **(retained for display; does not affect permission policy)** |
+| `metadata.tags` | `[event-driven, asyncapi, sample]` |
+| `metadata.annotations['example.com/visibility']` | `private` — displayed in the Annotations section; the permission policy applies `isEntityOwner` access control |
 | `spec.owner` | `group:default/streetlights-team` **(new in Lab 2)** |
 | `spec.type` | `asyncapi` |
 | `spec.lifecycle` | `production` |
@@ -142,16 +142,16 @@ permission policy restricts access via `isEntityOwner` (not via the annotation v
 
 Visible to: `streetlights-team` members only (Charlie, Diana).
 
-**Note**: Same approach as museum-api — the `private` tag surfaces the visibility
-designation in Backstage's UI; the annotation is for display completeness.
+**Note**: Same approach as museum-api — the `example.com/visibility: private` annotation is
+the single display source (FR-011). No separate tag mirrors this value.
 
 #### `api:default/train-travel-api` — *Shared*
 
 | Field | Value |
 |-------|-------|
 | `metadata.name` | `train-travel-api` **(new in Lab 2)** |
-| `metadata.tags` | `[rest, openapi, sample, shared]` — `shared` tag makes visibility visible in UI |
-| `metadata.annotations['example.com/visibility']` | `shared` **(read by permission policy to grant unconditional access)** |
+| `metadata.tags` | `[rest, openapi, sample]` |
+| `metadata.annotations['example.com/visibility']` | `shared` **(read by permission policy to grant unconditional access; displayed in Annotations section)** |
 | `spec.owner` | `group:default/platform-team` |
 | `spec.type` | `openapi` |
 | `spec.lifecycle` | `production` |
@@ -238,7 +238,8 @@ and the `memberOf` list on the User entity (both must be present for bidirection
 Shared vs. private access control is determined by the `example.com/visibility: shared`
 annotation on the API entity — it is independent of the `ownerOf` relation. All three API
 entities carry an explicit `example.com/visibility` annotation (`shared` or `private`) so
-that any user viewing an API's catalog page can immediately see its visibility designation.
+that any user viewing an API's catalog page can immediately see its visibility designation
+in the Annotations section. No separate tag mirrors this annotation (FR-011 prohibits it).
 
 **Effective visibility summary**:
 

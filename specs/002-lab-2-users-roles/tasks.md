@@ -109,11 +109,10 @@ Navigate to each team's page → verify owned APIs are listed. (Quickstart.md St
 ### Implementation for User Story 2
 
 - [X] T007 [P] [US2] Update `labs/lab-02-users-roles/catalog/apis/museum-api.yaml`: added
-  `metadata.annotations['example.com/visibility']: private` AND `metadata.tags: [private]`.
-  Tags are the primary UI mechanism (prominently shown in About card); annotation retained
-  for display completeness. YAML comments explain the dual purpose.
+  `metadata.annotations['example.com/visibility']: private`. The annotation is the single
+  source of truth for both policy and display (FR-011). No visibility tag is used.
 - [X] T008 [P] [US2] Update `labs/lab-02-users-roles/catalog/apis/streetlights-api.yaml`:
-  same as T007 — added `example.com/visibility: private` annotation and `private` tag.
+  same as T007 — added `example.com/visibility: private` annotation only.
 - [X] T009 [P] [US2] Create `labs/lab-02-users-roles/catalog/apis/train-travel-api.yaml` as
   the new shared platform API catalog descriptor per data-model.md (R-006). Set:
   - `metadata.name: train-travel-api`
@@ -128,15 +127,19 @@ Navigate to each team's page → verify owned APIs are listed. (Quickstart.md St
     shared platform API visible to all authenticated users via the `example.com/visibility: shared`
     annotation.
 - [X] T010 [US2] Updated README "Step 2: Associate APIs with Owning Teams" in
-  `labs/lab-02-users-roles/README.md`: visibility tiers table updated (all APIs now show
-  annotation + tag); added explanation of why ALL APIs carry an explicit visibility
-  annotation AND tag; directory listing updated to show both annotation and tag for each
-  API file; step 2a content retains full coverage of removing Lab 1 entries, adding Lab 2
-  entries, and the annotation-based approach.
-- [X] T011 [US2] Updated README "✅ Verification — Step 2" to check Tags (not Annotations
-  section) for visibility designation — tags are prominently shown in Backstage's About
-  card and catalog list. Added guidance on where tags appear and a ❌ Fail path for tags
-  not visible. Resolves the open issue filed in Run 2.
+  `labs/lab-02-users-roles/README.md`: visibility tiers table and directory listing updated
+  to show annotation only (no tags); added explanation of why the annotation is the single
+  source of truth for both policy and display; step 2a content retains full coverage of
+  removing Lab 1 entries, adding Lab 2 entries, and the annotation-based approach.
+- [X] T011 [US2] Updated README "✅ Verification — Step 2" to check Annotations section for
+  visibility designation (not Tags). Updated guidance and ❌ Fail path accordingly.
+- [X] T025 [US2] FR-011/SC-007 tag removal (spec refined 2026-06-11): removed `private` and
+  `shared` tags from all three API catalog descriptors (`museum-api.yaml`,
+  `streetlights-api.yaml`, `train-travel-api.yaml`). Updated plan.md, research.md R-006,
+  data-model.md, quickstart.md, and README.md to remove all tag references and direct
+  learners to the Annotations section for the visibility designation. The
+  `example.com/visibility` annotation is now the single source of truth for both the
+  permission policy and the displayed designation.
 
 **Checkpoint**: US2 deliverables complete — APIs display ownership and shared/private distinction.
 
@@ -216,8 +219,10 @@ Steps 4–6.)
   with no `example.com/visibility: shared` annotation will be invisible to all users
   (isEntityOwner returns false for everyone). Add two new edge cases from spec.md:
   (1) shared API accidentally configured as private — explain how to verify the annotation
-  is present and correctly spelled; (2) non-API entity type visibility — explain that
-  User, Group, and all other non-API kinds are always visible because the `not(isEntityKind)`
+  is present and correctly spelled (addresses US4-AS5 partial coverage: documents that an
+  anonymous/unauthenticated guest sees shared APIs but not private ones — rule 2 passes
+  for shared APIs regardless of user identity); (2) non-API entity type visibility — explain
+  that User, Group, and all other non-API kinds are always visible because the `not(isEntityKind)`
   arm passes for them, regardless of ownership.
 
 **Checkpoint**: US4 deliverables complete — the lab's primary learning outcome (two-tier
@@ -238,8 +243,8 @@ visibility) is achievable and demonstrable.
   plus their team's private API).
 - [X] T021 [P] README "Prerequisites" section is complete and correct. No changes required.
 - [X] T022 Updated README "Summary Checklist" in `labs/lab-02-users-roles/README.md`:
-  items 5, 6, 7 now reference **tags** (`private`/`shared`) rather than annotations,
-  matching both the updated quickstart.md and the resolution of the Run 2 open issue.
+  items 5, 6, 7 now reference the `example.com/visibility` annotation in the Annotations
+  section (updated as part of T025 — FR-011 tag removal).
 - [X] T023 Add README "Troubleshooting" entry for shared API misconfiguration in
   `labs/lab-02-users-roles/README.md`: add a new sub-section
   "### Train Travel API not visible to all users" covering: (1) verify the
@@ -318,20 +323,7 @@ T019: README Step 4 — Edge Cases (shared API, non-API entity visibility)
 
 ## Implementation Strategy
 
-### Minimum Change Set (US4 only — if US1/US2 artifacts are re-verified)
-
-If catalog files and auth are already working correctly from the prior implementation:
-
-1. Complete T003 (add platform-team to teams.yaml)
-2. Complete T007 and T008 (add `example.com/visibility: private` to museum and streetlights APIs)
-3. Complete T009 (create train-travel-api.yaml)
-4. Complete T010 and T011 (update Step 2 README for 3 APIs + shared/private annotation on all)
-5. Complete T015 and T016 (rewrite Step 4 policy explanation and TypeScript)
-6. Complete T017, T018, T019 (update and extend verifications and edge cases)
-7. **VALIDATE**: quickstart.md Steps 4–6 pass for both Alice and Charlie
-8. Complete Polish phase (T020, T022, T023, T024)
-
-### Full Sequential Strategy
+### Sequential Strategy (all tasks complete)
 
 Work in phase order: Phase 1 → 2 (already done) → US1 → US2 → US3 (already done) → US4 → Polish.
 Each story produces independently testable lab content before moving to the next.
