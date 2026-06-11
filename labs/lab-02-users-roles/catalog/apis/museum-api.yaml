@@ -1,0 +1,34 @@
+# Lab 2 — Museum API catalog descriptor (updated from Lab 1)
+#
+# Changes from Lab 1:
+#   - spec.owner added: group:default/museum-team
+#   - spec.lifecycle changed from experimental to production
+#   - spec.definition.$text now uses a full GitHub raw URL (required when the
+#     descriptor and the spec file are not in the same directory)
+#   - example.com/visibility: private annotation added (display + permission policy;
+#     this is the single source of truth — no separate tag mirrors it)
+
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: museum-api
+  description: >
+    A sample REST API for a fictional museum, demonstrating modern OpenAPI 3.1 design
+    practices. Covers special events, museum hours, and ticket purchasing.
+  tags:
+    - rest
+    - openapi
+    - sample
+  annotations:
+    # This annotation marks the API as private (team-restricted).
+    # It is both the policy-driving field (the permission policy uses isEntityOwner for
+    # access control) and the displayed designation (visible in Backstage's Annotations
+    # section on this API's catalog page). No separate tag mirrors this value.
+    # Note: example.com is a fictional annotation domain used for lab purposes only.
+    example.com/visibility: private
+spec:
+  type: openapi
+  lifecycle: production
+  owner: group:default/museum-team
+  definition:
+    $text: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-01-base-backstage/apis/museum/openapi.yaml

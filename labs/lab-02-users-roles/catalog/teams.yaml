@@ -1,0 +1,58 @@
+# Lab 2 — Group (team) entities
+#
+# Both groups MUST list their members here, AND each User entity MUST declare
+# memberOf pointing back to the group. Backstage requires both sides to build
+# the bidirectional hasMember / memberOf relations used by the permissions framework.
+#
+# All member names are fictional example values only.
+
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: museum-team
+  namespace: default
+  description: The team responsible for the Museum REST API.
+spec:
+  type: team
+  profile:
+    displayName: Museum Team
+  children: []
+  members:
+    - alice
+    - bob
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: streetlights-team
+  namespace: default
+  description: The team responsible for the Streetlights Event API.
+spec:
+  type: team
+  profile:
+    displayName: Streetlights Team
+  children: []
+  members:
+    - charlie
+    - diana
+---
+# platform-team owns shared platform APIs that are visible to all authenticated users.
+# It has no individual members by design — visibility of its APIs is controlled by the
+# example.com/visibility: shared annotation on each API entity, not by group membership.
+# This separates organisational ownership (who is responsible) from access control (who
+# can see it), which is a common pattern in real Backstage deployments.
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-team
+  namespace: default
+  description: >
+    Owns shared platform APIs that are visible to all authenticated users regardless of
+    team membership. Visibility is controlled by the example.com/visibility annotation on
+    each API, not by group membership — so this group intentionally has no members.
+spec:
+  type: team
+  profile:
+    displayName: Platform Team
+  children: []
+  members: []

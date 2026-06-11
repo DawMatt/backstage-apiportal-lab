@@ -1,0 +1,34 @@
+# Lab 2 — Train Travel API catalog descriptor (shared platform API)
+#
+# This is a SHARED API — visible to all authenticated users regardless of team membership.
+# Visibility is controlled by the annotation below, NOT by group membership.
+# The permission policy checks for this annotation and grants unconditional read access
+# when it is present.
+
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: train-travel-api
+  description: >
+    A sample REST API for booking train travel, demonstrating modern OpenAPI 3.1 design
+    practices. Covers stations, journeys, bookings, tickets, and payments. This API is a
+    shared platform resource visible to all authenticated users.
+  tags:
+    - rest
+    - openapi
+    - sample
+  annotations:
+    # This annotation marks the API as shared — visible to all authenticated users.
+    # It is both the policy-driving field (the permission policy reads it via
+    # catalogConditions.hasAnnotation to grant unconditional access) and the displayed
+    # designation (visible in Backstage's Annotations section on this API's catalog page).
+    # No separate tag mirrors this value.
+    # Note: example.com is a fictional annotation domain used for lab purposes.
+    # In a real Backstage deployment, use your organisation's own annotation domain.
+    example.com/visibility: shared
+spec:
+  type: openapi
+  lifecycle: production
+  owner: group:default/platform-team
+  definition:
+    $text: https://raw.githubusercontent.com/bump-sh-examples/train-travel-api/main/openapi.yaml

@@ -1,9 +1,9 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.1.0 → 1.2.0
+Version change: 1.2.0 → 1.3.0
 Added sections:
-  - Principle VIII. Support Experimentation
+  - Principle IX. Pragmatic Security for Learning Environments
 Modified principles: None renamed
 Removed sections: None
 Templates reviewed:
@@ -11,7 +11,8 @@ Templates reviewed:
   ✅ .specify/templates/spec-template.md — No principle-specific references; no updates required
   ✅ .specify/templates/tasks-template.md — No principle-specific references; no updates required
 Instance files requiring updates (in-progress feature work):
-  ⚠ specs/001-lab-1-base-backstage/plan.md — Constitution Check table missing Principle VIII
+  ⚠ specs/001-lab-1-base-backstage/plan.md — Constitution Check table missing Principle IX
+  ⚠ specs/002-lab-2-users-roles/spec.md — Should note Principle IX applies to auth credential handling
 Follow-up TODOs: None
 -->
 
@@ -110,6 +111,39 @@ constraints. A lab that only works when followed to the letter fails the majorit
 audience. Outcome-based verification and acknowledged variation points make labs resilient
 to the experimentation that real learning requires.
 
+### IX. Pragmatic Security for Learning Environments
+
+Labs MAY use simplified security practices — including storing example credentials in
+configuration files committed to the repository — when doing so meaningfully reduces
+the barrier to completing the lab.
+
+Any such practice MUST meet all of the following conditions:
+
+- **Clearly labelled**: Every instance of a simplified security practice MUST be accompanied
+  by a visible callout (e.g., a `> ⚠️ Lab only` block) that identifies it as intentionally
+  insecure.
+- **Fictional values**: Any credentials, secrets, or tokens used in examples MUST be
+  obviously fictional (e.g., `example-password`, `lab-secret-do-not-use`). Real or
+  reusable credentials MUST NOT appear anywhere in the repository.
+- **Production guidance provided**: Each simplified practice MUST be paired with a note
+  explaining what a production-appropriate alternative looks like. Examples include:
+  - Hardcoded passwords → secrets management (Vault, AWS Secrets Manager, Kubernetes Secrets)
+  - Local development auth → enterprise SSO / identity provider (LDAP, SAML, OIDC)
+  - Self-signed certificates → CA-signed certificates or a managed certificate service
+- **Scope-limited**: Simplified practices are only permitted in local development contexts.
+  No lab MAY configure a simplified security practice in a way that could be accidentally
+  deployed to a shared or internet-accessible environment without modification.
+
+Labs that introduce authentication or credential configuration MUST include a dedicated
+"Security Note" section explaining the production alternative before the learner encounters
+the first insecure configuration step.
+
+**Rationale**: Enforcing production-grade security in a local tutorial context adds
+prerequisites, cost, and complexity that exclude learners and obscure the Backstage
+concepts being taught. However, presenting insecure practices without context normalises
+them. This principle permits necessary simplifications while ensuring learners leave
+understanding both the shortcut they took and the right path for production.
+
 ## Lab Structure Standards
 
 Each lab MUST include the following documentation components:
@@ -119,6 +153,11 @@ Each lab MUST include the following documentation components:
 - **Step-by-step instructions**: Numbered steps with platform variants where needed.
 - **Verification**: A clear test the user can perform to confirm the lab completed successfully.
 - **Troubleshooting**: Common failure modes and their resolutions.
+
+Labs that use simplified security practices (Principle IX) MUST also include:
+
+- **Security Note**: A section appearing before the first insecure configuration step that
+  explains what production-appropriate alternatives exist.
 
 Labs MUST NOT require external network access beyond downloading freely available software
 and dependencies. All API samples and test data MUST be included in the repository.
@@ -150,4 +189,8 @@ Amendment procedure:
 
 All plan `Constitution Check` gates MUST reference the principles by Roman numeral and name.
 
-**Version**: 1.2.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-07
+## Common Issues
+
+- `yarn dev` does not exist. Use `yarn start` instead. 
+
+**Version**: 1.3.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-08

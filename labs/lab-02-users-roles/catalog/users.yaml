@@ -1,0 +1,54 @@
+# Lab 2 — User entities
+#
+# Each user MUST declare memberOf, AND the corresponding Group MUST list the user
+# in its members field. Backstage requires both sides to build bidirectional relations.
+#
+# All display names and email addresses are fictional example values only.
+
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: alice
+  namespace: default
+spec:
+  profile:
+    displayName: Alice Chen
+    email: alice@example.com
+  memberOf:
+    - museum-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: bob
+  namespace: default
+spec:
+  profile:
+    displayName: Bob Smith
+    email: bob@example.com
+  memberOf:
+    - museum-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: charlie
+  namespace: default
+spec:
+  profile:
+    displayName: Charlie Davis
+    email: charlie@example.com
+  memberOf:
+    - streetlights-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: diana
+  namespace: default
+spec:
+  profile:
+    displayName: Diana Lee
+    email: diana@example.com
+  memberOf:
+    - streetlights-team
