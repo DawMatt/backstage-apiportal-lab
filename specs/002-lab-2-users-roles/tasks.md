@@ -145,6 +145,95 @@ Navigate to each team's page → verify owned APIs are listed. (Quickstart.md St
 
 ---
 
+## Phase 4b: User Story 2 — API Visibility Frontend Module (FR-011 / SC-007 fix)
+
+**Goal**: Add a custom "API Visibility" card to every API entity page so that the
+`example.com/visibility` annotation is prominently displayed without requiring learners to
+find the Backstage Annotations section (which is not rendered in the default Backstage
+1.51.0 declarative frontend). The card reads the annotation directly from the entity object
+via `useEntity()` — the same field the permission policy evaluates. No secondary copy.
+
+**Context**: Run 3 confirmed that the annotation is not shown in the default Backstage UI
+with the new declarative frontend (`createApp` + `catalogPlugin/alpha`). The fix uses
+`EntityCardBlueprint` from `@backstage/plugin-catalog-react/alpha` to add a dedicated
+visibility card. All required packages are already installed — no `npm install` needed.
+See research.md R-007 and plan.md updated project structure for full details.
+
+**Independent Test**: Navigate to any API's catalog page → verify an "API Visibility" card
+appears showing either "Shared" or "Private" with a description. (Quickstart.md Step 2,
+updated verification.)
+
+### Implementation for Phase 4b
+
+- [X] T026 [P] [US2] Create `packages/app/src/modules/apiVisibility/ApiVisibilityCard.tsx`
+  in the student's Backstage instance. This is a React component that:
+  - Imports `useEntity` from `@backstage/plugin-catalog-react`
+  - Imports `InfoCard` from `@backstage/core-components`
+  - Imports `Typography`, `Box`, `Chip` from `@material-ui/core`
+  - Defines `VISIBILITY_ANNOTATION = 'example.com/visibility'`
+  - Reads `entity.metadata.annotations?.[VISIBILITY_ANNOTATION]` via `useEntity()`
+  - If absent: renders an InfoCard explaining the API is treated as private by default
+  - If `shared`: renders InfoCard with a primary-coloured "Shared" Chip and explanation
+  - If `private`: renders InfoCard with a default-coloured "Private" Chip and explanation
+  - Full source in research.md R-007
+- [X] T027 [P] [US2] Create `packages/app/src/modules/apiVisibility/index.ts`
+  in the student's Backstage instance:
+  - Imports `createFrontendModule` from `@backstage/frontend-plugin-api`
+  - Imports `EntityCardBlueprint` from `@backstage/plugin-catalog-react/alpha`
+  - Creates `apiVisibilityCard = EntityCardBlueprint.make({ name: 'api-visibility', params: { filter: 'kind:API', loader: async () => React.createElement(ApiVisibilityCard) } })`
+  - Exports `apiVisibilityModule = createFrontendModule({ pluginId: 'catalog', extensions: [apiVisibilityCard] })`
+  - Full source in research.md R-007
+- [X] T028 [US2] Modify `packages/app/src/App.tsx` in the student's Backstage instance
+  (depends on T026, T027 being created first):
+  - Add import: `import { apiVisibilityModule } from './modules/apiVisibility'`
+  - Add `apiVisibilityModule` to the `features` array in `createApp({ features: [...] })`
+  - The updated App.tsx: `createApp({ features: [catalogPlugin, navModule, apiVisibilityModule] })`
+- [X] T029 [US2] Add README "Step 2b — Add the API Visibility Card" sub-section in
+  `labs/lab-02-users-roles/README.md` (after Step 2a, before Step 2b restart):
+  - Explain WHY: the Backstage 1.51.0 new declarative frontend does not render custom
+    annotations in the default entity page layout; a custom card is required to make
+    the visibility designation visible (FR-011/SC-007)
+  - Explain WHAT: the card reads the annotation directly from the entity object — same
+    field as the permission policy, no secondary copy
+  - Explain ADDITIONAL LEARNING: this also demonstrates Backstage's declarative frontend
+    extension system (`EntityCardBlueprint`, `createFrontendModule`)
+  - Provide the directory creation instruction and both source files verbatim
+    (content from research.md R-007)
+  - Provide the App.tsx modification instruction
+  - Include an "Alpha imports" note explaining that `EntityCardBlueprint` is from
+    the `/alpha` sub-path — stable enough for this Backstage version, may change in
+    future major versions
+  - Platform note: directory creation (`mkdir`) differs on Windows vs macOS — provide
+    both: `mkdir -p packages/app/src/modules/apiVisibility` (macOS/Linux) and
+    `New-Item -ItemType Directory -Path packages\app\src\modules\apiVisibility` (Windows PowerShell)
+- [X] T030 [US2] Update README "✅ Verification — Step 2" in
+  `labs/lab-02-users-roles/README.md`: change items 3–5 from checking the Annotations
+  section to checking the API Visibility card:
+  - Museum API: verify "API Visibility" card shows "Private"
+  - Streetlights API: verify "API Visibility" card shows "Private"
+  - Train Travel API: verify "API Visibility" card shows "Shared"
+  - Update the ✅ Pass line to mention the card
+  - Replace the "Where are the Annotations?" hint with "Where is the API Visibility card?"
+    — explain it appears on the right side of the entity page as a card titled "API Visibility"
+  - Add ❌ Fail path: if the card is not visible, verify that `apiVisibilityModule` was
+    added to `App.tsx` and that Backstage was restarted
+- [X] T031 [US2] Update README "Summary Checklist" in
+  `labs/lab-02-users-roles/README.md`: change items 5–7 from annotation-in-Annotations
+  references to API Visibility card references:
+  - "Museum API shows museum-team as owner and API Visibility card showing **Private**"
+  - "Streetlights API shows streetlights-team as owner and API Visibility card showing **Private**"
+  - "Train Travel API shows platform-team as owner and API Visibility card showing **Shared**"
+- [X] T032 [US2] Update `specs/002-lab-2-users-roles/checklists/issues.md`: mark the
+  Run 3 open issue `- [ ]` as `- [x]` and add a resolution note: "Fixed (2026-06-11):
+  EntityCardBlueprint module added — a custom 'API Visibility' card now appears on every
+  API entity page, reading the example.com/visibility annotation directly from the entity
+  object. Card visible without extra navigation (SC-007). No secondary copy (FR-011)."
+
+**Checkpoint**: Phase 4b complete — API Visibility card visible on every API entity page;
+Run 3 issue resolved; FR-011 and SC-007 fully satisfied.
+
+---
+
 ## Phase 5: User Story 3 — Sign In as a Specific User (Priority: P3)
 
 **Goal**: Provide README instructions for configuring Backstage's guest auth provider with
@@ -271,6 +360,11 @@ visibility) is achievable and demonstrable.
 - **US1 (Phase 3)**: Depends on Phase 2 — T003 can start immediately; T005 and T006 depend on T003
 - **US2 (Phase 4)**: Depends on Phase 2 — T007/T008/T009 can start immediately (different
   files, no dependencies on each other); T010 and T011 depend on T007, T008, and T009
+- **US2 Frontend (Phase 4b)**: Depends on Phase 4 (APIs must be registered first so the
+  card can be verified). T026 and T027 can run in parallel (different files). T028 depends
+  on T026 and T027 (App.tsx imports both). T029 depends on T026/T027/T028 (README must show
+  the final working code). T030 and T031 depend on T029. T032 depends on T030 (close issue
+  after verification step is correct).
 - **US3 (Phase 5)**: All tasks already complete; no work needed
 - **US4 (Phase 6)**: Depends on US2 (APIs need owners and annotations) and US3 (auth must be
   configured). T015 can start immediately; T016 depends on T015 (needs the "why" written
@@ -311,6 +405,16 @@ T008: labs/lab-02-users-roles/catalog/apis/streetlights-api.yaml         (add pr
 T009: labs/lab-02-users-roles/catalog/apis/train-travel-api.yaml         (new shared API)
 ```
 
+## Parallel Example: Phase 4b Frontend Module
+
+```
+# T026 and T027 have no dependency on each other — different files:
+T026: packages/app/src/modules/apiVisibility/ApiVisibilityCard.tsx  (React component)
+T027: packages/app/src/modules/apiVisibility/index.ts                (module export)
+# T028 depends on both T026 and T027 (imports both):
+T028: packages/app/src/App.tsx                                        (add module to features)
+```
+
 ## Parallel Example: US4 README Updates
 
 ```
@@ -323,19 +427,20 @@ T019: README Step 4 — Edge Cases (shared API, non-API entity visibility)
 
 ## Implementation Strategy
 
-### Sequential Strategy (all tasks complete)
+### Sequential Strategy
 
-Work in phase order: Phase 1 → 2 (already done) → US1 → US2 → US3 (already done) → US4 → Polish.
-Each story produces independently testable lab content before moving to the next.
+Work in phase order: Phase 1 → 2 → US1 → US2 → **US2 Frontend (Phase 4b)** → US3 → US4 → Polish.
+T001–T025 are complete. Outstanding work is Phase 4b (T026–T032).
 
 ### Incremental Validation Gates
 
 1. After T003 + T005 + T006: quickstart.md Step 1 passes (3 groups, 4 users)
-2. After T007 + T008 + T009 + T010 + T011: quickstart.md Step 2 passes (3 APIs, correct
-   ownership + visibility annotation visible on each API page)
+2. After T007–T011 + **T026–T031**: quickstart.md Step 2 passes (3 APIs with correct
+   ownership + "API Visibility" card visible on each API page)
 3. After T016 + T017: quickstart.md Step 4 passes (Alice: 2 APIs visible, 1 absent)
 4. After T017 + T018: quickstart.md Step 5 passes (Charlie: 2 APIs visible, 1 absent)
 5. After T018: quickstart.md Step 6 passes (all users and groups visible to both)
+6. After T032: Run 3 issue closed in issues.md
 
 ---
 
@@ -353,5 +458,10 @@ Each story produces independently testable lab content before moving to the next
   macOS only is insufficient
 - The `example.com/visibility` annotation key is fictional (example.com domain) — document
   this in the README so learners understand it is not a built-in Backstage annotation
+- Phase 4b (T026–T032): `EntityCardBlueprint` is from `@backstage/plugin-catalog-react/alpha`
+  — all packages already installed, no `npm install` needed; the card must NOT be tested
+  without a running Backstage instance (no unit tests for tutorial content)
+- Phase 4b: The card must be registered under `pluginId: 'catalog'` (not `'app'`) because
+  `EntityCardBlueprint` is a catalog plugin extension point
 - platform-team has no members by design — the README MUST explain this is intentional
   so learners don't think it is a configuration error

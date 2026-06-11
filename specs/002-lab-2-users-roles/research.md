@@ -342,3 +342,142 @@ metadata:
 Constitution Principle VII. The `spec.definition` in the catalog-info.yaml should point
 to the raw GitHub URL of the OpenAPI spec file in that repository. Verify the URL is
 accessible before committing.
+
+---
+
+## R-007: Making the Visibility Annotation Visible in the Backstage UI
+
+**Context**: Backstage 1.51.0 in this lab uses the new declarative frontend (`createApp` from
+`@backstage/frontend-defaults` with `@backstage/plugin-catalog/alpha`). In this setup, the
+entity detail page is driven entirely by the catalog plugin's default extension configuration.
+Custom annotations from non-`backstage.io/` domains (such as `example.com/visibility`) are
+NOT rendered in any card on the default API entity page. Lab Run 3 confirmed: learners cannot
+see the visibility annotation in the Backstage UI, so FR-011 ("visible metadata field") and
+SC-007 ("visible without additional navigation or clicks") are both unmet.
+
+**Decision**: Create a custom frontend module using `EntityCardBlueprint` from
+`@backstage/plugin-catalog-react/alpha` to add an "API Visibility" card to the API entity
+detail page. The card reads `entity.metadata.annotations['example.com/visibility']` directly
+from the entity object provided by `useEntity()` — the same metadata field the permission
+policy evaluates via `catalogConditions.hasAnnotation`. No secondary copy is maintained.
+
+**Rationale**:
+- Satisfies FR-011: the displayed designation is derived directly from the annotation that
+  drives the permission policy — one field, two consumers (policy backend and UI card).
+- Satisfies SC-007: the card appears prominently on the API entity page with no extra
+  navigation. It is visible immediately when the developer opens any API's catalog page.
+- No new npm packages: all required packages (`@backstage/plugin-catalog-react/alpha`,
+  `@backstage/frontend-plugin-api`, `@backstage/core-components`) are already installed in
+  the Backstage instance created in Lab 1.
+- Follows the same pattern as the existing `navModule`: a `createFrontendModule` wrapping
+  an `EntityCardBlueprint.make()` extension.
+- Adds educational value: learners see a concrete example of Backstage's new declarative
+  frontend extension system, not just the catalog and permissions framework.
+
+**Implementation pattern** (confirmed for Backstage 1.51.0 new frontend):
+
+```typescript
+// packages/app/src/modules/apiVisibility/ApiVisibilityCard.tsx
+import React from 'react';
+import { useEntity } from '@backstage/plugin-catalog-react';
+import { InfoCard } from '@backstage/core-components';
+import { Typography, Box, Chip } from '@material-ui/core';
+
+const VISIBILITY_ANNOTATION = 'example.com/visibility';
+
+export function ApiVisibilityCard() {
+  const { entity } = useEntity();
+  const visibility = entity.metadata.annotations?.[VISIBILITY_ANNOTATION];
+
+  if (!visibility) {
+    return (
+      <InfoCard title="API Visibility">
+        <Typography variant="body2" color="textSecondary">
+          No visibility designation set. Under the permission policy, this API is visible
+          only to members of the owning team (treated as private by default).
+        </Typography>
+      </InfoCard>
+    );
+  }
+
+  const isShared = visibility === 'shared';
+
+  return (
+    <InfoCard title="API Visibility">
+      <Box display="flex" alignItems="center" gap={1}>
+        <Chip
+          label={isShared ? 'Shared' : 'Private'}
+          color={isShared ? 'primary' : 'default'}
+          size="small"
+        />
+        <Typography variant="body2">
+          {isShared
+            ? 'Visible to all authenticated users regardless of team membership.'
+            : 'Visible only to members of the owning team.'}
+        </Typography>
+      </Box>
+    </InfoCard>
+  );
+}
+```
+
+```typescript
+// packages/app/src/modules/apiVisibility/index.ts
+import { createFrontendModule } from '@backstage/frontend-plugin-api';
+import { EntityCardBlueprint } from '@backstage/plugin-catalog-react/alpha';
+import React from 'react';
+import { ApiVisibilityCard } from './ApiVisibilityCard';
+
+const apiVisibilityCard = EntityCardBlueprint.make({
+  name: 'api-visibility',
+  params: {
+    filter: 'kind:API',
+    loader: async () => React.createElement(ApiVisibilityCard),
+  },
+});
+
+export const apiVisibilityModule = createFrontendModule({
+  pluginId: 'catalog',
+  extensions: [apiVisibilityCard],
+});
+```
+
+```typescript
+// packages/app/src/App.tsx — add apiVisibilityModule to features
+import { createApp } from '@backstage/frontend-defaults';
+import catalogPlugin from '@backstage/plugin-catalog/alpha';
+import { navModule } from './modules/nav';
+import { apiVisibilityModule } from './modules/apiVisibility';
+
+export default createApp({
+  features: [catalogPlugin, navModule, apiVisibilityModule],
+});
+```
+
+**Import sources** (all packages already installed — no `npm install` needed):
+
+| Symbol | Package | Stability |
+|--------|---------|-----------|
+| `useEntity` | `@backstage/plugin-catalog-react` | Stable |
+| `EntityCardBlueprint` | `@backstage/plugin-catalog-react/alpha` | Alpha |
+| `createFrontendModule` | `@backstage/frontend-plugin-api` | Stable |
+| `InfoCard` | `@backstage/core-components` | Stable |
+| `Typography`, `Box`, `Chip` | `@material-ui/core` | Stable |
+
+**Alpha note**: `EntityCardBlueprint` is imported from the `/alpha` sub-path. This is the
+officially supported extension mechanism for the new Backstage declarative frontend as of
+1.51.0. The pattern is identical to how Backstage itself defines entity cards internally.
+
+**Alternatives considered**:
+- Using a tag alongside the annotation (Run 2 approach): tags are visible but FR-011
+  explicitly prohibits a tag that mirrors the annotation. Rejected on spec compliance grounds.
+- Modifying the app-config.yaml to configure entity page layout: Backstage 1.51.0 does not
+  yet support annotation display via YAML configuration. Code is required.
+- Adding `@backstage/plugin-catalog` frontend components directly: the catalog plugin's
+  built-in About card does not surface custom-domain annotations in the default layout.
+  A custom card is the correct extension point.
+- Linking to the raw entity YAML: adds navigation, violates SC-007.
+
+**Filter behaviour**: `filter: 'kind:API'` uses Backstage's entity filter expression syntax.
+The card will only be mounted and rendered on pages for entities of kind `API`. For all other
+entity kinds (User, Group, Component, etc.), the card is not loaded — no performance impact.

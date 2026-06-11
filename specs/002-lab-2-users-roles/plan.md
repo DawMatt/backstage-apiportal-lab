@@ -1,6 +1,6 @@
 # Implementation Plan: Lab 2 — Users, Roles, and API Visibility
 
-**Branch**: `002-lab-2-users-roles` | **Date**: 2026-06-08 (Updated: 2026-06-11 — FR-011/SC-007 tag removal) | **Spec**: [spec.md](spec.md)
+**Branch**: `002-lab-2-users-roles` | **Date**: 2026-06-08 (Updated: 2026-06-11 — annotation display via EntityCardBlueprint) | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/002-lab-2-users-roles/spec.md`
 
@@ -12,8 +12,11 @@ identity-aware sign-in using the guest auth provider already present in the Back
 install. A third API — a shared platform API visible to all authenticated users — is added
 alongside the two team-owned private APIs from Lab 1. All three API catalog descriptors
 carry an explicit `example.com/visibility` annotation (`shared` or `private`). This
-annotation is the single source of truth for both the permission policy and the displayed
-visibility designation on the API's catalog page (FR-011). The lab then
+annotation drives the permission policy and is displayed on each API's catalog page via
+a custom "API Visibility" card — a `createFrontendModule` using `EntityCardBlueprint` from
+Backstage's new declarative frontend system. The card reads the annotation directly from the
+entity object, making it the single source of truth for both policy enforcement and display
+(FR-011, SC-007). No new npm packages are required. The lab then
 replaces the default allow-all permission policy with a custom two-tier policy: APIs
 annotated `shared` are visible to everyone, `private` APIs are visible only to members of
 the owning team, and all other catalog entry types (User, Group, etc.) remain unrestricted.
@@ -112,6 +115,14 @@ Changes to the student's Backstage instance (guided by README, not committed to 
 app-config.local.yaml                   # New: guest provider userEntityRef setting
 app-config.yaml                         # Modified: add catalog locations for Lab 2 files
                                         # (remove Lab 1 API entries to avoid duplicates)
+packages/app/src/
+├── App.tsx                             # Modified: add apiVisibilityModule to features
+└── modules/
+    └── apiVisibility/
+        ├── index.ts                    # New: createFrontendModule wrapping the card
+        └── ApiVisibilityCard.tsx       # New: EntityCardBlueprint card — reads
+                                        # example.com/visibility annotation via useEntity();
+                                        # shown only on kind:API entity pages (FR-011/SC-007)
 packages/backend/src/
 ├── index.ts                            # Modified: remove allow-all, add custom policy
 └── extensions/

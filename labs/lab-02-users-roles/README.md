@@ -280,7 +280,161 @@ Lab 1):
 > **Using a fork or feature branch?** Replace `DawMatt/backstage-apiportal-lab/main` with
 > your own repo and branch, as you did in Step 1.
 
-### 2b — Restart Backstage
+### 2b — Add the API Visibility Card
+
+#### Why this step is needed
+
+Backstage 1.51.0 uses a new declarative frontend system (`createApp` with
+`@backstage/plugin-catalog/alpha`). In this system, the entity detail page layout is driven
+entirely by the catalog plugin's default extension configuration. Custom annotations from
+non-`backstage.io/` domains — including `example.com/visibility` — are **not rendered**
+in any default card on the entity page.
+
+Without this step, the visibility designation is stored in the catalog but invisible in the
+UI. FR-011 requires that the designation be derived from the same field the permission policy
+evaluates (no secondary copy), and SC-007 requires it to be visible without extra navigation.
+A custom entity card satisfies both: it reads the annotation directly from the entity object —
+the same metadata field `hasAnnotation` checks in the backend — and renders it immediately on
+the API page.
+
+#### What you are building
+
+This step also demonstrates Backstage's declarative frontend extension system:
+- `EntityCardBlueprint` adds a new card to entity pages filtered by kind
+- `createFrontendModule` bundles the card into a self-contained frontend module
+- The module is registered in `App.tsx` alongside the built-in `catalogPlugin`
+
+No new packages are required — all imports are already installed in the Backstage instance
+from Lab 1.
+
+#### Create the module directory
+
+| Platform | Command |
+|----------|---------|
+| macOS / Linux | `mkdir -p packages/app/src/modules/apiVisibility` |
+| Windows (PowerShell) | `New-Item -ItemType Directory -Path packages\app\src\modules\apiVisibility` |
+
+Run this command from inside your Backstage root directory
+(`labs/lab-01-base-backstage/backstage/`).
+
+#### Create `ApiVisibilityCard.tsx`
+
+Create `packages/app/src/modules/apiVisibility/ApiVisibilityCard.tsx` with the following
+content:
+
+```typescript
+import React from 'react';
+import { useEntity } from '@backstage/plugin-catalog-react';
+import { InfoCard } from '@backstage/core-components';
+import { Typography, Box, Chip } from '@material-ui/core';
+
+const VISIBILITY_ANNOTATION = 'example.com/visibility';
+
+export function ApiVisibilityCard() {
+  const { entity } = useEntity();
+  const visibility = entity.metadata.annotations?.[VISIBILITY_ANNOTATION];
+
+  if (!visibility) {
+    return (
+      <InfoCard title="API Visibility">
+        <Typography variant="body2" color="textSecondary">
+          No visibility designation set. Under the permission policy, this API is visible
+          only to members of the owning team (treated as private by default).
+        </Typography>
+      </InfoCard>
+    );
+  }
+
+  const isShared = visibility === 'shared';
+
+  return (
+    <InfoCard title="API Visibility">
+      <Box display="flex" alignItems="center" gap={1}>
+        <Chip
+          label={isShared ? 'Shared' : 'Private'}
+          color={isShared ? 'primary' : 'default'}
+          size="small"
+        />
+        <Typography variant="body2">
+          {isShared
+            ? 'Visible to all authenticated users regardless of team membership.'
+            : 'Visible only to members of the owning team.'}
+        </Typography>
+      </Box>
+    </InfoCard>
+  );
+}
+```
+
+#### Create `index.ts`
+
+Create `packages/app/src/modules/apiVisibility/index.ts` with the following content:
+
+```typescript
+import { createFrontendModule } from '@backstage/frontend-plugin-api';
+import { EntityCardBlueprint } from '@backstage/plugin-catalog-react/alpha';
+import React from 'react';
+import { ApiVisibilityCard } from './ApiVisibilityCard';
+
+const apiVisibilityCard = EntityCardBlueprint.make({
+  name: 'api-visibility',
+  params: {
+    filter: 'kind:API',
+    loader: async () => React.createElement(ApiVisibilityCard),
+  },
+});
+
+export const apiVisibilityModule = createFrontendModule({
+  pluginId: 'catalog',
+  extensions: [apiVisibilityCard],
+});
+```
+
+> **Note on Alpha imports**: `EntityCardBlueprint` is imported from
+> `@backstage/plugin-catalog-react/alpha`. This is the officially supported extension
+> point for adding custom entity cards in Backstage 1.51.0's new declarative frontend.
+> The `/alpha` sub-path indicates the API may change in future major Backstage versions,
+> but it is stable enough for this lab and follows the same pattern Backstage itself uses
+> internally.
+
+#### Update `App.tsx`
+
+Open `packages/app/src/App.tsx` and update it as follows:
+
+**Before:**
+```typescript
+import { createApp } from '@backstage/frontend-defaults';
+import catalogPlugin from '@backstage/plugin-catalog/alpha';
+import { navModule } from './modules/nav';
+
+export default createApp({
+  features: [catalogPlugin, navModule],
+});
+```
+
+**After:**
+```typescript
+import { createApp } from '@backstage/frontend-defaults';
+import catalogPlugin from '@backstage/plugin-catalog/alpha';
+import { navModule } from './modules/nav';
+import { apiVisibilityModule } from './modules/apiVisibility';
+
+export default createApp({
+  features: [catalogPlugin, navModule, apiVisibilityModule],
+});
+```
+
+**Import sources** (all packages already installed — no `npm install` needed):
+
+| Symbol | Package | Stability |
+|--------|---------|-----------|
+| `useEntity` | `@backstage/plugin-catalog-react` | Stable |
+| `EntityCardBlueprint` | `@backstage/plugin-catalog-react/alpha` | Alpha |
+| `createFrontendModule` | `@backstage/frontend-plugin-api` | Stable |
+| `InfoCard` | `@backstage/core-components` | Stable |
+| `Typography`, `Box`, `Chip` | `@material-ui/core` | Stable |
+
+### 2c — Restart Backstage
 
 ```
 yarn start
@@ -292,26 +446,30 @@ yarn start
 2. Verify **three APIs** appear: Museum API, Streetlights API, and Train Travel API
 3. Click **Museum API** → verify:
    - The **Owner** field shows **museum-team**
-   - The **Annotations** section shows `example.com/visibility: private`
+   - The **API Visibility** card shows **Private**
 4. Click **Streetlights API** → verify:
    - The **Owner** field shows **streetlights-team**
-   - The **Annotations** section shows `example.com/visibility: private`
+   - The **API Visibility** card shows **Private**
 5. Click **Train Travel API** → verify:
    - The **Owner** field shows **platform-team**
-   - The **Annotations** section shows `example.com/visibility: shared`
+   - The **API Visibility** card shows **Shared**
 6. Navigate to the **museum-team** Group page → verify **Museum API** appears under
    **Owned APIs**
 7. Navigate to the **streetlights-team** Group page → verify **Streetlights API** appears
 8. Navigate to the **platform-team** Group page → verify **Train Travel API** appears
 
-> **Where are the Annotations?** In Backstage's entity detail page, annotations appear in
-> the **Annotations** card — typically on the right-hand side of the entity page, below the
-> About card. If the Annotations section is not visible, the YAML file may not have been
-> loaded yet. Restart Backstage and wait for the catalog to fully load.
+> **Where is the API Visibility card?** The card appears on the right-hand side of the
+> API entity detail page, typically below the About card. It shows a coloured chip
+> labelled **Shared** or **Private** and a short description. If the card is not visible,
+> verify that `apiVisibilityModule` was added to the `features` array in
+> `packages/app/src/App.tsx` and that Backstage was fully restarted after the change.
 
-✅ **Pass**: All three APIs show their owning team and the `example.com/visibility`
-annotation (`shared` or `private`) in the Annotations section; each team's page lists its
-owned API(s).
+✅ **Pass**: All three APIs show their owning team and an **API Visibility** card showing
+**Shared** or **Private**; each team's page lists its owned API(s).
+
+❌ **Fail — API Visibility card not visible**: Verify that `apiVisibilityModule` is
+imported and included in the `features` array in `packages/app/src/App.tsx` (Step 2b),
+and that Backstage was restarted after the change.
 
 ❌ **Fail — duplicate APIs**: If you see two Museum API entries (or two Streetlights API
 entries), the Lab 1 entries were not removed from `app-config.yaml`. Remove them and
@@ -325,11 +483,6 @@ content (not a 404).
 ❌ **Fail — Owner field not shown**: Check that the updated API `yaml` URLs are in your
 `app-config.yaml` (not the original Lab 1 paths). Open each target URL in a browser to
 verify it returns the Lab 2 YAML with `spec.owner: group:default/...`.
-
-❌ **Fail — Annotations not visible**: Ensure the Lab 2 catalog files have been committed
-and pushed to GitHub. Open the raw GitHub URL for `museum-api.yaml` in a browser and verify
-it shows the `annotations:` block including `example.com/visibility: private`. If the URL
-still returns the old version, the push may not have completed.
 
 ---
 
@@ -693,9 +846,9 @@ Use this checklist to confirm you have completed every step of the lab:
 - [ ] Streetlights Team (`streetlights-team`) appears in the catalog with charlie and diana as members
 - [ ] Platform Team (`platform-team`) appears in the catalog with no members (expected)
 - [ ] All four users (alice, bob, charlie, diana) appear in the catalog
-- [ ] Museum API shows `museum-team` as owner and `example.com/visibility: private` in Annotations
-- [ ] Streetlights API shows `streetlights-team` as owner and `example.com/visibility: private` in Annotations
-- [ ] Train Travel API shows `platform-team` as owner and `example.com/visibility: shared` in Annotations
+- [ ] Museum API shows `museum-team` as owner and an **API Visibility** card showing **Private**
+- [ ] Streetlights API shows `streetlights-team` as owner and an **API Visibility** card showing **Private**
+- [ ] Train Travel API shows `platform-team` as owner and an **API Visibility** card showing **Shared**
 - [ ] Signed in as Alice → Train Travel API and Museum API are visible; Streetlights API is absent
 - [ ] Signed in as Charlie → Train Travel API and Streetlights API are visible; Museum API is absent
 - [ ] Signed in as either user → all three groups and all four users are visible in the catalog

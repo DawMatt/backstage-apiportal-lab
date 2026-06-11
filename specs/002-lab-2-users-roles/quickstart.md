@@ -33,19 +33,19 @@
 2. Verify three APIs are visible: Museum API, Streetlights API, Train Travel API
 3. Click the **Museum API** entry → verify:
    - The **Owner** field shows `museum-team`
-   - The **Annotations** section shows `example.com/visibility: private`
+   - The **API Visibility** card shows **Private**
 4. Click the **Streetlights API** entry → verify:
    - The **Owner** field shows `streetlights-team`
-   - The **Annotations** section shows `example.com/visibility: private`
+   - The **API Visibility** card shows **Private**
 5. Click the **Train Travel API** entry → verify:
    - The **Owner** field shows `platform-team`
-   - The **Annotations** section shows `example.com/visibility: shared`
+   - The **API Visibility** card shows **Shared**
 6. Navigate to the `museum-team` Group page → verify the Museum API appears under **Owned APIs**
 7. Navigate to the `streetlights-team` Group page → verify the Streetlights API appears under **Owned APIs**
 8. Navigate to the `platform-team` Group page → verify the Train Travel API appears under **Owned APIs**
 
-✅ **Pass**: Each API shows its owning team and its `example.com/visibility` annotation
-  (`private` or `shared`) in the Annotations section; each team's page lists its owned API
+✅ **Pass**: Each API shows its owning team and an **API Visibility** card showing
+  **Private** or **Shared**; each team's page lists its owned API
 ❌ **Fail**: Check that the updated API catalog-info.yaml files (with `spec.owner`,
   `example.com/visibility` annotations, and visibility tags) are registered in
   `app-config.yaml` and that the Lab 1 versions are removed to avoid duplicates
@@ -117,9 +117,9 @@
 
 - [ ] Museum Team, Streetlights Team, and Platform Team appear in the catalog with correct members
 - [ ] All four users (alice, bob, charlie, diana) appear in the catalog
-- [ ] Museum API shows `museum-team` as owner and `example.com/visibility: private` in Annotations
-- [ ] Streetlights API shows `streetlights-team` as owner and `example.com/visibility: private` in Annotations
-- [ ] Train Travel API shows `platform-team` as owner and `example.com/visibility: shared` in Annotations
+- [ ] Museum API shows `museum-team` as owner and an **API Visibility** card showing **Private**
+- [ ] Streetlights API shows `streetlights-team` as owner and an **API Visibility** card showing **Private**
+- [ ] Train Travel API shows `platform-team` as owner and an **API Visibility** card showing **Shared**
 - [ ] Signed in as Alice → Train Travel API and Museum API visible; Streetlights API absent
 - [ ] Signed in as Charlie → Train Travel API and Streetlights API visible; Museum API absent
 - [ ] Signed in as either user → all groups and users are visible in the catalog

@@ -124,9 +124,10 @@ versions are registered.
 Visible to: `museum-team` members only (Alice, Bob).
 
 **Note**: The `example.com/visibility: private` annotation is the single source of truth for
-the visibility designation. It appears in Backstage's Annotations section on the entity page
-(FR-011). The permission policy restricts access via `isEntityOwner` (not via the annotation
-value for private APIs — the annotation is for display). No separate tag mirrors this value.
+the visibility designation. It is displayed by the "API Visibility" frontend module (R-007),
+which renders a dedicated card on the API entity page (FR-011/SC-007). The permission policy
+restricts access via `isEntityOwner` (not via the annotation value — the annotation marks
+visibility intent; the policy uses ownership for enforcement). No separate tag mirrors this value.
 
 #### `api:default/streetlights-api` — *Private*
 
@@ -143,7 +144,8 @@ value for private APIs — the annotation is for display). No separate tag mirro
 Visible to: `streetlights-team` members only (Charlie, Diana).
 
 **Note**: Same approach as museum-api — the `example.com/visibility: private` annotation is
-the single display source (FR-011). No separate tag mirrors this value.
+the single display source (FR-011), rendered via the "API Visibility" card. No separate tag
+mirrors this value.
 
 #### `api:default/train-travel-api` — *Shared*
 
@@ -194,6 +196,45 @@ packages already present in Backstage 1.51.0.
 | API is owned by the signed-in user's team | ALLOW (private APIs for team members) |
 | None of the above | DENY |
 
+### `packages/app/src/modules/apiVisibility/ApiVisibilityCard.tsx` (new)
+
+A React component rendered by the "API Visibility" entity card. Reads the
+`example.com/visibility` annotation directly from the entity via `useEntity()`.
+
+| Element | Description |
+|---------|-------------|
+| `VISIBILITY_ANNOTATION` | Constant `'example.com/visibility'` — matches the policy annotation key |
+| `ApiVisibilityCard` | Renders an `InfoCard` with a `Chip` and description based on annotation value |
+| Annotation present + `shared` | Shows green/primary chip labelled "Shared" with explanation |
+| Annotation present + `private` | Shows default chip labelled "Private" with explanation |
+| Annotation absent | Shows explanatory message: treated as private (no annotation = no isEntityOwner match) |
+
+### `packages/app/src/modules/apiVisibility/index.ts` (new)
+
+Backstage declarative frontend module that adds the API Visibility card.
+
+| Element | Description |
+|---------|-------------|
+| `apiVisibilityCard` | `EntityCardBlueprint.make()` — `filter: 'kind:API'`, mounts `ApiVisibilityCard` |
+| `apiVisibilityModule` | `createFrontendModule({ pluginId: 'catalog', extensions: [apiVisibilityCard] })` |
+
+**Import sources** (all already installed):
+
+| Symbol | Package |
+|--------|---------|
+| `useEntity` | `@backstage/plugin-catalog-react` |
+| `EntityCardBlueprint` | `@backstage/plugin-catalog-react/alpha` |
+| `createFrontendModule` | `@backstage/frontend-plugin-api` |
+| `InfoCard` | `@backstage/core-components` |
+| `Typography`, `Box`, `Chip` | `@material-ui/core` |
+
+### `packages/app/src/App.tsx` (modified)
+
+| Change | Description |
+|--------|-------------|
+| Add import | `import { apiVisibilityModule } from './modules/apiVisibility'` |
+| Add to features | `apiVisibilityModule` added to `createApp({ features: [...] })` |
+
 ### `packages/backend/src/index.ts` (modified)
 
 | Change | Description |
@@ -237,9 +278,9 @@ The `hasMember`/`memberOf` relations are derived from the `members` list on the 
 and the `memberOf` list on the User entity (both must be present for bidirectional resolution).
 Shared vs. private access control is determined by the `example.com/visibility: shared`
 annotation on the API entity — it is independent of the `ownerOf` relation. All three API
-entities carry an explicit `example.com/visibility` annotation (`shared` or `private`) so
-that any user viewing an API's catalog page can immediately see its visibility designation
-in the Annotations section. No separate tag mirrors this annotation (FR-011 prohibits it).
+entities carry an explicit `example.com/visibility` annotation (`shared` or `private`).
+The annotation is displayed on every API's catalog page via the "API Visibility" card (R-007),
+which reads the annotation directly from the entity object — no secondary copy (FR-011).
 
 **Effective visibility summary**:
 
