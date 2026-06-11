@@ -432,6 +432,7 @@ const apiVisibilityCard = EntityCardBlueprint.make({
   name: 'api-visibility',
   params: {
     filter: 'kind:API',
+    type: 'info',   // REQUIRED: places card in right-hand info column (same as About card)
     loader: async () => React.createElement(ApiVisibilityCard),
   },
 });
@@ -481,3 +482,15 @@ officially supported extension mechanism for the new Backstage declarative front
 **Filter behaviour**: `filter: 'kind:API'` uses Backstage's entity filter expression syntax.
 The card will only be mounted and rendered on pages for entities of kind `API`. For all other
 entity kinds (User, Group, Component, etc.), the card is not loaded — no performance impact.
+
+**Card placement — `type: 'info'` is required (SC-007)**: Backstage's `DefaultEntityContentLayout`
+splits entity cards into two columns based on their `type` param:
+- `type: 'info'` → right-hand sticky info column (About, Links, Labels cards)
+- `type: 'content'` or no `type` → main content area (left column, rendered below all tab content)
+
+Without `type: 'info'`, the API Visibility card defaults to `type: 'content'` and renders at the
+very bottom of the page below all main content — failing SC-007 even though it technically
+requires no additional navigation. Setting `type: 'info'` places the card alongside the About
+card in the right-hand column, where it is immediately visible when a developer opens any API's
+catalog page. Confirmed by inspecting
+`@backstage/plugin-catalog/dist/alpha/DefaultEntityContentLayout.esm.js` in Backstage 1.51.0.

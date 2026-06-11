@@ -119,7 +119,12 @@ packages/app/src/
 ├── App.tsx                             # Modified: add apiVisibilityModule to features
 └── modules/
     └── apiVisibility/
-        ├── index.ts                    # New: createFrontendModule wrapping the card
+        ├── index.ts                    # New: createFrontendModule wrapping the card;
+        │                               # EntityCardBlueprint.make() MUST include type:'info'
+        │                               # to place the card in the right-hand info column
+        │                               # (same column as About card). Without it, the card
+        │                               # defaults to type:'content' and renders at the bottom
+        │                               # of the main content area, failing SC-007.
         └── ApiVisibilityCard.tsx       # New: EntityCardBlueprint card — reads
                                         # example.com/visibility annotation via useEntity();
                                         # shown only on kind:API entity pages (FR-011/SC-007)

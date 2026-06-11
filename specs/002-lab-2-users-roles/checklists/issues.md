@@ -28,6 +28,8 @@ Summary Checklist
 
  Verification — Step 2
 
-- [ ] The following statement about API Visibility location is correct. It currently shows at the very bottom of the page, under the main content. I want it to display either within or immediately below the About card, as this statement indicates.
+- [x] The following statement about API Visibility location is correct. It currently shows at the very bottom of the page, under the main content. I want it to display either within or immediately below the About card, as this statement indicates.
 
  Where is the API Visibility card? The card appears on the right-hand side of the API entity detail page, typically below the About card.
+
+ Fixed (2026-06-11): Added `type: 'info'` to `EntityCardBlueprint.make()` params in `index.ts`. Backstage's `DefaultEntityContentLayout` places cards with `type: 'info'` in the right-hand sticky info column (same column as the About card); cards without a type default to `type: 'content'` and render at the bottom of the main content area. The card now appears immediately below the About card in the right column, matching the README description.

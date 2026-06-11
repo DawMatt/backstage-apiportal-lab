@@ -220,7 +220,10 @@ are visible only to members of that team.
   catalog page without additional navigation or clicks, and is derived from the same
   metadata field the permission policy reads. When the policy-driving metadata is changed,
   the displayed designation updates automatically — no secondary field requires
-  synchronisation.
+  synchronisation. The designation MUST appear in the right-hand info column of the entity
+  page (alongside the About card), not at the bottom of the main content area — a card
+  buried below the main content fails this criterion even if it technically requires no
+  extra navigation, because a learner browsing the page will not see it at a glance.
 - **SC-004**: A developer signed in as a member of Team A sees all shared APIs and Team A's
   private APIs but not Team B's private APIs — and vice versa for a developer signed in as
   a member of Team B. The difference is directly attributable to the two-tier visibility

@@ -234,6 +234,52 @@ Run 3 issue resolved; FR-011 and SC-007 fully satisfied.
 
 ---
 
+## Phase 4c: User Story 2 — API Visibility Card Positioning Fix (Run 4)
+
+**Goal**: Move the "API Visibility" card from the main content area (bottom of the page) to
+the right-hand info column, immediately below the About card. Run 4 confirmed that the card
+appears at the very bottom of the page because it was registered without a `type` parameter —
+`DefaultEntityContentLayout` places cards with no type in the main content (left) column, while
+cards with `type: 'info'` go in the right-hand sticky info column alongside About, Links, and
+Labels cards.
+
+**Root cause**: `EntityCardBlueprint.make()` in `index.ts` omits `type`. Without it, the card
+defaults to `type: 'content'` and renders in the main content area, not the info panel.
+
+**Fix**: Add `type: 'info'` to the `params` object in `EntityCardBlueprint.make()`. This
+mirrors how the About card is configured (`type: 'info'` in `catalogAboutEntityCard`).
+
+**Independent Test**: Navigate to any API's catalog page → verify the "API Visibility" card
+appears in the right-hand info column, immediately below the About card (in the sticky sidebar).
+
+### Implementation for Phase 4c
+
+- [X] T033 [US2] Update `labs/lab-01-base-backstage/backstage/packages/app/src/modules/apiVisibility/index.ts`:
+  add `type: 'info'` to the `params` object inside `EntityCardBlueprint.make()`. The updated
+  `params` block must be:
+  ```typescript
+  params: {
+    filter: 'kind:API',
+    type: 'info',
+    loader: async () => React.createElement(ApiVisibilityCard),
+  },
+  ```
+  This places the card in the right-hand info column (same as About, Links, Labels cards)
+  rather than the main content column.
+- [X] T034 [US2] Update the `index.ts` code block inside the "Create `index.ts`" section of
+  README Step 2b (`labs/lab-02-users-roles/README.md`): add `type: 'info'` to the
+  `params` object shown in the code sample so it matches the actual file after T033.
+- [X] T035 [US2] Update `specs/002-lab-2-users-roles/checklists/issues.md`: mark the Run 4
+  open issue `- [ ]` as `- [x]` and add resolution note: "Fixed (2026-06-11): Added
+  `type: 'info'` to `EntityCardBlueprint.make()` params — card now renders in the right-hand
+  info column immediately below the About card, matching the README's 'right-hand side, below
+  the About card' description."
+
+**Checkpoint**: Phase 4c complete — API Visibility card appears in the right-hand info column;
+card location matches the README description; Run 4 issue closed.
+
+---
+
 ## Phase 5: User Story 3 — Sign In as a Specific User (Priority: P3)
 
 **Goal**: Provide README instructions for configuring Backstage's guest auth provider with

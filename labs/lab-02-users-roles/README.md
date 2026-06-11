@@ -380,6 +380,7 @@ const apiVisibilityCard = EntityCardBlueprint.make({
   name: 'api-visibility',
   params: {
     filter: 'kind:API',
+    type: 'info',
     loader: async () => React.createElement(ApiVisibilityCard),
   },
 });
