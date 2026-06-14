@@ -22,7 +22,7 @@ Lab 2 - Users and roles
 
 Lab 3 - API quality
 
-- Define a basic spectral ruleset that implements the default spectral OAS3 rules.
+- Define a basic spectral ruleset that implements the default spectral OAS3 and AsyncAPI rules.
 - Add the plugins backstage-plugin-api-grade and backstage-plugin-api-grade-backend, available here: https://github.com/DawMatt/api-grade
 - Configure the api-grade plugins to use the spectral ruleset defined above, and appear in the Info column below the About entry. This adds basic API grade and quality information for all users, and more detailed quality information for API owners.
 - Add a plugin (Spectral) and use the same pre-defined spectral ruleset to automatically assess each API. The spectral plugin is available here: https://github.com/dweber019/backstage-plugins/tree/main/plugins/api-docs-spectral-linter
