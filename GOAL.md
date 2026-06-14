@@ -20,17 +20,19 @@ Lab 2 - Users and roles
 - Important API metadata (e.g. whether it is shared) must be visible on the API page. This must use the underlying metadata that is used when executing policy, rather than a copy that could become out-of-sync with the underlying metadata.
 - Visibility of other catalog entry types, including users and groups, will remain allow all.
 
-Lab 3 - Auto registration
+Lab 3 - API quality
+
+- Define a basic spectral ruleset that implements the default spectral OAS3 rules.
+- Add the plugins backstage-plugin-api-grade and backstage-plugin-api-grade-backend, available here: https://github.com/DawMatt/api-grade
+- Configure the api-grade plugins to use the spectral ruleset defined above, and appear in the Info column below the About entry. This adds basic API grade and quality information for all users, and more detailed quality information for API owners.
+- Add a plugin (Spectral) and use the same pre-defined spectral ruleset to automatically assess each API. The spectral plugin is available here: https://github.com/dweber019/backstage-plugins/tree/main/plugins/api-docs-spectral-linter
+- By default all API quality feaures (e.g. Spectral and API grading) will be visible only to the team owning the API, and the team responsible for the Backstage platform.
+
+Lab 4 - Auto registration
 
 - Setup a process for automatic registration of APIs and creation of catalog metadata.
 - Assume API definition files exist within a Git mono-repo. 
 - Include sourcing of metadata from x-* fields, within the API specifications themselves, into catalog metadata, fields and annotations.
-
-Lab 4 - API quality
-
-- Add a plugin (Spectral) and use a pre-defined spectral ruleset to automatically assess each API
-- Include an "API Doctor" like grading of every OpenAPI and AsyncAPI. This will appear in the Info column below the About entry. 
-- By default all API quality feaures (e.g. Spectral and API grading) will be visible only to the team owning the API, and the team responsible for the Backstage platform.
 
 Lab 5 - Mocking and testing
 
