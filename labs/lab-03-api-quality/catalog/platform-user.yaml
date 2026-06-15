@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: eve
+  namespace: default
+spec:
+  profile:
+    displayName: Eve Rodriguez
+    email: eve@example.com      # fictional example value — see Security Note in README
+  memberOf:
+    - platform-team

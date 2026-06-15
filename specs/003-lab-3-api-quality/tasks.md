@@ -30,7 +30,7 @@ description: "Task list for Lab 3 — API Quality"
 
 **Purpose**: Create the lab directory structure so subsequent phases have concrete files to write to.
 
-- [ ] T001 Create labs/lab-03-api-quality/ directory with README.md placeholder and catalog/ subdirectory
+- [X] T001 Create labs/lab-03-api-quality/ directory with README.md placeholder and catalog/ subdirectory
 
 ---
 
@@ -40,7 +40,7 @@ description: "Task list for Lab 3 — API Quality"
 
 **⚠️ CRITICAL**: Story-phase README content cannot be written until this skeleton exists.
 
-- [ ] T002 Draft README overview section (what Lab 3 demonstrates), prerequisites section (Lab 2 completed; Node.js 20 LTS; yarn; Git), and section-heading skeleton in labs/lab-03-api-quality/README.md
+- [X] T002 Draft README overview section (what Lab 3 demonstrates), prerequisites section (Lab 2 completed; Node.js 20 LTS; yarn; Git), and section-heading skeleton in labs/lab-03-api-quality/README.md
 
 **Checkpoint**: README skeleton exists — story-phase content can now be added independently.
 
@@ -54,8 +54,8 @@ description: "Task list for Lab 3 — API Quality"
 
 ### Implementation for User Story 1
 
-- [ ] T003 [US1] Create labs/lab-03-api-quality/.spectral.yaml with `extends: [spectral:oas, spectral:asyncapi]` (canonical content from R-001; include CDN fallback as a comment)
-- [ ] T004 [US1] Write README Step 1: explain why a single shared ruleset is used (FR-013 — single source of truth for consistent results), show the ruleset content, document the file path, and provide the GitHub raw URL template that both plugins will reference in labs/lab-03-api-quality/README.md
+- [X] T003 [US1] Create labs/lab-03-api-quality/.spectral.yaml with `extends: [spectral:oas, spectral:asyncapi]` (canonical content from R-001; include CDN fallback as a comment)
+- [X] T004 [US1] Write README Step 1: explain why a single shared ruleset is used (FR-013 — single source of truth for consistent results), show the ruleset content, document the file path, and provide the GitHub raw URL template that both plugins will reference in labs/lab-03-api-quality/README.md
 
 **Checkpoint**: Spectral ruleset committed and documented — both plugin phases can now reference the ruleset URL.
 
@@ -69,12 +69,12 @@ description: "Task list for Lab 3 — API Quality"
 
 ### Implementation for User Story 2
 
-- [ ] T005 [P] [US2] Write README Step 2a: frontend package installation instructions — npm-first check (`npm view backstage-plugin-api-grade`) with `yarn --cwd packages/app add` command, plus full GitHub source-build fallback (clone, yarn install, yarn build, file: protocol install) per R-002 in labs/lab-03-api-quality/README.md
-- [ ] T006 [P] [US2] Write README Step 2b: backend package installation instructions — same npm-first / source-build pattern for `backstage-plugin-api-grade-backend`, referencing same cloned api-grade repo per R-002 in labs/lab-03-api-quality/README.md
-- [ ] T007 [US2] Write README Step 3: full code listing for packages/app/src/modules/apiGrade/index.ts (EntityCardBlueprint.make with filter:'kind:API', type:'info', ApiGradeCard loader) per R-003; explain why type:'info' is required in labs/lab-03-api-quality/README.md
-- [ ] T008 [US2] Write README Step 4: App.tsx update — add import for apiGradeModule and add it to the features array in createApp(); include complete updated features array for clarity in labs/lab-03-api-quality/README.md
-- [ ] T009 [US2] Write README Step 5: packages/backend/src/index.ts update — add single `backend.add(import('backstage-plugin-api-grade-backend'))` line; explain on-demand grading (no cache — grade computed fresh each page load per R-004, correcting the spec clarification) in labs/lab-03-api-quality/README.md
-- [ ] T010 [US2] Write README Step 6: app-config.yaml apiGrade section — full YAML block with ruleset.url (GitHub raw URL template), visibility.allowAll:false, visibility.groups:[group:default/platform-team]; explain what each setting achieves (summary vs. detail split) per R-005 in labs/lab-03-api-quality/README.md
+- [X] T005 [P] [US2] Write README Step 2a: frontend package installation instructions — npm-first check (`npm view backstage-plugin-api-grade`) with `yarn --cwd packages/app add` command, plus full GitHub source-build fallback (clone, yarn install, yarn build, file: protocol install) per R-002 in labs/lab-03-api-quality/README.md
+- [X] T006 [P] [US2] Write README Step 2b: backend package installation instructions — same npm-first / source-build pattern for `backstage-plugin-api-grade-backend`, referencing same cloned api-grade repo per R-002 in labs/lab-03-api-quality/README.md
+- [X] T007 [US2] Write README Step 3: full code listing for packages/app/src/modules/apiGrade/index.ts (EntityCardBlueprint.make with filter:'kind:API', type:'info', ApiGradeCard loader) per R-003; explain why type:'info' is required in labs/lab-03-api-quality/README.md
+- [X] T008 [US2] Write README Step 4: App.tsx update — add import for apiGradeModule and add it to the features array in createApp(); include complete updated features array for clarity in labs/lab-03-api-quality/README.md
+- [X] T009 [US2] Write README Step 5: packages/backend/src/index.ts update — add single `backend.add(import('backstage-plugin-api-grade-backend'))` line; explain on-demand grading (no cache — grade computed fresh each page load per R-004, correcting the spec clarification) in labs/lab-03-api-quality/README.md
+- [X] T010 [US2] Write README Step 6: app-config.yaml apiGrade section — full YAML block with ruleset.url (GitHub raw URL template), visibility.allowAll:false, visibility.groups:[group:default/platform-team]; explain what each setting achieves (summary vs. detail split) per R-005 in labs/lab-03-api-quality/README.md
 
 **Checkpoint**: api-grade plugin fully documented — student can install, configure, and verify the grade card independently of the Spectral linter.
 
@@ -88,11 +88,11 @@ description: "Task list for Lab 3 — API Quality"
 
 ### Implementation for User Story 3
 
-- [ ] T011 [US3] Write README Step 7: @dweber019/backstage-plugin-api-docs-spectral-linter@0.5.2 installation — `yarn --cwd packages/app add` command; note this package IS on npm (no source build needed) per R-006 in labs/lab-03-api-quality/README.md
-- [ ] T012 [US3] Write README Step 8: full code listing for packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx — permission-gated wrapper using useEntityOwnership + identityApiRef.getBackstageIdentity().ownershipEntityRefs; include the access-restricted InfoCard fallback; explain WHY EntityContentBlueprint filter cannot hide the tab (lacks user context) and why the access-restricted message is used instead per R-007 in labs/lab-03-api-quality/README.md
-- [ ] T013 [US3] Write README Step 9: full code listing for packages/app/src/modules/spectralLinter/index.ts — EntityContentBlueprint.make with defaultPath:'/spectral', defaultTitle:'Spectral', filter:'kind:API', SpectralLinterContent loader per R-007 in labs/lab-03-api-quality/README.md
-- [ ] T014 [US3] Write README Step 10: App.tsx update — add import for spectralLinterModule and add it to the features array; show updated features array with both apiGradeModule and spectralLinterModule in labs/lab-03-api-quality/README.md
-- [ ] T015 [US3] Write README Step 11: app-config.yaml spectralLinter section — full YAML block with openApiRulesetUrl and asyncApiRulesetUrl both pointing to the same .spectral.yaml GitHub raw URL; explain that Spectral's format detection applies OAS3 vs AsyncAPI rules automatically per R-006 in labs/lab-03-api-quality/README.md
+- [X] T011 [US3] Write README Step 7: @dweber019/backstage-plugin-api-docs-spectral-linter@0.5.2 installation — `yarn --cwd packages/app add` command; note this package IS on npm (no source build needed) per R-006 in labs/lab-03-api-quality/README.md
+- [X] T012 [US3] Write README Step 8: full code listing for packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx — permission-gated wrapper using useEntityOwnership + identityApiRef.getBackstageIdentity().ownershipEntityRefs; include the access-restricted InfoCard fallback; explain WHY EntityContentBlueprint filter cannot hide the tab (lacks user context) and why the access-restricted message is used instead per R-007 in labs/lab-03-api-quality/README.md
+- [X] T013 [US3] Write README Step 9: full code listing for packages/app/src/modules/spectralLinter/index.ts — EntityContentBlueprint.make with defaultPath:'/spectral', defaultTitle:'Spectral', filter:'kind:API', SpectralLinterContent loader per R-007 in labs/lab-03-api-quality/README.md
+- [X] T014 [US3] Write README Step 10: App.tsx update — add import for spectralLinterModule and add it to the features array; show updated features array with both apiGradeModule and spectralLinterModule in labs/lab-03-api-quality/README.md
+- [X] T015 [US3] Write README Step 11: app-config.yaml spectralLinter section — full YAML block with openApiRulesetUrl and asyncApiRulesetUrl both pointing to the same .spectral.yaml GitHub raw URL; explain that Spectral's format detection applies OAS3 vs AsyncAPI rules automatically per R-006 in labs/lab-03-api-quality/README.md
 
 **Checkpoint**: Spectral linter plugin fully documented — student can install, configure, and verify the linter tab independently.
 
@@ -106,10 +106,10 @@ description: "Task list for Lab 3 — API Quality"
 
 ### Implementation for User Story 4
 
-- [ ] T016 [P] [US4] Create labs/lab-03-api-quality/catalog/platform-user.yaml — User entity for eve (displayName: Eve Rodriguez, email: eve@example.com, memberOf: [platform-team]) per data-model.md
-- [ ] T017 [US4] Update labs/lab-02-users-roles/catalog/teams.yaml — add `- eve` to the members list under the platform-team Group entry per R-008; add a comment noting this is a Lab 3 addition
-- [ ] T018 [US4] Write README Step 12: app-config.yaml catalog location entry for platform-user.yaml — type:url, target: GitHub raw URL template, rules allow:[User]; explain why teams.yaml is updated (not a new Group file) to avoid duplicate entity error per R-009 in labs/lab-03-api-quality/README.md
-- [ ] T019 [US4] Write README Step 13: app-config.local.yaml identity-switching instructions — show the three userEntityRef values (alice, charlie, eve) and explain each user's role and expected quality visibility per data-model.md visibility table in labs/lab-03-api-quality/README.md
+- [X] T016 [P] [US4] Create labs/lab-03-api-quality/catalog/platform-user.yaml — User entity for eve (displayName: Eve Rodriguez, email: eve@example.com, memberOf: [platform-team]) per data-model.md
+- [X] T017 [US4] Update labs/lab-02-users-roles/catalog/teams.yaml — add `- eve` to the members list under the platform-team Group entry per R-008; add a comment noting this is a Lab 3 addition
+- [X] T018 [US4] Write README Step 12: app-config.yaml catalog location entry for platform-user.yaml — type:url, target: GitHub raw URL template, rules allow:[User]; explain why teams.yaml is updated (not a new Group file) to avoid duplicate entity error per R-009 in labs/lab-03-api-quality/README.md
+- [X] T019 [US4] Write README Step 13: app-config.local.yaml identity-switching instructions — show the three userEntityRef values (alice, charlie, eve) and explain each user's role and expected quality visibility per data-model.md visibility table in labs/lab-03-api-quality/README.md
 
 **Checkpoint**: Platform team fully configured and documented — all four user stories are complete and independently testable.
 
@@ -119,11 +119,11 @@ description: "Task list for Lab 3 — API Quality"
 
 **Purpose**: Complete README with verification, troubleshooting, platform variants, and constitution-required sections.
 
-- [ ] T020 Write README verification section using all 7 steps from quickstart.md — Step 1 (eve in catalog), Step 2 (grade card for all), Step 3 (Alice sees detail), Step 4 (Charlie sees summary only), Step 5 (Eve sees all detail), Step 6 (ruleset consistency check), Step 7 (AsyncAPI quality check) in labs/lab-03-api-quality/README.md
-- [ ] T021 Write README troubleshooting section covering: Spectral ruleset path misconfiguration (wrong raw URL), api-grade plugin installation issues (npm vs source build), permission config mistakes (allowAll:true leaking detail, platform-team ref typo causing restricted access), missing catalog location for platform-user.yaml (FR-009) in labs/lab-03-api-quality/README.md
-- [ ] T022 [P] Add Windows/macOS platform-specific variants to all yarn/npm commands in the README where they differ (e.g. path separators, shell syntax); confirm no Unix-only assumptions per FR-012 in labs/lab-03-api-quality/README.md
-- [ ] T023 [P] Add Security Note section before the guest auth step (app-config.local.yaml switching) — label guest provider as lab-only, list production alternatives (OIDC, SAML, LDAP), note that userEntityRef values are fictional per Constitution Principle IX in labs/lab-03-api-quality/README.md
-- [ ] T024 Review completed README for all constitution gates: WHY explanations present (FR-013 single ruleset rationale, on-demand grading explanation, EntityContentBlueprint filter limitation note); verification tests outcomes not implementation details (SC-003–SC-006); platform variants complete; Security Note before first insecure step in labs/lab-03-api-quality/README.md
+- [X] T020 Write README verification section using all 7 steps from quickstart.md — Step 1 (eve in catalog), Step 2 (grade card for all), Step 3 (Alice sees detail), Step 4 (Charlie sees summary only), Step 5 (Eve sees all detail), Step 6 (ruleset consistency check), Step 7 (AsyncAPI quality check) in labs/lab-03-api-quality/README.md
+- [X] T021 Write README troubleshooting section covering: Spectral ruleset path misconfiguration (wrong raw URL), api-grade plugin installation issues (npm vs source build), permission config mistakes (allowAll:true leaking detail, platform-team ref typo causing restricted access), missing catalog location for platform-user.yaml (FR-009) in labs/lab-03-api-quality/README.md
+- [X] T022 [P] Add Windows/macOS platform-specific variants to all yarn/npm commands in the README where they differ (e.g. path separators, shell syntax); confirm no Unix-only assumptions per FR-012 in labs/lab-03-api-quality/README.md
+- [X] T023 [P] Add Security Note section before the guest auth step (app-config.local.yaml switching) — label guest provider as lab-only, list production alternatives (OIDC, SAML, LDAP), note that userEntityRef values are fictional per Constitution Principle IX in labs/lab-03-api-quality/README.md
+- [X] T024 Review completed README for all constitution gates: WHY explanations present (FR-013 single ruleset rationale, on-demand grading explanation, EntityContentBlueprint filter limitation note); verification tests outcomes not implementation details (SC-003–SC-006); platform variants complete; Security Note before first insecure step in labs/lab-03-api-quality/README.md
 
 ---
 
