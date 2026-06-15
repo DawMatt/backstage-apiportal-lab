@@ -82,18 +82,68 @@ yarn --cwd packages/backend add backstage-plugin-api-grade-backend
 ```
 
 **GitHub source fallback** (if not on npm):
+
+The clone MUST be performed from the **repository root** (`backstage-apiportal-lab/`) so
+that the api-grade directory lands beside the repo (i.e., as a sibling of `backstage-apiportal-lab/`).
+
+**macOS / Linux (bash/zsh)**:
 ```bash
-# Clone the api-grade repo alongside backstage-apiportal-lab:
+# From backstage-apiportal-lab/ (repo root):
 git clone https://github.com/DawMatt/api-grade ../api-grade
 cd ../api-grade
 yarn install
 yarn build
 
-# Install from local build:
+# Return to backstage instance (cd - goes back to repo root, then navigate in):
+cd -
 cd labs/lab-01-base-backstage/backstage
-yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../api-grade/packages/backstage-plugin-api-grade"
-yarn --cwd packages/backend add "backstage-plugin-api-grade-backend@file:../../../../api-grade/packages/backstage-plugin-api-grade-backend"
+
+# Install from local build — 6 levels up from packages/app to reach the sibling directory:
+yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
+yarn --cwd packages/backend add "backstage-plugin-api-grade-backend@file:../../../../../../api-grade/packages/backstage-plugin-api-grade-backend"
 ```
+
+**Windows (PowerShell)** — `cd -` is not available; use `Set-Location -` or navigate explicitly:
+```powershell
+# From backstage-apiportal-lab\ (repo root):
+git clone https://github.com/DawMatt/api-grade ..\api-grade
+Set-Location ..\api-grade
+npm install        # yarn install equivalent
+npm run build      # yarn build equivalent
+
+# Return to backstage instance (PowerShell: use Push-Location / Pop-Location or an explicit path):
+Set-Location ..\backstage-apiportal-lab\labs\lab-01-base-backstage\backstage
+
+# Install from local build:
+yarn --cwd packages\app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
+yarn --cwd packages\backend add "backstage-plugin-api-grade-backend@file:../../../../../../api-grade/packages/backstage-plugin-api-grade-backend"
+```
+
+**Path rationale** (why 6 levels, not 4):
+`yarn --cwd packages/app` resolves `file:` paths relative to `packages/app`, not the shell
+working directory. From `packages/app`, reaching the sibling `api-grade` directory requires
+traversing: `packages/app` → `packages` → `backstage` → `lab-01-base-backstage` → `labs` →
+`backstage-apiportal-lab` → parent directory → `api-grade` = **6 levels** (`../../../../../../`).
+Using only 4 levels (`../../../../`) reaches `labs/` inside the repo — the error encountered
+in Run 1 testing (`ENOENT: lstat 'labs/api-grade/...'`).
+
+**If yarn install fails on Windows (peer dependency conflict)**:
+The `@material-ui/core@4` package declares a peer dependency on `@types/react@"^16.8.6 || ^17.0.0"`,
+which conflicts with the `@types/react@18.x` installed by Backstage 1.51.0. Yarn 4.x tolerates
+this conflict silently; npm does not. If `npm install` is used instead and fails with `ERESOLVE`:
+```powershell
+# Add --legacy-peer-deps to bypass the peer dep conflict:
+yarn --cwd packages\app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade" --legacy-peer-deps
+```
+Or if using npm directly from within packages/app:
+```powershell
+cd packages\app
+npm install "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade" --legacy-peer-deps
+cd ..\..
+```
+Note: `--legacy-peer-deps` instructs npm to ignore peer dependency version mismatches. It is
+safe to use here because the conflict is a type declaration version mismatch, not a runtime
+incompatibility — Backstage 1.51.0 uses React 18 and Material UI v4 together without issues.
 
 **Backend compatibility**: `backstage-plugin-api-grade-backend` requires
 `@backstage/backend-plugin-api ^0.6.0` and `@backstage/catalog-client ^1.0.0` — both

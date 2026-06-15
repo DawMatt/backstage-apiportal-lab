@@ -69,11 +69,11 @@ description: "Task list for Lab 3 — API Quality"
 
 ### Implementation for User Story 2
 
-- [X] T005 [P] [US2] Write README Step 2a: frontend package installation instructions — npm-first check (`npm view backstage-plugin-api-grade`) with `yarn --cwd packages/app add` command, plus full GitHub source-build fallback (clone, yarn install, yarn build, file: protocol install) per R-002 in labs/lab-03-api-quality/README.md
-- [X] T006 [P] [US2] Write README Step 2b: backend package installation instructions — same npm-first / source-build pattern for `backstage-plugin-api-grade-backend`, referencing same cloned api-grade repo per R-002 in labs/lab-03-api-quality/README.md
+- [X] T005 [P] [US2] Write README Step 2a: frontend package installation instructions — npm-first check (`npm view backstage-plugin-api-grade`) with `yarn --cwd packages/app add` command, plus full GitHub source-build fallback with: (a) clone from repo root so api-grade lands beside the repo, (b) macOS `cd -` and Windows `Set-Location -` return-navigation alternatives, (c) corrected file: path of `../../../../../../api-grade/packages/backstage-plugin-api-grade` (6 levels from packages/app), (d) npm equivalents (`npm install`, `npm run build`) for Windows users without yarn, (e) `--legacy-peer-deps` fallback for ERESOLVE peer dependency conflict per R-002 in labs/lab-03-api-quality/README.md
+- [X] T006 [P] [US2] Write README Step 2b: backend package installation instructions — same npm-first / source-build pattern for `backstage-plugin-api-grade-backend` with identical corrected file: path (`../../../../../../api-grade/packages/backstage-plugin-api-grade-backend`), same Windows/PowerShell alternatives, and same `--legacy-peer-deps` note per R-002 in labs/lab-03-api-quality/README.md
 - [X] T007 [US2] Write README Step 3: full code listing for packages/app/src/modules/apiGrade/index.ts (EntityCardBlueprint.make with filter:'kind:API', type:'info', ApiGradeCard loader) per R-003; explain why type:'info' is required in labs/lab-03-api-quality/README.md
 - [X] T008 [US2] Write README Step 4: App.tsx update — add import for apiGradeModule and add it to the features array in createApp(); include complete updated features array for clarity in labs/lab-03-api-quality/README.md
-- [X] T009 [US2] Write README Step 5: packages/backend/src/index.ts update — add single `backend.add(import('backstage-plugin-api-grade-backend'))` line; explain on-demand grading (no cache — grade computed fresh each page load per R-004, correcting the spec clarification) in labs/lab-03-api-quality/README.md
+- [X] T009 [US2] Write README Step 5: packages/backend/src/index.ts update — add single `backend.add(import('backstage-plugin-api-grade-backend'))` line; explain on-demand grading (grade computed fresh on every page load per R-004; no persistent cache) in labs/lab-03-api-quality/README.md
 - [X] T010 [US2] Write README Step 6: app-config.yaml apiGrade section — full YAML block with ruleset.url (GitHub raw URL template), visibility.allowAll:false, visibility.groups:[group:default/platform-team]; explain what each setting achieves (summary vs. detail split) per R-005 in labs/lab-03-api-quality/README.md
 
 **Checkpoint**: api-grade plugin fully documented — student can install, configure, and verify the grade card independently of the Spectral linter.
@@ -100,7 +100,7 @@ description: "Task list for Lab 3 — API Quality"
 
 ## Phase 6: User Story 4 — Platform Team Configuration (Priority: P4)
 
-**Goal**: A new user `eve` (platform team member) is added to the catalog. The platform-team group in Lab 2's teams.yaml is updated to list eve as a member. Eve can sign in and see detailed quality information for all three APIs regardless of ownership.
+**Goal**: A new user `eve` (platform team member) is added to the catalog. The existing `platform-team` group in Lab 2's teams.yaml is updated to list eve as its first member. Eve can sign in and see detailed quality information for all three APIs regardless of ownership.
 
 **Independent Test**: Sign in as Eve (platform-team), navigate to the Museum API entity page (owned by museum-team, not platform-team), and confirm both the api-grade detailed breakdown and the Spectral lint results tab are visible to her.
 
@@ -185,7 +185,7 @@ T023: Add Security Note section
 1. Setup + Foundational → README skeleton + lab directory exist
 2. US1 → Ruleset file + Step 1 README → test that ruleset is accessible at documented path
 3. US2 → api-grade plugin instructions → test grade card per quickstart Steps 2–3
-4. US3 → Spectral linter instructions → test linter tab per quickstart Step 3–4
+4. US3 → Spectral linter instructions → test linter tab per quickstart Steps 3–4
 5. US4 → Platform team catalog files + instructions → test eve access per quickstart Step 5
 6. Polish → Full README with verification, troubleshooting, and platform variants
 

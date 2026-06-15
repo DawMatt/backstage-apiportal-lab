@@ -191,8 +191,10 @@ on every API catalog page, including APIs owned by other teams.
   linter plugin (`api-docs-spectral-linter`) from
   https://github.com/dweber019/backstage-plugins/tree/main/plugins/api-docs-spectral-linter,
   pointing it at the same shared Spectral ruleset defined in FR-001.
-- **FR-005**: The lab MUST define a "platform team" group entity in the Backstage catalog
-  to represent the team responsible for maintaining the Backstage instance.
+- **FR-005**: The lab MUST add a new platform team member (`eve`) to the existing
+  `group:default/platform-team` Group entity from Lab 2, and MUST register `eve`'s User
+  entity in the Backstage catalog. The Group entity itself is not redefined in Lab 3 —
+  only the `members` list in `labs/lab-02-users-roles/catalog/teams.yaml` is updated.
 - **FR-006**: The lab MUST configure Backstage's permissions framework so that all API
   quality features (api-grade card and Spectral linter panel) are visible only to members
   of the API's owning team and members of the platform team. If the api-grade plugin
@@ -223,11 +225,10 @@ on every API catalog page, including APIs owned by other teams.
 - **FR-013**: The lab MUST explain WHY a single shared Spectral ruleset is used for both
   plugins, to reinforce the principle that quality assessments should be consistent and
   traceable to a single source of truth.
-- **FR-014**: The api-grade backend MUST compute and cache quality grades on demand (first
-  request triggers the Spectral assessment; the result is stored and served for subsequent
-  requests). The lab MUST include a verification step that triggers the initial grade
-  computation for each sample API, so the learner confirms a grade is visible before
-  demonstrating visibility permissions.
+- **FR-014**: The api-grade backend computes quality grades on demand — a grade is
+  recalculated on every page load and no result is cached between requests. The lab MUST
+  include a verification step that confirms a grade is visible for both an OpenAPI and an
+  AsyncAPI specification before the learner tests visibility permissions.
 
 ### Key Entities
 
@@ -260,8 +261,8 @@ on every API catalog page, including APIs owned by other teams.
   ruleset definition through permission verification) within 60 minutes on a clean machine.
 - **SC-002**: After following the lab, a quality grade card is visible in the Info column
   below the About entry on every API catalog page, for all authenticated users. The grade
-  is served from a backend cache; first load may trigger computation but subsequent visits
-  return the cached result without noticeable delay.
+  is computed on demand with each page load; in a local development environment with three
+  small API specifications, computation is fast enough that no loading state is noticeable.
 - **SC-003**: The grade displayed by the api-grade plugin for a sample API matches the
   result produced when running the same Spectral ruleset against that API's specification
   manually, confirming the plugin and ruleset are correctly connected. The lab MUST include
@@ -298,9 +299,12 @@ on every API catalog page, including APIs owned by other teams.
   permissions framework or conditional rendering. If the plugin does not natively support
   permission gating, the lab will document the closest available mechanism and note the
   limitation.
-- The platform team is a new group entity introduced in Lab 3. It does not replace or merge
-  with the API-owning teams from Lab 2. The permission policy extension in this lab adds a
-  platform team check alongside the existing ownership check.
+- The `platform-team` Group entity was introduced in Lab 2 as an owner for shared platform
+  APIs. Lab 3 adds the first member to this group (user `eve`) and configures the quality
+  plugins to grant platform team members access to detailed API quality information across
+  all APIs. The permission policy extension adds a platform team membership check alongside
+  the existing ownership check. A second Group definition for platform-team MUST NOT be
+  created in Lab 3 — doing so causes a duplicate entity error in the catalog.
 - The shared Spectral ruleset extends both OAS3 and AsyncAPI default recommended rules.
   OpenAPI specifications are assessed by the OAS3 rules; AsyncAPI specifications are
   assessed by the AsyncAPI rules. Both API types present in Lab 1 will receive quality
