@@ -91,12 +91,15 @@ that the api-grade directory lands beside the repo (i.e., as a sibling of `backs
 # From backstage-apiportal-lab/ (repo root):
 git clone https://github.com/DawMatt/api-grade ../api-grade
 cd ../api-grade
-yarn install
-yarn build
+npm install   # api-grade uses npm internally; yarn install fails on this repo
+npm run build
 
-# Return to backstage instance (cd - goes back to repo root, then navigate in):
+# Return to backstage instance:
 cd -
 cd labs/lab-01-base-backstage/backstage
+
+# api-grade-core is not on npm; pre-install it from the local build before backstage-plugin-api-grade:
+yarn --cwd packages/app add "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core"
 
 # Install from local build — 6 levels up from packages/app to reach the sibling directory:
 yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"

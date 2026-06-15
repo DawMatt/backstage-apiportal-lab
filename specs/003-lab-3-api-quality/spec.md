@@ -12,7 +12,7 @@
 
 ### Session 2026-06-15
 
-- Q: When does the Spectral quality assessment run? → A: Computed on demand then cached by the backend plugin (fresh Spectral run triggered on first request for a given API, result stored by the backend; subsequent visits serve the cached result).
+- Q: When does the Spectral quality assessment run? → A: Computed on demand on every page load — the backend plugin runs a fresh Spectral assessment each time an API entity page is opened. No result is stored between requests; each visit triggers a new computation. (Note: initial clarification assumed caching; research into the actual plugin implementation confirmed the no-cache design, reflected in FR-014.)
 - Q: Fallback if api-grade plugin cannot natively split summary vs. detail by permission? → A: Hide the grade card entirely from non-owners — show nothing to users outside the owning team or platform team; do not attempt a partial/placeholder display.
 - Q: How should the lab handle AsyncAPI specifications under the OAS3-only Spectral ruleset? → A: Add AsyncAPI default rules to the shared Spectral ruleset alongside the OAS3 rules, so both OpenAPI and AsyncAPI specifications are assessed by appropriate default rules from a single ruleset file.
 
@@ -195,13 +195,14 @@ on every API catalog page, including APIs owned by other teams.
   `group:default/platform-team` Group entity from Lab 2, and MUST register `eve`'s User
   entity in the Backstage catalog. The Group entity itself is not redefined in Lab 3 —
   only the `members` list in `labs/lab-02-users-roles/catalog/teams.yaml` is updated.
-- **FR-006**: The lab MUST configure Backstage's permissions framework so that all API
-  quality features (api-grade card and Spectral linter panel) are visible only to members
-  of the API's owning team and members of the platform team. If the api-grade plugin
-  natively supports a split view (summary grade for all, detailed breakdown for owners),
-  the lab MUST use that split. If no native split is available, the grade card MUST be
-  hidden entirely from users outside the owning team and platform team — no placeholder or
-  partial display is acceptable.
+- **FR-006**: The lab MUST configure Backstage's permissions framework so that the detailed
+  quality breakdown (api-grade full report: individual rule results, recommendations, and
+  diagnostics) and the Spectral linter panel are visible only to members of the API's owning
+  team and members of the platform team. The summary grade (letter, percentage, quality
+  label) displayed by the api-grade card is visible to all authenticated users — see FR-007
+  for the native-split configuration. If the api-grade plugin does not natively support this
+  split, the grade card MUST be hidden entirely from users outside the owning team and
+  platform team — no placeholder or partial display is acceptable.
 - **FR-007**: Where the api-grade plugin natively supports displaying a summary grade to
   all authenticated users independently of the detailed breakdown, the lab MUST configure
   this split. If the plugin does not support this natively, this requirement is superseded

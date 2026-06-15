@@ -4,16 +4,20 @@
 
 Step 2a — Install the api-grade Frontend Plugin
 
-- [ ] These steps did not work. I had to use the npm equivalent of each of these instead:
+- [X] These steps did not work. I had to use the npm equivalent of each of these instead:
 
 ```powershell
 yarn install # Use npm install
 yarn build # Use npm run build
 ```
 
-- [ ] This step did not work in Powershell: `cd -`
+**Resolution (2026-06-15)**: README Step 2a and Step 2b macOS section now uses `npm install` / `npm run build` to build the api-grade repo. api-grade uses npm internally; the yarn equivalents do not work on this repo on either platform.
 
-- [ ] This step did not work: yarn install from checked out repo
+- [X] This step did not work in Powershell: `cd -`
+
+**Resolution (2026-06-15)**: Windows (PowerShell) section now uses `Set-Location ..\backstage-apiportal-lab\labs\lab-01-base-backstage\backstage` instead of `cd -`. The `cd -` shorthand is Bash/zsh only.
+
+- [X] This step did not work: yarn install from checked out repo
 
 ```powershell
 yarn --cwd packages\app add "backstage-plugin-api-grade@file:../../../../api-grade/packages/backstage-plugin-api-grade"
@@ -94,23 +98,81 @@ npm error   node_modules/@material-ui/core
 npm error     @material-ui/core@"^4.12.2" from @backstage/core-components@0.18.10
 npm error     node_modules/@backstage/core-components
 npm error       @backstage/core-components@"^0.18.10" from @backstage/frontend-defaults@0.5.2
-npm error       node_modules/@backstage/frontend-defaults
-npm error         @backstage/frontend-defaults@"^0.5.2" from @backstage/frontend-app-api@0.16.3
+npm error     node_modules/@backstage/frontend-defaults
+npm error       @backstage/frontend-defaults@"^0.5.2" from @backstage/frontend-app-api@0.16.3
 npm error         node_modules/@backstage/frontend-app-api
 npm error         1 more (app)
-npm error       22 more (@backstage/plugin-app, @backstage/plugin-api-docs, ...)
-npm error     @material-ui/core@"^4.9.13" from @backstage/plugin-app@0.4.6
-npm error     node_modules/@backstage/plugin-app
-npm error       @backstage/plugin-app@"^0.4.6" from @backstage/frontend-defaults@0.5.2
-npm error       node_modules/@backstage/frontend-defaults
-npm error         @backstage/frontend-defaults@"^0.5.2" from @backstage/frontend-app-api@0.16.3
-npm error         node_modules/@backstage/frontend-app-api
-npm error         1 more (app)
-npm error       1 more (@backstage/frontend-test-utils)
-npm error     30 more (@backstage/plugin-api-docs, ...)
+npm error     22 more (@backstage/plugin-app, @backstage/plugin-api-docs, ...)
+npm error   @material-ui/core@"^4.9.13" from @backstage/plugin-app@0.4.6
 npm error
 npm error Fix the upstream dependency conflict, or retry
 npm error this command with --force or --legacy-peer-deps
 npm error to accept an incorrect (and potentially broken) dependency resolution.
 ```
 
+**Resolution (2026-06-15)**: Two separate fixes applied:
+1. The `file:` path was wrong — 4 levels (`../../../../`) reaches `labs/api-grade/` inside the repo, not the sibling clone. Corrected to 6 levels (`../../../../../../`) from `packages/app`.
+2. The `npm install` ERESOLVE is a known `@material-ui/core@4` / `@types/react@18` peer dependency conflict. Use `yarn --cwd` instead (yarn 4.x ignores it silently), or add `--legacy-peer-deps` if npm must be used. Both approaches are now documented in Step 2a and the Troubleshooting section.
+
+---
+
+## Run 2 - 2026/06/15
+
+- [X] Yarn does not work with api-grade on any operating system. api-grade uses npm as its package manager so yarn refuses to install or build that repository. So these commands fail:
+
+```
+yarn install
+yarn build
+```
+
+**Resolution (2026-06-15)**: README Step 2a macOS section now uses `npm install` / `npm run build` for the api-grade repo build step. Was previously using yarn on macOS but npm on Windows; now consistently npm on both platforms for building the api-grade source.
+
+- [X] Manual plugin install process failed with the following error message:
+
+```bash
+$ yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
+
+➤ YN0000: · Yarn 4.4.1
+➤ YN0000: ┌ Resolution step
+➤ YN0035: │ api-grade-core@npm:*: Package not found
+➤ YN0035: │   Response Code: 404 (Not Found)
+➤ YN0035: │   Request Method: GET
+➤ YN0035: │   Request URL: https://registry.yarnpkg.com/api-grade-core
+➤ YN0000: └ Completed in 0s 260ms
+➤ YN0000: · Failed with errors in 0s 264ms
+```
+
+**Resolution (2026-06-15)**: `api-grade-core` is a workspace dependency of `backstage-plugin-api-grade` that is not published to npm. README Step 2a now pre-installs `api-grade-core` from the local file path before installing `backstage-plugin-api-grade`:
+```bash
+yarn --cwd packages/app add "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core"
+yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
+```
+
+- [ ] This command does install the missing package, but it was not sufficient to make the backstage plugin work at the second install attempt.
+
+```bash
+$ yarn --cwd packages/app add "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core" 
+
+➤ YN0000: · Yarn 4.4.1
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + api-grade-core@file:../../../../../../api-grade/packages/api-grade-core#../../../../../../api-grade/packages/api-grade-core::hash=55c1d3&locator=app%40workspace%3Apackages%2Fapp, and 18 more.
+➤ YN0000: └ Completed in 2s 145ms
+➤ YN0000: ┌ Post-resolution validation
+➤ YN0060: │ @testing-library/react is listed by your project with version 14.3.1 (pc9eb9), which doesn't satisfy what @backstage/frontend-test-utils and other dependencies request (^16.0.0).
+➤ YN0060: │ react is listed by your project with version 18.3.1 (pd98da), which doesn't satisfy what @material-ui/core and other dependencies request (but they have non-overlapping ranges!).
+➤ YN0060: │ react-dom is listed by your project with version 18.3.1 (pfa800), which doesn't satisfy what @material-ui/core and other dependencies request (but they have non-overlapping ranges!).
+➤ YN0002: │ app@workspace:packages/app doesn't provide @types/react (pceee1), requested by @backstage/core-components and other dependencies.
+➤ YN0002: │ app@workspace:packages/app doesn't provide jest (p99cdc), requested by @backstage/cli.
+➤ YN0002: │ backend@workspace:packages/backend doesn't provide jest (p35ee3), requested by @backstage/cli.
+➤ YN0086: │ Some peer dependencies are incorrectly met by your project; run yarn explain peer-requirements <hash> for details, where <hash> is the six-letter p-prefixed code.
+➤ YN0086: │ Some peer dependencies are incorrectly met by dependencies; run yarn explain peer-requirements for details.
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ 19 packages were added to the project (+ 12.9 MiB).
+➤ YN0000: └ Completed in 0s 948ms
+➤ YN0000: ┌ Link step
+➤ YN0000: └ Completed in 0s 659ms
+➤ YN0000: · Done with warnings in 4s 16ms
+```
+
+**Status**: Partially addressed. Run 2 tested: pre-install api-grade-core (succeeded with warnings) → second install of backstage-plugin-api-grade (still failed — error output not captured). Run 2 tested with yarn build of api-grade, which itself fails. The README now uses `npm install`/`npm run build` for the api-grade build step, which may change the outcome. **Needs re-testing in Run 3** with the updated instructions (npm build + api-grade-core pre-install + backstage-plugin-api-grade install) to confirm the sequence works end to end.

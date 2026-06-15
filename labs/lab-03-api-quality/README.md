@@ -127,14 +127,18 @@ yarn --cwd packages/app add backstage-plugin-api-grade
 # From backstage-apiportal-lab/ (repository root):
 git clone https://github.com/DawMatt/api-grade ../api-grade
 cd ../api-grade
-yarn install
-yarn build
+npm install   # api-grade uses npm as its package manager — use npm, not yarn
+npm run build
 cd -   # returns to backstage-apiportal-lab/
 
 # Move into the Backstage instance:
 cd labs/lab-01-base-backstage/backstage
 
-# Install from the local build — 6 levels up from packages/app to reach the sibling directory:
+# api-grade-core is a dependency of backstage-plugin-api-grade that is not published to npm.
+# Install it from the local build first so yarn can resolve it:
+yarn --cwd packages/app add "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core"
+
+# Now install the frontend plugin:
 yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
 ```
 
@@ -144,13 +148,17 @@ yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../a
 # From backstage-apiportal-lab\ (repository root):
 git clone https://github.com/DawMatt/api-grade ..\api-grade
 Set-Location ..\api-grade    # cd - is not available in PowerShell; use Set-Location
-npm install                  # yarn install equivalent
-npm run build                # yarn build equivalent
+npm install                  # api-grade uses npm as its package manager
+npm run build
 
 # Return to the Backstage instance (adjust the path to your repo location):
 Set-Location ..\backstage-apiportal-lab\labs\lab-01-base-backstage\backstage
 
-# Install from the local build:
+# api-grade-core is a dependency of backstage-plugin-api-grade that is not published to npm.
+# Install it from the local build first so yarn can resolve it:
+yarn --cwd packages\app add "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core"
+
+# Now install the frontend plugin:
 yarn --cwd packages\app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
 ```
 
@@ -160,18 +168,60 @@ yarn --cwd packages\app add "backstage-plugin-api-grade@file:../../../../../../a
 parent directory → `api-grade`. That is six `../` steps. Using only four steps reaches `labs/`
 inside the repo (not the sibling directory), which produces a `no such file or directory` error.
 
-**If yarn fails with a peer dependency error (ERESOLVE)**: This can occur when using npm
-instead of yarn. The `@material-ui/core@4` package declares a peer dependency on
-`@types/react@"^16 || ^17"`, but Backstage 1.51.0 installs `@types/react@18`. Yarn 4.x
-tolerates this mismatch silently. If you are using npm and see `ERESOLVE`, add
-`--legacy-peer-deps`:
+> **Windows path note**: The `file:` protocol path always uses forward slashes (`/`), even
+> on Windows. Do not replace the slashes with backslashes in the `file:` argument — yarn
+> requires forward slashes here regardless of platform.
+
+**Verify the path before installing** (optional but recommended): Confirm the cloned
+repository is reachable at the expected path before running `yarn add`:
 
 ```bash
-yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade" --legacy-peer-deps
+# macOS / Linux — from the Backstage instance directory (labs/lab-01-base-backstage/backstage/):
+ls ../../../../../../api-grade/packages/
+```
+
+```powershell
+# Windows (PowerShell) — from the Backstage instance directory:
+Get-ChildItem ..\..\..\..\..\..\api-grade\packages\
+```
+
+You should see `api-grade-core`, `backstage-plugin-api-grade`, and
+`backstage-plugin-api-grade-backend` listed. If you see an error, the clone did not land
+in the expected sibling location — re-run the clone from the repository root
+(`backstage-apiportal-lab/`).
+
+**Which package manager to use at each stage:**
+
+| Stage | Command | Why |
+|-------|---------|-----|
+| Build the api-grade repo | `npm install` / `npm run build` | api-grade uses npm internally; `yarn install` fails on this repo |
+| Install into Backstage (packages/app, packages/backend) | `yarn --cwd ...` | Yarn 4.x silently ignores the `@material-ui/core@4` / `@types/react@18` peer dependency mismatch; npm raises an ERESOLVE error for the same conflict |
+
+**If npm raises an ERESOLVE peer dependency error**: If you prefer npm or cannot use yarn
+for the Backstage install step, add `--legacy-peer-deps`. This flag tells npm to ignore peer
+dependency version mismatches — it applies only to this one install command, not to your
+global npm config:
+
+```bash
+# macOS / Linux (from the Backstage instance directory):
+cd packages/app
+npm install "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core" --legacy-peer-deps
+npm install "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade" --legacy-peer-deps
+cd ../..
+```
+
+```powershell
+# Windows (PowerShell):
+Set-Location packages\app
+npm install "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core" --legacy-peer-deps
+npm install "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade" --legacy-peer-deps
+Set-Location ..\..
 ```
 
 The flag is safe here: the conflict is a type declaration version mismatch only — Backstage
-runs React 18 and Material UI v4 together in production without issues.
+runs React 18 and Material UI v4 together in production without issues. Note that when using
+`npm install` from inside `packages/app`, the `file:` path is still six levels up (same as
+`yarn --cwd packages/app`) because both resolve relative to the `packages/app` directory.
 
 ---
 
@@ -194,16 +244,32 @@ yarn --cwd packages/backend add "backstage-plugin-api-grade-backend@file:../../.
 ```
 
 ```powershell
-# Windows (PowerShell):
+# Windows (PowerShell) — use forward slashes in the file: path even on Windows:
 yarn --cwd packages\backend add "backstage-plugin-api-grade-backend@file:../../../../../../api-grade/packages/backstage-plugin-api-grade-backend"
 ```
 
-If you encounter an ERESOLVE error with npm, apply `--legacy-peer-deps` here as well (same
-reason as in Step 2a).
+**If npm raises an ERESOLVE error** (same peer dependency conflict as Step 2a — apply
+`--legacy-peer-deps` as a command-line flag, not a global config change):
+
+```bash
+# macOS / Linux:
+cd packages/backend
+npm install "backstage-plugin-api-grade-backend@file:../../../../../../api-grade/packages/backstage-plugin-api-grade-backend" --legacy-peer-deps
+cd ../..
+```
+
+```powershell
+# Windows (PowerShell):
+Set-Location packages\backend
+npm install "backstage-plugin-api-grade-backend@file:../../../../../../api-grade/packages/backstage-plugin-api-grade-backend" --legacy-peer-deps
+Set-Location ..\..
+```
 
 The backend plugin depends on `api-grade-core`, which bundles the Spectral packages
 (`@stoplight/spectral-core`, `@stoplight/spectral-rulesets`, etc.). You do NOT need to
-install additional Spectral packages in your Backstage backend.
+install additional Spectral packages in your Backstage backend, and you do NOT need to
+pre-install `api-grade-core` separately for the backend (unlike Step 2a, the backend plugin
+package resolves it differently).
 
 ---
 
@@ -707,6 +773,62 @@ starting with `.`).
 compatible with Backstage 1.51.0.
 
 **Fix**: Follow the GitHub source build fallback in Steps 2a and 2b.
+
+---
+
+### Source build install fails — `no such file or directory` or `Package not found`
+
+**Symptom A**: `yarn add "backstage-plugin-api-grade@file:..."` fails with `ENOENT: no such
+file or directory` or `lstat '...'` pointing to an unexpected location (e.g.,
+`labs/api-grade/...` instead of a sibling directory).
+
+**Cause**: The `file:` path is wrong. The `api-grade` repository must be cloned as a *sibling*
+of `backstage-apiportal-lab` (i.e., `../api-grade` from the repo root), and the install
+command must be run from the Backstage instance directory
+(`labs/lab-01-base-backstage/backstage`). Cloning from inside the Backstage directory, or
+using the wrong number of `../` steps, produces this error.
+
+**Fix**: Verify the clone location first:
+```bash
+ls ../../../../../../api-grade/packages/   # macOS/Linux from Backstage instance dir
+```
+If this fails, re-clone from `backstage-apiportal-lab/` with `git clone https://github.com/DawMatt/api-grade ../api-grade`.
+
+**Symptom B**: `yarn add "backstage-plugin-api-grade@file:..."` fails with
+`api-grade-core@npm:* Package not found` (yarn tries to resolve `api-grade-core` from the
+npm registry and fails because it is not published).
+
+**Cause**: `api-grade-core` is a workspace dependency of `backstage-plugin-api-grade` that
+is not published to npm. Yarn must see a local file: reference for it before it can resolve
+the main plugin package.
+
+**Fix**: Install `api-grade-core` from the local build first, then install the plugin:
+```bash
+yarn --cwd packages/app add "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core"
+yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
+```
+
+---
+
+### npm raises ERESOLVE peer dependency error during source build install
+
+**Symptom**: `npm install "backstage-plugin-api-grade@file:..."` fails with an ERESOLVE
+error referencing `@material-ui/core@4.12.4` and `@types/react`.
+
+**Cause**: `@material-ui/core@4` declares a peer dependency on `@types/react@"^16 || ^17"`,
+but Backstage 1.51.0 installs `@types/react@18`. npm raises this as an error; yarn 4.x
+silently ignores the mismatch (which is safe — it is a type declaration version conflict, not
+a runtime incompatibility).
+
+**Fix (preferred)**: Use `yarn --cwd packages/app add "file:..."` instead of npm — yarn
+tolerates this conflict without any flags.
+
+**Fix (if npm required)**: Add `--legacy-peer-deps` as a one-time command-line flag:
+```bash
+npm install "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade" --legacy-peer-deps
+```
+This flag applies only to this single install command and does not change your global npm
+configuration.
 
 ---
 

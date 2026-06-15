@@ -38,8 +38,10 @@ open-source, and cross-platform. No paid accounts or external services are requi
 **Primary Dependencies**:
 - `backstage-plugin-api-grade` — not yet on npm; install from GitHub source
 - `backstage-plugin-api-grade-backend` — not yet on npm; install from GitHub source
+- `api-grade-core` — not on npm; must be pre-installed from GitHub source before `backstage-plugin-api-grade` (yarn cannot resolve it from registry during the main install)
 - `@dweber019/backstage-plugin-api-docs-spectral-linter@0.5.2` — on npm
 - No additional Spectral npm packages required (bundled in api-grade-core and linter plugin)
+- **Build note**: the `api-grade` repository uses npm internally — use `npm install` / `npm run build` when building it locally (not `yarn install` / `yarn build`)
 
 **Storage**: YAML files (Spectral ruleset, one new User catalog descriptor); updates to
 two existing YAML files (teams.yaml in Lab 2 and app-config.yaml in Lab 1 Backstage instance)
@@ -76,7 +78,7 @@ existing Lab 2 features (visibility annotation card, permission policy)
 | VI. Progressive Lab Structure | Lab 3 requires Lab 2 completion; adds to (does not replace) the Lab 2 permission policy, catalog entities, and authentication setup; `eve` user extends the Lab 2 user set; no Lab 2 feature is broken or removed | ✅ Pass |
 | VII. Modern & Purposeful API Examples | No new API examples added; Museum (OpenAPI), Streetlights (AsyncAPI), and Train Travel (OpenAPI) from Labs 1/2 are used for quality demonstration — these already satisfy Principle VII | ✅ Pass |
 | VIII. Support Experimentation | README notes alternatives: custom Spectral rules can be added to the shared ruleset file; `visibility.groups` can include additional groups; the platform-team check in `SpectralLinterContent` uses the same pattern as the permission policy and can be extended; verification tests outcomes, not exact implementation details | ✅ Pass |
-| IX. Pragmatic Security for Learning Environments | No new insecure security shortcuts introduced in Lab 3; the development guest provider from Lab 2 is reused (`userEntityRef: user:default/eve`). No Security Note section is required. If the Spectral ruleset is hosted in a private repo, a GitHub PAT token would be added to `app-config.local.yaml` (gitignored) — the README must include the production alternative (OIDC-scoped token, secrets manager) if this path is documented | ✅ Pass |
+| IX. Pragmatic Security for Learning Environments | No new insecure security shortcuts introduced in Lab 3; the development guest provider from Lab 2 is reused (`userEntityRef: user:default/eve`). A Security Note section is included in the README (T023) before the identity-switching step — the guest auth shortcut introduced in Lab 2 is reused here, and the constitution requires a Security Note whenever authentication or credential configuration appears. Production alternatives (OIDC, SAML, LDAP) are documented. If the Spectral ruleset is hosted in a private repo, a GitHub PAT token would be added to `app-config.local.yaml` (gitignored) — the README must include the production alternative (OIDC-scoped token, secrets manager) if this path is documented | ✅ Pass |
 
 No violations. Complexity Tracking section omitted.
 
