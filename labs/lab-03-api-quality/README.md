@@ -134,9 +134,22 @@ cd -   # returns to backstage-apiportal-lab/
 # Move into the Backstage instance:
 cd labs/lab-01-base-backstage/backstage
 
-# api-grade-core is a dependency of backstage-plugin-api-grade that is not published to npm.
-# Install it from the local build first so yarn can resolve it:
-yarn --cwd packages/app add "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core"
+# api-grade-core is a transitive dependency of backstage-plugin-api-grade that is not
+# published to npm. Add a yarn resolution to the workspace root package.json so yarn
+# resolves it from the local build instead of looking it up on the npm registry.
+#
+# Open labs/lab-01-base-backstage/backstage/package.json and add the following at the
+# top level of the JSON object (alongside "name", "private", "workspaces", etc.):
+#
+#   "resolutions": {
+#     "api-grade-core": "file:../../../../api-grade/packages/api-grade-core"
+#   }
+#
+# Or run this node one-liner from labs/lab-01-base-backstage/backstage/ to add it automatically:
+node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.resolutions=Object.assign({},p.resolutions,{'api-grade-core':'file:../../../../api-grade/packages/api-grade-core'});fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+
+# Apply the resolution — yarn reads the resolutions field during install:
+yarn install
 
 # Now install the frontend plugin:
 yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
@@ -154,9 +167,21 @@ npm run build
 # Return to the Backstage instance (adjust the path to your repo location):
 Set-Location ..\backstage-apiportal-lab\labs\lab-01-base-backstage\backstage
 
-# api-grade-core is a dependency of backstage-plugin-api-grade that is not published to npm.
-# Install it from the local build first so yarn can resolve it:
-yarn --cwd packages\app add "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core"
+# api-grade-core is a transitive dependency of backstage-plugin-api-grade that is not
+# published to npm. Add a yarn resolution to the workspace root package.json.
+#
+# Open labs/lab-01-base-backstage/backstage/package.json and add the following at the
+# top level of the JSON object:
+#
+#   "resolutions": {
+#     "api-grade-core": "file:../../../../api-grade/packages/api-grade-core"
+#   }
+#
+# Or run this node one-liner from labs/lab-01-base-backstage/backstage\ to add it automatically:
+node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.resolutions=Object.assign({},p.resolutions,{'api-grade-core':'file:../../../../api-grade/packages/api-grade-core'});fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+
+# Apply the resolution:
+yarn install
 
 # Now install the frontend plugin:
 yarn --cwd packages\app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
@@ -798,15 +823,26 @@ If this fails, re-clone from `backstage-apiportal-lab/` with `git clone https://
 `api-grade-core@npm:* Package not found` (yarn tries to resolve `api-grade-core` from the
 npm registry and fails because it is not published).
 
-**Cause**: `api-grade-core` is a workspace dependency of `backstage-plugin-api-grade` that
-is not published to npm. Yarn must see a local file: reference for it before it can resolve
-the main plugin package.
+**Cause**: `api-grade-core` is a transitive dependency of `backstage-plugin-api-grade` that
+is not published to npm. Yarn v4 resolves each package's dependencies independently — even
+if you pre-install `api-grade-core@file:...` as a direct dependency, yarn will still try to
+resolve `api-grade-core@npm:*` separately when processing `backstage-plugin-api-grade`'s
+own `package.json`. The two resolution keys (`file:` vs `npm:`) are treated as different
+entries and do not match.
 
-**Fix**: Install `api-grade-core` from the local build first, then install the plugin:
+**Fix**: Add a `resolutions` override to the workspace root `package.json`
+(`labs/lab-01-base-backstage/backstage/package.json`) before installing the plugin.
+The `resolutions` field tells yarn to use the local file path for `api-grade-core`
+regardless of which package requests it:
+
 ```bash
-yarn --cwd packages/app add "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core"
+# From labs/lab-01-base-backstage/backstage/:
+node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.resolutions=Object.assign({},p.resolutions,{'api-grade-core':'file:../../../../api-grade/packages/api-grade-core'});fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+yarn install
 yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
 ```
+
+Or edit `package.json` manually: add `"resolutions": { "api-grade-core": "file:../../../../api-grade/packages/api-grade-core" }` at the top level of the JSON object, then run `yarn install` before `yarn add`.
 
 ---
 

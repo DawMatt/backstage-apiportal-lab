@@ -148,7 +148,7 @@ yarn --cwd packages/app add "api-grade-core@file:../../../../../../api-grade/pac
 yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
 ```
 
-- [ ] This command does install the missing package, but it was not sufficient to make the backstage plugin work at the second install attempt.
+- [X] This command does install the missing package, but it was not sufficient to make the backstage plugin work at the second install attempt.
 
 ```bash
 $ yarn --cwd packages/app add "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core" 
@@ -175,4 +175,60 @@ $ yarn --cwd packages/app add "api-grade-core@file:../../../../../../api-grade/p
 ➤ YN0000: · Done with warnings in 4s 16ms
 ```
 
-**Status**: Partially addressed. Run 2 tested: pre-install api-grade-core (succeeded with warnings) → second install of backstage-plugin-api-grade (still failed — error output not captured). Run 2 tested with yarn build of api-grade, which itself fails. The README now uses `npm install`/`npm run build` for the api-grade build step, which may change the outcome. **Needs re-testing in Run 3** with the updated instructions (npm build + api-grade-core pre-install + backstage-plugin-api-grade install) to confirm the sequence works end to end.
+**Resolution (2026-06-15)**: The pre-install approach does not work because yarn v4 resolves `backstage-plugin-api-grade`'s transitive dependencies independently — `api-grade-core@npm:*` is treated as a separate key from `api-grade-core@file:...` so the pre-install is ignored. Fixed by adding a `resolutions` override to the workspace root `package.json` that maps `api-grade-core` to the local file path before running `yarn add`. The `resolutions` field is read by yarn during the resolution step and applies to all packages, including transitive dependencies. README Step 2a (macOS and Windows) and Troubleshooting Symptom B updated accordingly.
+
+## Run 3 - 2026/06/15
+
+- [X] The api-grade-core install command does install that package, but the backstage plugin install command fails anyway.
+
+```bash
+# api-grade-core is a dependency of backstage-plugin-api-grade that is not published to npm.
+# Install it from the local build first so yarn can resolve it:
+yarn --cwd packages/app add "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core"
+...
+➤ YN0000: · Done with warnings in 1s 922ms
+
+# Now install the frontend plugin:
+$ yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
+
+➤ YN0000: · Yarn 4.4.1
+➤ YN0000: ┌ Resolution step
+➤ YN0035: │ api-grade-core@npm:*: Package not found
+➤ YN0035: │   Response Code: 404 (Not Found)
+➤ YN0035: │   Request Method: GET
+➤ YN0035: │   Request URL: https://registry.yarnpkg.com/api-grade-core
+➤ YN0000: └ Completed in 0s 490ms
+➤ YN0000: · Failed with errors in 0s 495ms
+```
+
+**Resolution (2026-06-15)**: Confirmed root cause — yarn v4 re-resolves `api-grade-core@npm:*` independently when processing `backstage-plugin-api-grade`'s transitive dependencies, ignoring any `api-grade-core@file:...` entry already in the lockfile (different resolution keys). Fixed by adding `"resolutions": { "api-grade-core": "file:../../../../api-grade/packages/api-grade-core" }` to the workspace root `package.json` before installing `backstage-plugin-api-grade`. The `resolutions` field causes yarn to substitute the local file path for any request for `api-grade-core`, regardless of the requester's version range. README Step 2a (macOS and Windows sections) and Troubleshooting Symptom B updated.
+
+## Run 4 - 2026/06/15
+
+Step 5 — Register the api-grade Backend Plugin
+
+- [x] Added the import line to the index.ts file, as requested. i.e.
+`backend.add(import('backstage-plugin-api-grade-backend'));`. This was added as the last line before the `backend.start();` line. The "import" part of that statement (and the package name) showed with a squiggly red underline in VS Code. The entire Backstage environment failed to work properly with lots of errors in the UI. No objects, APIs, etc would show. Error messages in the terminal were captured and included below:
+
+```
+Starting app, backend
+Loaded config from app-config.yaml, app-config.local.yaml
+<i> [webpack-dev-server] Project is running at:
+<i> [webpack-dev-server] Loopback: http://localhost:3000/, http://[::1]:3000/
+<i> [webpack-dev-server] Content not from webpack is served from '/Users/matt/Code/DawMatt/backstage-apiportal-lab/labs/lab-01-base-backstage/backstage/packages/app/public' directory
+<i> [webpack-dev-server] 404s will fallback to '/index.html'
+<i> [webpack-dev-middleware] wait until bundle finished: /api-docs?filters%5Bkind%5D=api&filters%5Buser%5D=all
+Rspack compiled successfully
+/Users/matt/Code/DawMatt/backstage-apiportal-lab/labs/lab-01-base-backstage/backstage/node_modules/@backstage/backend-app-api/src/wiring/helpers.ts:23
+  if ('$$type' in feature) {
+      ^
+
+
+TypeError: Cannot use 'in' operator to search for '$$type' in undefined
+    at Object.unwrapFeature (/Users/matt/Code/DawMatt/backstage-apiportal-lab/labs/lab-01-base-backstage/backstage/node_modules/@backstage/backend-app-api/src/wiring/helpers.ts:23:7)
+    at <anonymous> (/Users/matt/Code/DawMatt/backstage-apiportal-lab/labs/lab-01-base-backstage/backstage/node_modules/@backstage/backend-app-api/src/wiring/BackstageBackend.ts:41:47)
+    at async BackendInitializer.#doStart (/Users/matt/Code/DawMatt/backstage-apiportal-lab/labs/lab-01-base-backstage/backstage/node_modules/@backstage/backend-app-api/src/wiring/BackendInitializer.ts:285:24)
+    at async BackendInitializer.start (/Users/matt/Code/DawMatt/backstage-apiportal-lab/labs/lab-01-base-backstage/backstage/node_modules/@backstage/backend-app-api/src/wiring/BackendInitializer.ts:278:12)
+    at async BackstageBackend.start (/Users/matt/Code/DawMatt/backstage-apiportal-lab/labs/lab-01-base-backstage/backstage/node_modules/@backstage/backend-app-api/src/wiring/BackstageBackend.ts:48:12)
+```
+
