@@ -137,8 +137,28 @@ description: "Task list for Lab 3 — API Quality"
 - [X] T028 [US3] Add a new Troubleshooting entry for the Run 6 error ("Routable extension component ... was not discovered in the app element tree") documenting cause and fix (install `@backstage/core-compat-api`; wrap component in `compatWrapper`) in labs/lab-03-api-quality/README.md
 - [X] T029 [P] Update research.md R-006 and R-007 with the `compatWrapper` decision, updated code sample, and updated Import sources table; update plan.md's Primary Dependencies list to include `@backstage/core-compat-api` in specs/003-lab-3-api-quality/research.md and specs/003-lab-3-api-quality/plan.md
 - [X] T030 [P] Mark Run 4 and Run 6 resolved in specs/003-lab-3-api-quality/checklists/issues.md with resolution notes matching the README and research.md changes
+- [X] T031 [US3] Add a duplicate-dependency diagnostic and fix to README Step 7 in labs/lab-03-api-quality/README.md: run `yarn --cwd packages/app why @backstage/core-plugin-api` after installing the Spectral linter plugin; if more than one version is resolved, add a `resolutions` entry to the workspace root `package.json` pinning `@backstage/core-plugin-api` to the version already used by the rest of the app, then `yarn install` to collapse the duplicate; explain WHY (the linter plugin declares `@backstage/core-plugin-api` as a regular, not peer, dependency, so an unhoisted duplicate creates a second React context object that `compatWrapper` cannot populate)
+- [X] T032 [US3] Extend the "Routable extension component ... was not discovered" Troubleshooting entry in labs/lab-03-api-quality/README.md with a two-part fix: part 1 is the Run 6 compatWrapper fix; part 2 is the Run 7 duplicate-`@backstage/core-plugin-api`-instance fix (diagnose via `yarn why`, resolve via `resolutions` + `yarn install`), including how to tell from the browser error's call stack which nested `node_modules` path indicates a duplicate
+- [X] T033 [P] Update research.md R-007 with the Run 7 root-cause analysis (regular vs. peer dependency, duplicate React context, why occurrences were intermittent) and update plan.md's Primary Dependencies list to note the possible `resolutions` requirement in specs/003-lab-3-api-quality/research.md and specs/003-lab-3-api-quality/plan.md
+- [X] T034 [P] Mark Run 7 resolved in specs/003-lab-3-api-quality/checklists/issues.md with a resolution note cross-referencing the Run 6 entry and explaining why the first fix alone was insufficient
 
-**Checkpoint**: Both outstanding issues.md items (Run 4 confirmed resolved by npm publish, Run 6 fixed via compatWrapper) are documented and reflected in the README and design docs.
+**Checkpoint (superseded by Phase 9 — see below)**: Runs 6/7 fixes (compatWrapper + forced `@backstage/core-plugin-api` singleton) were later confirmed via Run 8 human testing to have made no improvement at all. Both fixes were retracted after root-causing the actual bug through source inspection.
+
+---
+
+## Phase 9: Issue Remediation — Run 8 Correction (checklists/issues.md)
+
+**Purpose**: Runs 6 and 7 (Phase 8, T026–T034) did not fix the Spectral tab error — confirmed by direct human testing showing zero improvement. Root-caused via source inspection of `@backstage/core-plugin-api` and the linter plugin; implement the verified fix and retract the incorrect ones.
+
+- [X] T035 [US3] Retract the Run 6/7 fixes in labs/lab-03-api-quality/README.md: remove `compatWrapper` import/usage from the Step 8 SpectralLinterContent.tsx code listing and the `@backstage/core-plugin-api` `resolutions`/`yarn why` diagnostic from Step 7; replace both with the corrected explanation of why `useRouteRef` always takes the new-system code path and never reaches the branch `compatWrapper` populates
+- [X] T036 [US3] Update README Step 8 in labs/lab-03-api-quality/README.md: add a new ambient module declaration file `packages/app/src/modules/spectralLinter/spectral-linter-content.d.ts` typing the unofficial subpath import; change `SpectralLinterContent.tsx`'s import of `EntityApiDocsSpectralLinterContent` to the subpath `@dweber019/backstage-plugin-api-docs-spectral-linter/dist/components/EntityApiDocsSpectralLinterContent/index.esm.js` (the unwrapped, non-routable component) instead of the package root
+- [X] T037 [US3] Update README Step 9 in labs/lab-03-api-quality/README.md: add `spectralLinterApiPlugin = convertLegacyPlugin(apiDocsSpectralLinterPlugin, { extensions: [] })` to `packages/app/src/modules/spectralLinter/index.ts`, exported alongside `spectralLinterModule`; explain WHY (registers the unwrapped component's `linterApiRef` dependency with the new frontend system's API registry, since the old plugin system's automatic API registration doesn't apply to a new-system app)
+- [X] T038 [US3] Update README Step 10 in labs/lab-03-api-quality/README.md: add `spectralLinterApiPlugin` to the `features` array in `App.tsx` alongside `spectralLinterModule`; note that omitting it produces a different error (missing API implementation) rather than fixing the tab
+- [X] T039 [US3] Rewrite the "Routable extension component ... was not discovered" Troubleshooting entry in labs/lab-03-api-quality/README.md with the verified root cause (new-system `routeResolutionApi` always resolves, so the legacy fallback branch is unreachable) and the actual fix (unwrapped component subpath import + `convertLegacyPlugin`); explicitly note that `compatWrapper` and the `@backstage/core-plugin-api` `resolutions` pin have no effect and should be removed if previously added
+- [X] T040 [P] Rewrite research.md R-007's Run 6/Run 7 updates as retracted and add a Run 8 update with the full verified root-cause analysis (useRouteRef control flow, routeResolutionApi always present, unwrapped component discovery) and the corrected implementation pattern/import table; update plan.md's Primary Dependencies list accordingly in specs/003-lab-3-api-quality/research.md and specs/003-lab-3-api-quality/plan.md
+- [X] T041 [P] Add a Run 8 entry to specs/003-lab-3-api-quality/checklists/issues.md documenting the human's report that Run 6/7 made no improvement, the verified root cause, and the fix; mark the Run 6 and Run 7 resolution notes as retracted with a pointer to Run 8
+
+**Checkpoint**: The Spectral tab renders lint results (or the access-restricted message) without error, using a fix verified against the actual compiled source of both packages rather than inference from the error message alone.
 
 ---
 
@@ -154,6 +174,7 @@ description: "Task list for Lab 3 — API Quality"
 - **US4 (Phase 6)**: Depends on Phase 2 (README skeleton); T016 and T017 can run in parallel; T018/T019 depend on T016 and T017 completing
 - **Polish (Phase 7)**: Depends on all story phases complete; T022 and T023 can run in parallel
 - **Issue Remediation (Phase 8)**: Depends on Phase 4 (US2 npm install) and Phase 5 (US3 Spectral linter component) being written; addresses issues discovered during manual testing after the original phases were completed
+- **Issue Remediation — Run 8 Correction (Phase 9)**: Depends on Phase 8; supersedes T026–T029 and T031–T034's `compatWrapper`/`resolutions` approach after human testing confirmed it made no improvement
 
 ### User Story Dependencies
 

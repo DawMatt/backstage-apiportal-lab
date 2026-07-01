@@ -248,8 +248,10 @@ and react-router-dom 6, both already present in this Backstage instance.
 ```bash
 yarn --cwd packages/app add @dweber019/backstage-plugin-api-docs-spectral-linter @backstage/core-compat-api
 ```
-`@backstage/core-compat-api` is required to bridge the plugin's old-system routable extension
-into the new frontend system — see R-007's Run 6 update.
+`@backstage/core-compat-api` is required for its `convertLegacyPlugin` helper, which registers
+the plugin's old-system API factory (`linterApiRef`) with the new frontend system — see
+R-007's Run 8 update for why this is needed and why `compatWrapper` (the Run 6/7 attempt) was
+not the right tool for this job.
 
 **App-config configuration**:
 ```yaml
@@ -276,17 +278,61 @@ visibility gating (unlike the api-grade plugin which handles this via backend re
 filtering). The plugin also predates the new Backstage declarative frontend and does not
 export a blueprint extension. We must wrap it manually.
 
-**Update (2026-07-01, Run 6 issue)**: `EntityApiDocsSpectralLinterContent` is a *routable
-extension* built on the old plugin system (`createPlugin` + `createRoutableExtension` —
-confirmed via the package's `dist/index.d.ts`, which exposes
-`apiDocsSpectralLinterPlugin: BackstagePlugin<{ root: RouteRef<undefined> }>`). Rendered
-directly inside the new-system `EntityContentBlueprint` loader, it fails at runtime with
-"Routable extension component ... was not discovered in the app element tree" — the old
-system's routeRef has no route tree entry in a `createApp` (new frontend system) app. Fixed
-by wrapping the returned element in `compatWrapper(...)` from `@backstage/core-compat-api`,
-which bridges old-system context (including routeRef resolution) into new-system apps.
-`@backstage/core-compat-api` is already a transitive dependency of `@backstage/frontend-defaults`
-and is added as a direct dependency in Step 7.
+**Update (2026-07-01, Run 6/7/8 issue — superseded, see below)**: Runs 6 and 7 attempted two
+fixes — wrapping the component in `compatWrapper(...)` (Run 6), then additionally forcing a
+single `@backstage/core-plugin-api` instance via a `resolutions` pin (Run 7) — but Run 8
+testing showed the identical error still occurred at the same rate, with no improvement.
+Both fixes were based on an incorrect diagnosis and are **retracted**; see the Run 8 update
+below for the verified root cause and actual fix.
+
+**Update (2026-07-01, Run 8 issue — verified via source inspection)**: Traced the exact
+runtime behavior by downloading and reading the compiled source of both
+`@backstage/core-plugin-api@1.12.7` (`dist/routing/useRouteRef.esm.js`) and
+`@dweber019/backstage-plugin-api-docs-spectral-linter@0.5.2` (`dist/plugin.esm.js`,
+`dist/routes.esm.js`, `dist/components/EntityApiDocsSpectralLinterContent/*`).
+
+`useRouteRef(routeRef)` first calls `useApi(routeResolutionApiRef)` (the **new** frontend
+system's route-resolution API, from `@backstage/frontend-plugin-api`). In a new-system app
+(`createApp` from `@backstage/frontend-defaults`), this API is *always* present — `useApi`
+never throws, so `routeResolutionApi` is never `undefined`. The code takes the "new system"
+branch unconditionally: `newRouteFunc = routeResolutionApi.resolve(routeRef, ...)`. Since our
+custom Spectral tab never registers this plugin's internal `root` routeRef as an actual
+mounted new-system route, `resolve()` returns `undefined` (not a thrown error), so
+`newRouteFunc !== null` is true (`undefined !== null`), the code enters the "no path" branch,
+and throws `"No path for ${routeRef}"` — which `RoutableExtensionWrapper` (in
+`core-plugin-api`'s `extensions.esm.js`) catches and re-throws as the friendly "was not
+discovered in the app element tree" message.
+
+**Critically, the "legacy versioned context" fallback branch that `compatWrapper` populates
+is only reached if `routeResolutionApi` itself is `undefined`** — which never happens in a
+new-system app. This proves `compatWrapper` cannot fix this error under any circumstances,
+regardless of whether `@backstage/core-plugin-api` is deduplicated (Run 7's hypothesis was a
+red herring — the "4 vs 2 occurrences" difference between Run 6 and Run 7 was simply a
+per-tab/per-render count, not evidence of partial improvement).
+
+**Actual fix**: Don't render the routable-extension-wrapped `EntityApiDocsSpectralLinterContent`
+export at all. Inspecting the package's `dist/` output shows it also ships (unexported from
+its main `index.esm.js`, but present in the published files with no `package.json` `exports`
+restriction blocking subpath access) a *plain, unwrapped* version of the same component at
+`dist/components/EntityApiDocsSpectralLinterContent/index.esm.js`. That inner component only
+calls `useEntity()` (from `@backstage/plugin-catalog-react`) and `useApi(linterApiRef)` — no
+`useRouteRef`, no route dependency, no failure mode. Importing this subpath directly sidesteps
+the incompatibility structurally instead of trying to bridge it.
+
+This unwrapped component still needs `linterApiRef` (backed by the plugin's `LinterClient`)
+registered in the app's API registry. The plugin declares this the old way
+(`createPlugin({ apis: [createApiFactory({ api: linterApiRef, ... })] })`), so it's not
+automatically available in a new-system app. `convertLegacyPlugin` from
+`@backstage/core-compat-api` (confirmed via its source at
+`dist/convertLegacyPlugin.esm.js`) reads `legacyPlugin.getApis()` and converts each factory
+into an `ApiBlueprint` extension — this is precisely the mechanism needed, and requires no
+manual reimplementation of `LinterClient`. Call
+`convertLegacyPlugin(apiDocsSpectralLinterPlugin, { extensions: [] })` (empty `extensions`
+because we don't want any of the plugin's own page/route extensions — only its API) and add
+the result to the app's `features` array alongside the custom `EntityContentBlueprint` module.
+
+`@backstage/core-compat-api` remains a required dependency — just for `convertLegacyPlugin`,
+not `compatWrapper`.
 
 The `EntityContentBlueprint` `filter` attribute supports entity-based predicates but does
 not have access to the requesting user's identity, so the tab itself cannot be hidden via
@@ -298,14 +344,22 @@ a blank tab and teaches the conditional-rendering pattern.
 **Implementation pattern**:
 
 ```typescript
+// packages/app/src/modules/spectralLinter/spectral-linter-content.d.ts
+// Ambient module declaration — the package ships no .d.ts for this subpath.
+declare module '@dweber019/backstage-plugin-api-docs-spectral-linter/dist/components/EntityApiDocsSpectralLinterContent/index.esm.js' {
+  import { ComponentType } from 'react';
+  export const EntityApiDocsSpectralLinterContent: ComponentType<{}>;
+}
+```
+
+```typescript
 // packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx
 import React, { useEffect, useState } from 'react';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { useEntityOwnership } from '@backstage/plugin-catalog-react';
-import { EntityApiDocsSpectralLinterContent } from '@dweber019/backstage-plugin-api-docs-spectral-linter';
+import { EntityApiDocsSpectralLinterContent } from '@dweber019/backstage-plugin-api-docs-spectral-linter/dist/components/EntityApiDocsSpectralLinterContent/index.esm.js';
 import { InfoCard } from '@backstage/core-components';
 import { Typography } from '@material-ui/core';
-import { compatWrapper } from '@backstage/core-compat-api';
 
 export function SpectralLinterContent() {
   const identityApi = useApi(identityApiRef);
@@ -336,7 +390,7 @@ export function SpectralLinterContent() {
     );
   }
 
-  return compatWrapper(<EntityApiDocsSpectralLinterContent />);
+  return <EntityApiDocsSpectralLinterContent />;
 }
 ```
 
@@ -344,6 +398,8 @@ export function SpectralLinterContent() {
 // packages/app/src/modules/spectralLinter/index.ts
 import { createFrontendModule } from '@backstage/frontend-plugin-api';
 import { EntityContentBlueprint } from '@backstage/plugin-catalog-react/alpha';
+import { convertLegacyPlugin } from '@backstage/core-compat-api';
+import { apiDocsSpectralLinterPlugin } from '@dweber019/backstage-plugin-api-docs-spectral-linter';
 import React from 'react';
 import { SpectralLinterContent } from './SpectralLinterContent';
 
@@ -361,7 +417,17 @@ export const spectralLinterModule = createFrontendModule({
   pluginId: 'catalog',
   extensions: [spectralLinterContent],
 });
+
+// Registers linterApiRef (backed by LinterClient) with the new system's API registry.
+// extensions: [] deliberately excludes the plugin's own page/route extensions.
+export const spectralLinterApiPlugin = convertLegacyPlugin(apiDocsSpectralLinterPlugin, {
+  extensions: [],
+});
 ```
+
+Both `spectralLinterModule` and `spectralLinterApiPlugin` must be added to `App.tsx`'s
+`features` array — the tab renders without the API plugin, but lint results fail with a
+missing-API-implementation error since `linterApiRef` would never be registered.
 
 **Import sources**:
 
@@ -373,8 +439,9 @@ export const spectralLinterModule = createFrontendModule({
 | `createFrontendModule` | `@backstage/frontend-plugin-api` | Stable | Yes (Lab 2) |
 | `InfoCard` | `@backstage/core-components` | Stable | Yes |
 | `Typography` | `@material-ui/core` | Stable | Yes |
-| `compatWrapper` | `@backstage/core-compat-api` | Stable | New in Lab 3 (added as direct dep, Run 6 fix) |
-| `EntityApiDocsSpectralLinterContent` | `@dweber019/backstage-plugin-api-docs-spectral-linter` | — | New in Lab 3 |
+| `convertLegacyPlugin` | `@backstage/core-compat-api` | Stable | New in Lab 3 (Run 8 fix; supersedes Run 6's `compatWrapper`, which is no longer used) |
+| `apiDocsSpectralLinterPlugin` | `@dweber019/backstage-plugin-api-docs-spectral-linter` | — | New in Lab 3 |
+| `EntityApiDocsSpectralLinterContent` (unwrapped) | `@dweber019/backstage-plugin-api-docs-spectral-linter/dist/components/EntityApiDocsSpectralLinterContent/index.esm.js` | Internal/unofficial subpath | New in Lab 3 (Run 8 fix) |
 
 **Platform team check via ownershipEntityRefs**: `identityApi.getBackstageIdentity()` returns
 the user's `ownershipEntityRefs` which includes the user's own ref AND all their group refs.

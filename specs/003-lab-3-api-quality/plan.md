@@ -41,7 +41,8 @@ open-source, and cross-platform. No paid accounts or external services are requi
 - `@dawmatt/backstage-plugin-api-grade-backend@0.5.0` — on npm
 - `@dawmatt/api-grade-core@0.5.0` — on npm; installed automatically as a declared dependency of both api-grade plugins
 - `@dweber019/backstage-plugin-api-docs-spectral-linter@0.5.2` — on npm
-- `@backstage/core-compat-api` — bridges the Spectral linter's old-system routable extension into the new frontend system (see research.md R-007 Run 6 update); transitive dependency of `@backstage/frontend-defaults`, added as a direct dependency
+- `@backstage/core-compat-api` — its `convertLegacyPlugin` helper registers the Spectral linter's old-system `linterApiRef` API factory with the new frontend system's API registry (see research.md R-007 Run 8 update); transitive dependency of `@backstage/frontend-defaults`, added as a direct dependency
+- The Spectral linter's Entity tab imports the plugin's *unwrapped* inner content component via an internal subpath (`.../dist/components/EntityApiDocsSpectralLinterContent/index.esm.js`), not its package-root export — the package-root export is a routable extension whose `routeRef` can never resolve inside a custom `EntityContentBlueprint` tab in the new frontend system (see research.md R-007 Run 8 update; this supersedes the Run 6/7 attempts, which did not work)
 - No additional Spectral npm packages required (bundled in api-grade-core and linter plugin)
 
 **Storage**: YAML files (Spectral ruleset, one new User catalog descriptor); updates to

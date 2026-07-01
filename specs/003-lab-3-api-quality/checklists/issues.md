@@ -291,9 +291,124 @@ route-ref resolution) that the routable extension needs, without converting the 
 back to the old plugin system. README Step 7 (dependency install) and Step 8 (component code
 + WHY explanation) updated, plus a new Troubleshooting entry added.
 
+**⚠️ Retracted (2026-07-01, see Run 8)**: This fix did not work. Testing after this change
+showed the identical error still occurring. `compatWrapper` addresses a different problem
+(bridging plugin API/analytics context) and has no effect on route-discovery failures — see
+Run 8 for the verified root cause and actual fix.
+
 ## Run 7 - 2026/07/01
 
-- [ ] Error returned when clicking on the Spectral tab is below. It seems the same as run 6, but run 6 returned this error 4 times and run 7 returned it only 2 times.
+- [X] Error returned when clicking on the Spectral tab is below. It seems the same as run 6, but run 6 returned this error 4 times and run 7 returned it only 2 times.
+
+```
+Error
+Routable extension component with mount point routeRef{type=absolute,id=api-docs-spectral-linter} was not discovered in the app element tree. Routable extension components may not be rendered by other components and must be directly available as an element within the App provider component.
+Call Stack
+ RoutableExtensionWrapper
+  node_modules/@dweber019/backstage-plugin-api-docs-spectral-linter/node_modules/@backstage/core-plugin-api/dist/extensions/extensions.esm.js:44:23
+ renderWithHooks
+  node_modules/react-dom/cjs/react-dom.development.js:15486:18
+ updateFunctionComponent
+  node_modules/react-dom/cjs/react-dom.development.js:19612:20
+ mountLazyComponent
+  node_modules/react-dom/cjs/react-dom.development.js:19983:17
+ beginWork
+  node_modules/react-dom/cjs/react-dom.development.js:21627:16
+ HTMLUnknownElement.callCallback
+  node_modules/react-dom/cjs/react-dom.development.js:4164:14
+ Object.invokeGuardedCallbackDev
+  node_modules/react-dom/cjs/react-dom.development.js:4213:16
+ invokeGuardedCallback
+  node_modules/react-dom/cjs/react-dom.development.js:4277:31
+ beginWork$1
+  node_modules/react-dom/cjs/react-dom.development.js:27485:7
+ performUnitOfWork
+  node_modules/react-dom/cjs/react-dom.development.js:26591:12
+```
+**Resolution (2026-07-01)**: The `compatWrapper` fix from Run 6 was necessary but not
+sufficient. Root cause: `@dweber019/backstage-plugin-api-docs-spectral-linter` declares
+`@backstage/core-plugin-api` as a regular dependency (not a peer dependency), so yarn
+sometimes installs a second, nested copy under
+`node_modules/@dweber019/backstage-plugin-api-docs-spectral-linter/node_modules/@backstage/core-plugin-api`
+instead of hoisting to the single copy used by the rest of the app — confirmed by this Run's
+error call stack pointing at that nested path. Two copies of `@backstage/core-plugin-api`
+create two separate React context objects for routable-extension discovery, so `compatWrapper`
+(which populates the app's singleton context) is invisible to a component reading from the
+nested copy's context, and the error still fires (intermittently, depending on which copy
+React resolves at render time — explaining why Run 6 saw 4 occurrences and Run 7 saw 2).
+
+Fixed by forcing a single `@backstage/core-plugin-api` instance: added a diagnostic step
+(`yarn --cwd packages/app why @backstage/core-plugin-api`) and a `resolutions` entry in the
+workspace root `package.json` pinning `@backstage/core-plugin-api` to the version already used
+by the rest of the app, followed by `yarn install` to collapse the duplicate. README Step 7
+and the Troubleshooting entry updated; research.md R-007 updated with the full root-cause
+analysis.
+
+**⚠️ Retracted (2026-07-01, see Run 8)**: This diagnosis was wrong. The "4 occurrences in
+Run 6 vs. 2 in Run 7" was a per-API/per-tab render count, not evidence that the fix was
+partially working — testing after the `resolutions` pin showed no improvement at all. The
+duplicate-dependency theory does not explain the actual failure; see Run 8.
+
+## Run 8 - 2026/07/01
+
+- [X] Human reported that Run 6 and Run 7 fixes made no measurable difference: "Runs 6 and 7
+contained exactly the same error. It turns out that one API's Spectral tab shows 2 errors,
+and the other API's Spectral tab shows 4 errors. So your last two rounds of fixes appear to
+have made no improvement at all."
+
+**Resolution (2026-07-01)**: Root-caused by downloading and reading the actual compiled
+source of `@backstage/core-plugin-api@1.12.7` (`dist/routing/useRouteRef.esm.js`) and
+`@dweber019/backstage-plugin-api-docs-spectral-linter@0.5.2` (`dist/plugin.esm.js`,
+`dist/routes.esm.js`, and its component files), rather than continuing to guess from the
+error message alone.
+
+`useRouteRef(mountPoint)` (called internally by the routable-extension wrapper) checks the
+**new** frontend system's `routeResolutionApi` first. In a `createApp` (new frontend system)
+app, that API is always present, so the code always takes the "new system" branch and never
+falls through to the legacy/versioned-context branch that `compatWrapper` populates. This is
+true regardless of whether `@backstage/core-plugin-api` is deduplicated. Both Run 6's and
+Run 7's fixes targeted code paths that can never execute in this app — which is exactly why
+neither made any difference, confirming the human's report.
+
+Since our custom Spectral tab never registers the plugin's internal route as an actual
+mounted page, `routeResolutionApi.resolve()` always returns `undefined` for it, and the
+routable-extension wrapper always throws "No path for ..." (re-thrown as the friendly
+"was not discovered" message) — on every single render, deterministically, not
+intermittently. (The differing occurrence counts between API tabs were simply due to
+React re-rendering the tab a different number of times per entity page, unrelated to any
+partial fix.)
+
+**Actual fix**: Stop rendering the package's routable-extension-wrapped
+`EntityApiDocsSpectralLinterContent` export entirely. The package also ships (at
+`dist/components/EntityApiDocsSpectralLinterContent/index.esm.js`, not re-exported from its
+main `index.esm.js`, but reachable since the package sets no `exports` field blocking
+subpaths) a plain, unwrapped version of the same component with no `routeRef` dependency —
+only `useEntity()` and `useApi(linterApiRef)`. Importing this subpath directly removes the
+failure mode structurally rather than working around it.
+
+`linterApiRef` (backed by the plugin's `LinterClient`) still needs to be registered in the
+app's API registry, since the old plugin system's automatic registration doesn't apply to a
+new-system app. `convertLegacyPlugin` from `@backstage/core-compat-api` (verified via
+`dist/convertLegacyPlugin.esm.js`) reads the legacy plugin's declared `apis` and converts
+each factory into an `ApiBlueprint` extension for the new system — exactly what's needed,
+with no need to reimplement `LinterClient` wiring.
+
+Changes made:
+- `SpectralLinterContent.tsx` now imports `EntityApiDocsSpectralLinterContent` from the
+  subpath above instead of the package root; `compatWrapper` removed (confirmed to have no
+  effect and is no longer used).
+- A new ambient module declaration (`spectral-linter-content.d.ts`) types the subpath import.
+- `packages/app/src/modules/spectralLinter/index.ts` now also exports
+  `spectralLinterApiPlugin = convertLegacyPlugin(apiDocsSpectralLinterPlugin, { extensions: [] })`.
+- `App.tsx` now registers both `spectralLinterModule` and `spectralLinterApiPlugin`.
+- The `@backstage/core-plugin-api` `resolutions` entry from Run 7 is no longer needed and
+  should be removed if already added — it was not the cause and has no effect either way.
+- README Steps 7–10, the Troubleshooting entry, research.md R-007, and plan.md updated
+  accordingly.
+
+## Run 10 - 2026/07/01
+
+- [ ] Same problem. Your previous fixes have possibly made it slightly worse. One API now shows 4 errors, and the other 5.
 
 ```
 Error
