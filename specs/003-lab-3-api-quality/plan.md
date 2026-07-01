@@ -44,6 +44,20 @@ open-source, and cross-platform. No paid accounts or external services are requi
 - `@backstage/core-compat-api` — its `convertLegacyPlugin` helper registers the Spectral linter's old-system `linterApiRef` API factory with the new frontend system's API registry (see research.md R-007 Run 8 update); transitive dependency of `@backstage/frontend-defaults`, added as a direct dependency
 - The Spectral linter's Entity tab imports the plugin's *unwrapped* inner content component via an internal subpath (`.../dist/components/EntityApiDocsSpectralLinterContent/index.esm.js`), not its package-root export — the package-root export is a routable extension whose `routeRef` can never resolve inside a custom `EntityContentBlueprint` tab in the new frontend system (see research.md R-007 Run 8 update; this supersedes the Run 6/7 attempts, which did not work)
 - No additional Spectral npm packages required (bundled in api-grade-core and linter plugin)
+- **Two `resolutions` overrides** in the Backstage workspace root `package.json`, both required
+  to make the Spectral linter work in the browser (the linter `0.5.2` pins exact `@stoplight`
+  versions, so yarn installs nested duplicates that break at lint time —
+  `Failed to lint API / Provided ruleset is not an object`):
+  - `"@stoplight/spectral-ruleset-bundler": "1.7.0"` — the linter pins `1.6.3`, which uses the
+    defunct skypack CDN and fails in-browser; `1.7.0` (used by `@dawmatt/api-grade-core`) uses
+    `esm.sh`.
+  - `"@stoplight/spectral-core": "1.23.0"` — the linter pins `1.20.0` while the bundler and
+    `api-grade-core` use `1.23.0`; the ruleset is built with the bundler's `1.23.0` `Ruleset`
+    but consumed by `Spectral.setRuleset()` from the nested `1.20.0`, whose `instanceof Ruleset`
+    check fails across copies. Must be `1.23.0` (api-grade-core requires `^1.23.0`).
+
+  See research.md R-007 (Run 14/15 updates). Requires `yarn install` + a full `yarn start`
+  restart; verified by replicating the plugin's full lint flow against the deduped tree.
 
 **Storage**: YAML files (Spectral ruleset, one new User catalog descriptor); updates to
 two existing YAML files (teams.yaml in Lab 2 and app-config.yaml in Lab 1 Backstage instance)

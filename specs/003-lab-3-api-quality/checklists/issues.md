@@ -408,7 +408,7 @@ Changes made:
 
 ## Run 10 - 2026/07/01
 
-- [ ] Same problem. Your previous fixes have possibly made it slightly worse. One API now shows 4 errors, and the other 5.
+- [X] Same problem. Your previous fixes have possibly made it slightly worse. One API now shows 4 errors, and the other 5. **See Run 11 resolution at the bottom of this section.**
 
 ```
 Error
@@ -435,3 +435,187 @@ Call Stack
  performUnitOfWork
   node_modules/react-dom/cjs/react-dom.development.js:26591:12
 ```
+
+**Resolution (2026-07-01, Run 11 — actually applied and build-verified)**: The real reason
+no prior run made a difference: **the Run 8 fix was written into the docs (README Steps 7–10,
+research.md R-007, plan.md) but never applied to the actual source files.** The live
+`packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx` on disk was still in the
+Run 6 state — it imported the package-root routable extension
+(`import { EntityApiDocsSpectralLinterContent } from '@dweber019/backstage-plugin-api-docs-spectral-linter'`)
+and rendered it via `compatWrapper(...)`. So every re-test executed the old broken code, which
+is why the identical "was not discovered" error kept appearing (the differing 2/4/5 error
+counts were just per-tab React re-render counts, not evidence of partial progress).
+
+Root cause confirmed by reading the *installed* package source, not the error message:
+- `dist/plugin.esm.js`: `EntityApiDocsSpectralLinterContent` (package-root export) =
+  `apiDocsSpectralLinterPlugin.provide(createRoutableExtension({ ..., mountPoint: rootRouteRef }))`.
+  Its `RoutableExtensionWrapper` calls `useRouteRef(rootRouteRef)`; in a `createApp`
+  (new frontend system) app that route is never mounted, so it throws on every render.
+  `compatWrapper` populates the legacy versioned-context branch that this code path never
+  reaches — it cannot fix this error. This matches the Run 8 diagnosis.
+- `dist/components/EntityApiDocsSpectralLinterContent/EntityApiDocsSpectralLinterContent.esm.js`:
+  the *unwrapped* inner component uses only `useEntity()` and `useApi(linterApiRef)` — no
+  routeRef. Rendering it directly removes the failure mode structurally.
+- `@backstage/core-compat-api/dist/convertLegacyPlugin.esm.js`: `convertLegacyPlugin` maps
+  `legacyPlugin.getApis()` -> `ApiBlueprint.make(...)`, so
+  `convertLegacyPlugin(apiDocsSpectralLinterPlugin, { extensions: [] })` registers `linterApiRef`
+  (and nothing else) in the new system's API registry — exactly what the unwrapped component
+  needs for `useApi`.
+
+Changes applied to the live instance (now matching the already-correct README):
+- `SpectralLinterContent.tsx`: import the unwrapped component from the dist subpath
+  `.../dist/components/EntityApiDocsSpectralLinterContent/index.esm.js`; removed the
+  `compatWrapper` import and call; `return <EntityApiDocsSpectralLinterContent />;`.
+- Added `spectral-linter-content.d.ts` ambient declaration typing that subpath import.
+- `spectralLinter/index.ts`: added `export const spectralLinterApiPlugin =
+  convertLegacyPlugin(apiDocsSpectralLinterPlugin, { extensions: [] });`.
+- `App.tsx`: added `spectralLinterApiPlugin` to `features`.
+
+**Verification (the step every prior run skipped)**: `yarn workspace app build` (the rspack
+bundler the dev server uses) completes with **EXIT=0 and no module-resolution errors** — the
+deep `.esm.js` subpath import and `convertLegacyPlugin` both resolve and bundle. `yarn tsc`
+reports only pre-existing, unrelated strict-mode warnings (unused `React` across several files
+incl. Lab 2's `ApiVisibilityCard`, and the `defaultPath`/`defaultTitle` deprecation brands
+that already worked at runtime); no new type errors were introduced by this change. Remaining
+check for the student: sign in as an owner/platform-team member and open an API's **Spectral**
+tab — it should now render lint results (or "No linting errors found...") instead of the
+routable-extension error.
+
+> Process note: the recurring failure was a **doc/code divergence** — resolutions were recorded
+> in issues.md/README but the corresponding source edits were never made (or were reverted).
+> Confirm the on-disk source matches the README before closing a run.
+
+## Run 12 - 2026/07/01
+
+- [X] Spectral tab now runs, but displays the following error message:
+
+```
+Warning: Failed to lint API
+Provided ruleset is not an object
+```
+
+**Investigation (2026-07-01, Run 13 — findings that led to the fix)**:
+Deep-dived the actual Spectral bundling path instead of guessing. Key findings:
+
+- The failing message `Provided ruleset is not an object` is thrown by
+  `@stoplight/spectral-core`'s `assertValidRuleset` when a value handed to `new Ruleset(...)`
+  (including each `extends` entry, which is validated recursively) is not a plain object.
+  Reproduced the exact message with `new Ruleset({ extends: ['<url-string>'] })` and with an
+  `undefined` extends entry — so in the browser, one of the ruleset's `extends` entries is
+  evaluating to `undefined`/a string rather than a resolved ruleset object.
+- **The ruleset content, the config, and the bundling logic are all VALID.** Reproduced the
+  full browser bundling path in Node (`@stoplight/spectral-ruleset-bundler`'s browser loader →
+  `runtime` preset → `new Ruleset(...)`) against the live config URL and it loads **111 rules
+  successfully**. Verified this with BOTH the nested `spectral-ruleset-bundler@1.6.3` (the copy
+  the plugin actually resolves, under its own `node_modules`, with `rollup@2.79.2`) AND the
+  hoisted `1.7.0` (`rollup@4.61.1`); with the `@stoplight/spectral-runtime` fetch the plugin
+  actually passes; and under 5 concurrent calls. All succeed. So it is NOT: a 404 (URL returns
+  HTTP 200), NOT the `spectralLinter.*RulesetUrl` config, NOT the `.spectral.yaml` content, NOT
+  the `spectral:oas`/`spectral:asyncapi` aliases per se, NOT the bundler version, NOT a
+  concurrency race.
+- Printed the actual bundled IIFE the plugin executes. It resolves the builtins through a
+  process-global registry:
+  `const oas = globalThis[Symbol.for('@stoplight-spectral/builtins')]['<randomId>']['@stoplight/spectral-rulesets']['oas'];`
+  … `var _spectral = { extends: [{ extends: [oas, asyncapi] }] };`. If `oas`/`asyncapi` are
+  `undefined` at IIFE-eval time (i.e. the `@stoplight/spectral-rulesets` builtins are not
+  present in that global registry inside the rspack-bundled browser app), the `extends` entry
+  is `undefined` → the exact error. This is the leading hypothesis and is consistent with the
+  fallback note already written in `labs/lab-03-api-quality/.spectral.yaml`
+  ("Fallback if spectral: aliases don't resolve in a browser context").
+- **What is NOT yet proven**: the actual browser behaviour. Every Node reproduction passes, so
+  the failure is specific to how the Backstage frontend (rspack) bundles/executes
+  `@stoplight/spectral-ruleset-bundler` + its builtins registry in the browser. Verifying this
+  and any fix REQUIRES observing the running app in a browser (bundle output / the value of the
+  builtins registry at eval time / Network tab). Per the Run 11 process note, no fix will be
+  marked resolved until it is verified in the browser, not just in Node.
+
+The leading candidate above (swapping the aliases) turned out to be unnecessary — browser
+diagnostics located a different, exact root cause. See resolution below.
+
+**Resolution (2026-07-02, Run 14 — root-caused via in-browser diagnostics, then fixed)**:
+The candidate "aliases don't resolve in the browser" theory was DISPROVEN by an in-browser
+diagnostic (a temporary `useEffect` in `SpectralLinterContent.tsx`): `@stoplight/spectral-rulesets`
+bundles fine in the browser — `oas`/`asyncapi` are real objects (`oas` has 56 rules). A second
+in-browser diagnostic ran the ruleset bundler three ways and ALL passed:
+`T1` extends the live remote `.spectral.yaml` → **111 rules**, `T2` extends bare `spectral:oas`
+→ 56 rules, `T3` self-contained → 1 rule. Crucially, that diagnostic imported the bundler the
+same way the app does, and rspack resolved it to the **hoisted `@stoplight/spectral-ruleset-bundler@1.7.0`** — which works perfectly in the browser.
+
+**Actual root cause**: the Spectral linter plugin
+(`@dweber019/backstage-plugin-api-docs-spectral-linter@0.5.2`) declares an exact dependency on
+`@stoplight/spectral-ruleset-bundler@1.6.3`, so yarn installed a **second, nested copy** at
+`node_modules/@dweber019/.../node_modules/@stoplight/spectral-ruleset-bundler@1.6.3`. The
+plugin's `LinterClient` imports *that* nested `1.6.3`, not the hoisted `1.7.0`. Diffing the two
+versions: `1.6.3`'s `runtime` preset uses the `skypack` plugin (CDN fallback resolver →
+`https://cdn.skypack.dev/…`); `1.7.0` renamed it to `esmCdn` and switched the CDN to
+`https://esm.sh/…`. Skypack is effectively defunct, so `1.6.3`'s bundler misbehaves in the
+browser (Node never needs the CDN — local module resolution covers everything — which is why
+`1.6.3` loads 111 rules in Node but fails in the browser; `1.7.0` works in both). The failure
+surfaces as a ruleset `extends` entry resolving to a non-object → "Provided ruleset is not an
+object".
+
+This is the SAME class of problem Run 7 guessed at (a nested duplicate dependency) but for a
+DIFFERENT package and with actual proof this time — Run 7's `@backstage/core-plugin-api`
+duplicate theory was a red herring for the routeRef error; here the duplicate
+`@stoplight/spectral-ruleset-bundler` is verifiably the cause of the ruleset error.
+
+**Fix applied**: added a `resolutions` override in the Backstage workspace root
+`package.json` (`labs/lab-01-base-backstage/backstage/package.json`):
+`"@stoplight/spectral-ruleset-bundler": "1.7.0"`, then `yarn install`. Confirmed the nested
+`1.6.3` copy is gone and every consumer (the plugin, `@dawmatt/api-grade-core`) now resolves the
+single hoisted `1.7.0` (verified with `yarn why` and by listing bundler `package.json` versions
+on disk — only `1.7.0` remains). `yarn workspace app build` passes (EXIT 0). The temporary
+diagnostics were removed from `SpectralLinterContent.tsx`.
+
+**Evidence this fix works in the browser (not just Node)**: diagnostic `T1` executed the exact
+current setup (entry `extends: [<live raw .spectral.yaml URL>]`) through `1.7.0` **in the
+browser** and returned 111 rules with no error. The resolutions override makes the plugin use
+that same `1.7.0`. Final confirmation step for the student: restart `yarn start` (the
+`yarn install` changed `node_modules`, so the dev server must be restarted) and reload an API's
+Spectral tab — it should show lint results (or "No linting errors found...").
+
+README Step 7, research.md R-007, and plan.md updated to add the `resolutions` override and
+explain WHY (nested `1.6.3` uses the defunct skypack CDN; force the hoisted `1.7.0`).
+
+**Correction + real fix (2026-07-02, Run 15)**: The Run 14 bundler dedupe above
+(`@stoplight/spectral-ruleset-bundler` → 1.7.0) was NECESSARY but NOT SUFFICIENT — the tab
+still showed `Provided ruleset is not an object` after it. My "T1 proves 1.7.0 works in the
+browser" claim was misleading: T1 only exercised `bundleAndLoadRuleset`, not the plugin's
+*second* step. In-browser diagnostics then showed the plugin's exact bundling inputs (indented
+YAML, `@stoplight/spectral-runtime` fetch, bundler 1.7.0) ALL succeed in the browser (D1/D2/D3
+each returned 111 rules) — so the failure was not in bundling at all.
+
+**Actual blocking root cause**: a SECOND duplicate dependency — `@stoplight/spectral-core`.
+Two copies were installed: hoisted `1.23.0` (used by the bundler and by
+`@dawmatt/api-grade-core`) and a nested `1.20.0` under the linter plugin (which pins it
+exactly). The plugin's `LinterClient` does:
+`const ruleSet = await bundleAndLoadRuleset(...)` — `ruleSet` is a `Ruleset` instance created by
+the bundler's `spectral-core` (**1.23.0**); then `spectral.setRuleset(ruleSet)` where `spectral`
+is `new Spectral()` from the plugin's nested `spectral-core` (**1.20.0**). `setRuleset` is
+`ruleset instanceof Ruleset ? ruleset : new Ruleset(ruleset)` — a `1.23.0` `Ruleset` is not
+`instanceof` the `1.20.0` `Ruleset` class, so it falls to `new Ruleset(<a class instance>)`,
+whose `assertValidRuleset` rejects the non-plain-object with exactly "Provided ruleset is not an
+object." Confirmed by reading `setRuleset` in the nested `1.20.0` source (`dist/spectral.js:66`).
+
+**Fix**: added a second `resolutions` override,
+`"@stoplight/spectral-core": "1.23.0"` (must be `1.23.0`, not `1.20.0`, because
+`@dawmatt/api-grade-core` requires `^1.23.0`), then `yarn install`. Confirmed the nested
+`1.20.0` copy is gone — only a single hoisted `1.23.0` remains — so the bundler's `Ruleset` and
+the plugin's `Spectral` now share one class and `instanceof` passes.
+
+**Validation**: replicated the plugin's exact flow in Node against the deduped tree
+(`bundleAndLoadRuleset` → `new Spectral()` → `setRuleset(ruleSet)` → `spectral.run(...)`):
+`setRuleset` accepts the ruleset, `run` returns diagnostics — the full flow passes (previously
+`setRuleset` is where it threw). `yarn workspace app build` passes (EXIT 0). Both temporary
+diagnostics removed from `SpectralLinterContent.tsx`.
+
+Both `resolutions` entries are required together: `spectral-ruleset-bundler@1.7.0` (skypack→
+esm.sh, browser CDN) AND `spectral-core@1.23.0` (single `Ruleset` class so `setRuleset` accepts
+the bundled ruleset). Final confirmation for the student: restart `yarn start` (node_modules
+changed) and reload an API's Spectral tab — it should now render lint results.
+
+> Process note (reinforced): a passing narrow reproduction (T1) is NOT proof of a fix. Reproduce
+> the FULL failing path, including the caller's second step (`setRuleset`), before claiming
+> resolution. This duplicate-dependency error is a general Backstage-plugin hazard: a plugin
+> that pins an exact `@stoplight/spectral-*` (or any lib with `instanceof` checks) gets a nested
+> copy that fails to interoperate with the hoisted copy used elsewhere.

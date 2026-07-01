@@ -334,6 +334,37 @@ the result to the app's `features` array alongside the custom `EntityContentBlue
 `@backstage/core-compat-api` remains a required dependency — just for `convertLegacyPlugin`,
 not `compatWrapper`.
 
+**Update (2026-07-02, Run 14 — ruleset bundler nested-duplicate fix)**: After the routable-
+extension issue was resolved, the Spectral tab rendered but failed to lint with
+`Provided ruleset is not an object`. Root-caused via in-browser diagnostics (temporary logging
+in `SpectralLinterContent.tsx`): the plugin (`0.5.2`) pins `@stoplight/spectral-ruleset-bundler`
+to an exact `1.6.3`, installed as a **nested duplicate** under the plugin's `node_modules`.
+`1.6.3` resolves un-bundled modules through the defunct **skypack** CDN (`cdn.skypack.dev`),
+which fails in the browser (Node never needs the CDN, so it only reproduces in-browser — the
+bundler loads 111 rules fine in Node); `1.7.0` switched the CDN to `esm.sh` and works in the
+browser. Proven in the browser: running the exact current setup through `1.7.0` returns 111
+rules with no error. Fix: a `resolutions` override
+`"@stoplight/spectral-ruleset-bundler": "1.7.0"` in the Backstage workspace root `package.json`,
+then `yarn install` to collapse the nested `1.6.3` into the single hoisted `1.7.0`.
+
+**Update (2026-07-02, Run 15 — the bundler dedupe was necessary but not sufficient)**: after the
+bundler dedupe the error persisted. In-browser diagnostics proved `bundleAndLoadRuleset@1.7.0`
+succeeds with the plugin's exact inputs (indented YAML + spectral-runtime fetch → 111 rules), so
+bundling was not the blocker. The blocking cause was a SECOND nested-duplicate:
+`@stoplight/spectral-core` (hoisted `1.23.0` used by the bundler; nested `1.20.0` pinned by the
+linter plugin). `LinterClient` builds the ruleset with the bundler's `1.23.0` `Ruleset` and then
+`spectral.setRuleset(ruleSet)` on a `Spectral` from the nested `1.20.0`; `setRuleset` is
+`ruleset instanceof Ruleset ? ruleset : new Ruleset(ruleset)` (`dist/spectral.js:66`), and a
+`1.23.0` `Ruleset` isn't `instanceof` the `1.20.0` `Ruleset`, so it re-wraps a class instance →
+`assertValidRuleset` → "Provided ruleset is not an object". Fix: a second `resolutions` override
+`"@stoplight/spectral-core": "1.23.0"` (must be `1.23.0` — `@dawmatt/api-grade-core` requires
+`^1.23.0`), collapsing to a single `spectral-core`. Validated by replicating the plugin's full
+flow (`bundleAndLoadRuleset` → `new Spectral()` → `setRuleset` → `run`) against the deduped tree:
+`setRuleset` accepts the ruleset and `run` returns diagnostics. Both resolutions are required
+together. NOTE vs Run 7: these are genuine nested-duplicate fixes with verified mechanisms —
+Run 7's `@backstage/core-plugin-api` duplicate theory for the (unrelated) routeRef error was a
+red herring; here the duplicates are real and proven.
+
 The `EntityContentBlueprint` `filter` attribute supports entity-based predicates but does
 not have access to the requesting user's identity, so the tab itself cannot be hidden via
 the filter. Instead, the tab appears for all users on API entity pages, but the CONTENT

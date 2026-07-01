@@ -255,6 +255,53 @@ yarn --cwd packages/app add @dweber019/backstage-plugin-api-docs-spectral-linter
 No source build is required. The package is compatible with React 18 and react-router-dom 6,
 both already present in this Backstage instance.
 
+### Dedupe two Spectral libraries so linting works in the browser (required)
+
+The Spectral linter (`0.5.2`) pins **exact** versions of two `@stoplight` libraries, so yarn
+installs a second, *nested* copy of each under the plugin's own `node_modules`. Both nested
+copies break the Spectral tab (`Failed to lint API / Provided ruleset is not an object`), for
+two independent reasons:
+
+1. **`@stoplight/spectral-ruleset-bundler`** — the plugin pins `1.6.3`, which resolves
+   un-bundled modules through the now-defunct **skypack** CDN (`cdn.skypack.dev`) and fails in
+   the browser. `1.7.0` switched to `esm.sh` and works (and is already pulled in by
+   `@dawmatt/api-grade-core`).
+2. **`@stoplight/spectral-core`** — the plugin pins `1.20.0`, but the bundler and
+   `@dawmatt/api-grade-core` use `1.23.0`. The linter builds the ruleset with the bundler's
+   `spectral-core` (`1.23.0`) and then hands it to `new Spectral()` from its own `spectral-core`
+   (`1.20.0`). `Spectral.setRuleset()` does `ruleset instanceof Ruleset ? … : new Ruleset(ruleset)`
+   — a `1.23.0` `Ruleset` is not `instanceof` the `1.20.0` `Ruleset` class, so it re-wraps a
+   class instance as if it were a plain object and throws "Provided ruleset is not an object."
+   Both must be the **same** `spectral-core` copy for the `instanceof` check to pass.
+
+Force a single copy of each by adding `resolutions` to the **Backstage workspace root**
+`package.json` (the root of your Backstage app, *not* `packages/app/package.json`):
+
+```jsonc
+{
+  "resolutions": {
+    "@stoplight/spectral-ruleset-bundler": "1.7.0",
+    "@stoplight/spectral-core": "1.23.0"
+  }
+}
+```
+
+(`spectral-core` must be `1.23.0`, not `1.20.0` — `@dawmatt/api-grade-core` requires `^1.23.0`.)
+
+Then reinstall so the nested `1.6.3` / `1.20.0` copies collapse into the single hoisted
+`1.7.0` / `1.23.0`:
+
+```bash
+yarn install
+# verify only one version of each remains:
+yarn why @stoplight/spectral-ruleset-bundler
+yarn why @stoplight/spectral-core
+```
+
+> Note: because this changes `node_modules`, you must **fully restart `yarn start`** afterwards
+> (stop the process and start it again) — a hot reload will not pick up the swapped
+> dependencies.
+
 **Why `@backstage/core-compat-api` too?** `@dweber019/backstage-plugin-api-docs-spectral-linter`
 is built on Backstage's old plugin system (`createPlugin` + `createApiFactory`). The plugin
 registers an API (`linterApiRef`, backed by a `LinterClient`) the old way. `convertLegacyPlugin`
@@ -738,7 +785,52 @@ change wrapping.
 **If you previously tried wrapping the component in `compatWrapper`, or added a `resolutions`
 entry for `@backstage/core-plugin-api`**: neither of those addresses the actual cause and can
 be reverted — remove the `compatWrapper` import/call and any `@backstage/core-plugin-api`
-`resolutions` entry; they have no effect on this error either way.
+`resolutions` entry; they have no effect on this error either way. (This is unrelated to the
+`@stoplight/spectral-ruleset-bundler` resolution in Step 7, which *is* required — see the next
+entry.)
+
+---
+
+### Spectral tab shows "Failed to lint API / Provided ruleset is not an object"
+
+**Symptom**: The Spectral tab renders (no routable-extension error), but instead of lint
+results it shows:
+```
+Failed to lint API
+Provided ruleset is not an object
+```
+
+**Cause**: This has **two independent root causes**, both *nested duplicate dependencies* the
+plugin (`0.5.2`) pulls in by pinning exact `@stoplight` versions:
+
+1. `@stoplight/spectral-ruleset-bundler` pinned to `1.6.3`, which resolves modules via the
+   defunct **skypack** CDN and fails in the browser (works in Node — it never needs the CDN —
+   which is why this only reproduces in-browser). `1.7.0` uses `esm.sh` and works.
+2. `@stoplight/spectral-core` pinned to `1.20.0`, while the bundler/`api-grade-core` use
+   `1.23.0`. The linter builds the ruleset with the bundler's `1.23.0` `Ruleset` class, then
+   calls `setRuleset()` on a `Spectral` from the nested `1.20.0`; `setRuleset` does
+   `ruleset instanceof Ruleset ? … : new Ruleset(ruleset)`, and a cross-version `Ruleset` fails
+   the `instanceof`, so it re-wraps a class instance as a plain object → this exact error.
+
+`yarn why @stoplight/spectral-ruleset-bundler` and `yarn why @stoplight/spectral-core` will each
+show two versions until deduped.
+
+**Fix**: Force a single copy of each with `resolutions` in the Backstage workspace root
+`package.json` and reinstall (this is Step 7):
+```jsonc
+"resolutions": {
+  "@stoplight/spectral-ruleset-bundler": "1.7.0",
+  "@stoplight/spectral-core": "1.23.0"
+}
+```
+```bash
+yarn install
+yarn why @stoplight/spectral-ruleset-bundler   # should show only 1.7.0
+yarn why @stoplight/spectral-core              # should show only 1.23.0
+```
+Then **fully restart `yarn start`** (stop and start the process — a hot reload will not pick up
+the swapped dependencies). The Spectral tab should now show lint results, or "No linting errors
+found..." for a clean API.
 
 ---
 
