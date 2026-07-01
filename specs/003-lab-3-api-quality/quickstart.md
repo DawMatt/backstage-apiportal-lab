@@ -11,7 +11,7 @@
 - api-grade plugins installed (from npm or GitHub source — see README)
 - `@dweber019/backstage-plugin-api-docs-spectral-linter` installed
 - `app-config.yaml` updated with `apiGrade` and `spectralLinter` sections
-- `packages/backend/src/index.ts` updated with `backend.add(import('backstage-plugin-api-grade-backend'))`
+- `packages/backend/src/index.ts` updated with `backend.add(import('@dawmatt/backstage-plugin-api-grade-backend'))`
 - `App.tsx` updated with `apiGradeModule` and `spectralLinterModule`
 
 ## Verification Steps
@@ -48,7 +48,7 @@
 ❌ **Fail (card missing)**: Check that `apiGradeModule` is in the `features` array in
   `App.tsx`; verify the module file exists and is imported correctly; check browser console
   for errors
-❌ **Fail (grade shows error/blank)**: Check that `backstage-plugin-api-grade-backend` is
+❌ **Fail (grade shows error/blank)**: Check that `@dawmatt/backstage-plugin-api-grade-backend` is
   registered in `packages/backend/src/index.ts`; check backend logs for Spectral errors;
   verify `apiGrade.ruleset.url` is reachable (try fetching it in a browser)
 

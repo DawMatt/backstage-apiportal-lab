@@ -8,7 +8,7 @@
 ruleset aliases `spectral:oas` and `spectral:asyncapi`. Reference this file in both quality
 plugins via its GitHub raw URL.
 
-**Rationale**: Both `api-grade-core` (used by the api-grade backend) and
+**Rationale**: Both `@dawmatt/api-grade-core` (used by the api-grade backend) and
 `@stoplight/spectral-rulesets` (used by the Spectral linter plugin) resolve `spectral:oas`
 and `spectral:asyncapi` as built-in aliases for the standard OAS3 and AsyncAPI recommended
 rules. No additional npm packages need to be installed for the ruleset — the required
@@ -61,109 +61,38 @@ Note: if the fallback is required, both plugins still point to the same single r
 
 ## R-002: api-grade Plugin Installation
 
-**Decision**: Install `backstage-plugin-api-grade` and `backstage-plugin-api-grade-backend`
-from the GitHub source (`https://github.com/DawMatt/api-grade`) via local build + file:
-protocol until the packages are published to npm. Verify npm availability before following
-source build steps — if published, a simple `yarn add` is sufficient.
+**Decision**: Install `@dawmatt/backstage-plugin-api-grade` and
+`@dawmatt/backstage-plugin-api-grade-backend` directly from npm.
 
-**Finding**: As of 2026-06-15, neither `backstage-plugin-api-grade` nor
-`backstage-plugin-api-grade-backend` is published to the npm registry. Both are at
-version 0.1.0 in the GitHub repo. The packages may be published by the time this lab is
-followed.
+**Finding** (updated 2026-07-01): Both packages are now published to the npm registry at
+version 0.5.0, under the `@dawmatt` scope. `@dawmatt/api-grade-core` (the shared grading
+engine) is also published to npm and is a declared dependency of both plugins, so it is
+installed automatically — no local build, GitHub clone, or `file:` protocol install is
+required.
 
-**npm-first approach** (try this first):
 ```bash
-# Check if published:
-npm view backstage-plugin-api-grade version 2>/dev/null || echo "not on npm"
-
-# If on npm:
-yarn --cwd packages/app add backstage-plugin-api-grade
-yarn --cwd packages/backend add backstage-plugin-api-grade-backend
+yarn --cwd packages/app add @dawmatt/backstage-plugin-api-grade
+yarn --cwd packages/backend add @dawmatt/backstage-plugin-api-grade-backend
 ```
 
-**GitHub source fallback** (if not on npm):
-
-The clone MUST be performed from the **repository root** (`backstage-apiportal-lab/`) so
-that the api-grade directory lands beside the repo (i.e., as a sibling of `backstage-apiportal-lab/`).
-
-**macOS / Linux (bash/zsh)**:
-```bash
-# From backstage-apiportal-lab/ (repo root):
-git clone https://github.com/DawMatt/api-grade ../api-grade
-cd ../api-grade
-npm install   # api-grade uses npm internally; yarn install fails on this repo
-npm run build
-
-# Return to backstage instance:
-cd -
-cd labs/lab-01-base-backstage/backstage
-
-# api-grade-core is not on npm; pre-install it from the local build before backstage-plugin-api-grade:
-yarn --cwd packages/app add "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core"
-
-# Install from local build — 6 levels up from packages/app to reach the sibling directory:
-yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
-yarn --cwd packages/backend add "backstage-plugin-api-grade-backend@file:../../../../../../api-grade/packages/backstage-plugin-api-grade-backend"
-```
-
-**Windows (PowerShell)** — `cd -` is not available; use `Set-Location -` or navigate explicitly:
-```powershell
-# From backstage-apiportal-lab\ (repo root):
-git clone https://github.com/DawMatt/api-grade ..\api-grade
-Set-Location ..\api-grade
-npm install        # yarn install equivalent
-npm run build      # yarn build equivalent
-
-# Return to backstage instance (PowerShell: use Push-Location / Pop-Location or an explicit path):
-Set-Location ..\backstage-apiportal-lab\labs\lab-01-base-backstage\backstage
-
-# Install from local build:
-yarn --cwd packages\app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
-yarn --cwd packages\backend add "backstage-plugin-api-grade-backend@file:../../../../../../api-grade/packages/backstage-plugin-api-grade-backend"
-```
-
-**Path rationale** (why 6 levels, not 4):
-`yarn --cwd packages/app` resolves `file:` paths relative to `packages/app`, not the shell
-working directory. From `packages/app`, reaching the sibling `api-grade` directory requires
-traversing: `packages/app` → `packages` → `backstage` → `lab-01-base-backstage` → `labs` →
-`backstage-apiportal-lab` → parent directory → `api-grade` = **6 levels** (`../../../../../../`).
-Using only 4 levels (`../../../../`) reaches `labs/` inside the repo — the error encountered
-in Run 1 testing (`ENOENT: lstat 'labs/api-grade/...'`).
-
-**If yarn install fails on Windows (peer dependency conflict)**:
-The `@material-ui/core@4` package declares a peer dependency on `@types/react@"^16.8.6 || ^17.0.0"`,
-which conflicts with the `@types/react@18.x` installed by Backstage 1.51.0. Yarn 4.x tolerates
-this conflict silently; npm does not. If `npm install` is used instead and fails with `ERESOLVE`:
-```powershell
-# Add --legacy-peer-deps to bypass the peer dep conflict:
-yarn --cwd packages\app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade" --legacy-peer-deps
-```
-Or if using npm directly from within packages/app:
-```powershell
-cd packages\app
-npm install "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade" --legacy-peer-deps
-cd ..\..
-```
-Note: `--legacy-peer-deps` instructs npm to ignore peer dependency version mismatches. It is
-safe to use here because the conflict is a type declaration version mismatch, not a runtime
-incompatibility — Backstage 1.51.0 uses React 18 and Material UI v4 together without issues.
-
-**Backend compatibility**: `backstage-plugin-api-grade-backend` requires
+**Backend compatibility**: `@dawmatt/backstage-plugin-api-grade-backend` requires
 `@backstage/backend-plugin-api ^0.6.0` and `@backstage/catalog-client ^1.0.0` — both
 already installed in Backstage 1.51.0. It registers using `backend.add(import(...))` which
 is consistent with the New Backend System already used in this project.
 
 **Alternatives considered**:
+- GitHub source build (clone + local build + `file:` protocol install): this was the
+  documented fallback while the packages were unpublished (pre-2026-07-01). No longer
+  needed now that both packages and `@dawmatt/api-grade-core` are on npm.
 - gitpkg.now.sh: adds a third-party service dependency that learners cannot control.
   Excluded per Constitution Principle V (zero-cost) and Principle IV (no undocumented
   external dependencies).
-- Fork and publish: requires a GitHub or npm account with publish rights. Excluded.
 
 ---
 
 ## R-003: api-grade Frontend — New Declarative Frontend Compatibility
 
-**Decision**: Wrap the `ApiGradeCard` component from `backstage-plugin-api-grade` in an
+**Decision**: Wrap the `ApiGradeCard` component from `@dawmatt/backstage-plugin-api-grade` in an
 `EntityCardBlueprint.make()` extension, following the same pattern used in Lab 2 for the
 `ApiVisibilityCard`. Add the resulting module to `App.tsx`'s `features` array.
 
@@ -180,7 +109,7 @@ frontend correctly.
 import { createFrontendModule } from '@backstage/frontend-plugin-api';
 import { EntityCardBlueprint } from '@backstage/plugin-catalog-react/alpha';
 import React from 'react';
-import { ApiGradeCard } from 'backstage-plugin-api-grade';
+import { ApiGradeCard } from '@dawmatt/backstage-plugin-api-grade';
 
 const apiGradeCard = EntityCardBlueprint.make({
   name: 'api-grade',
@@ -223,7 +152,7 @@ filtering. This satisfies FR-006 natively (if the plugin supports split) and FR-
 |--------|---------|-----------|-------------------|
 | `EntityCardBlueprint` | `@backstage/plugin-catalog-react/alpha` | Alpha | Yes (Lab 2) |
 | `createFrontendModule` | `@backstage/frontend-plugin-api` | Stable | Yes (Lab 2) |
-| `ApiGradeCard` | `backstage-plugin-api-grade` | — | New in Lab 3 |
+| `ApiGradeCard` | `@dawmatt/backstage-plugin-api-grade` | — | New in Lab 3 |
 
 ---
 
@@ -249,14 +178,14 @@ grade is slow to appear, the lab README should advise waiting a few seconds and 
 **Backend registration**:
 ```typescript
 // packages/backend/src/index.ts — add one line
-backend.add(import('backstage-plugin-api-grade-backend'));
+backend.add(import('@dawmatt/backstage-plugin-api-grade-backend'));
 ```
 
 The backend plugin self-registers under the `api-grade` plugin ID, wires to the Catalog
 client and identity services via the New Backend System's dependency injection. No manual
 router registration is needed.
 
-**api-grade-core**: The backend plugin depends on `api-grade-core` which bundles
+**api-grade-core**: The backend plugin depends on `@dawmatt/api-grade-core` which bundles
 `@stoplight/spectral-core`, `@stoplight/spectral-rulesets`, `@stoplight/spectral-parsers`,
 and `@stoplight/spectral-ruleset-bundler`. No additional Spectral packages need to be
 installed in the Backstage backend.

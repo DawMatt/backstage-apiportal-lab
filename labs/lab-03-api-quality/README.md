@@ -10,10 +10,11 @@ By the end of this lab you will have:
 
 - A `.spectral.yaml` ruleset committed to the repository, referenced by both quality plugins
   via its GitHub raw URL — one file, consistent results across both tools.
-- The `backstage-plugin-api-grade` frontend card and `backstage-plugin-api-grade-backend`
-  installed and configured. Every API entity page shows a grade card (letter, percentage,
-  quality label) in the Info column. Owners and platform team members also see the full
-  Quality Assessment, Recommendations, and Diagnostics breakdown.
+- The `@dawmatt/backstage-plugin-api-grade` frontend card and
+  `@dawmatt/backstage-plugin-api-grade-backend` installed and configured. Every API entity
+  page shows a grade card (letter, percentage, quality label) in the Info column. Owners and
+  platform team members also see the full Quality Assessment, Recommendations, and
+  Diagnostics breakdown.
 - The `@dweber019/backstage-plugin-api-docs-spectral-linter` installed and wrapped in a
   custom permission-gated component. A "Spectral" tab appears on every API entity page.
   Owners and platform team members see the inline lint results; other users see an
@@ -37,7 +38,6 @@ By the end of this lab you will have:
   Train Travel API registered; user/group visibility working; Alice and Charlie sign-in verified
 - **Node.js 20 LTS** — same version as Labs 1 and 2
 - **Yarn** — same version as Labs 1 and 2
-- **Git** — needed to clone the api-grade repository if not yet published to npm
 
 ---
 
@@ -95,206 +95,29 @@ content of the ruleset.
 
 ## Step 2a — Install the api-grade Frontend Plugin
 
-The `backstage-plugin-api-grade` package may or may not be published to npm by the time you
-follow this lab. Check first:
+`@dawmatt/backstage-plugin-api-grade` is published to npm — install it directly:
 
 ```bash
-# macOS / Linux
-npm view backstage-plugin-api-grade version 2>/dev/null || echo "not on npm"
+yarn --cwd packages/app add @dawmatt/backstage-plugin-api-grade
 ```
 
-```powershell
-# Windows (PowerShell)
-npm view backstage-plugin-api-grade version 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "not on npm" }
-```
-
-**If published to npm**, install directly:
-
-```bash
-yarn --cwd packages/app add backstage-plugin-api-grade
-```
-
-**If not yet on npm**, build from GitHub source.
-
-> **Directory note**: The clone command below uses `../api-grade`, which places the
-> `api-grade` directory *beside* `backstage-apiportal-lab` (as a sibling). Run the clone
-> from the **repository root** (`backstage-apiportal-lab/`), not from inside the Backstage
-> instance directory.
-
-**macOS / Linux**:
-
-```bash
-# From backstage-apiportal-lab/ (repository root):
-git clone https://github.com/DawMatt/api-grade ../api-grade
-cd ../api-grade
-npm install   # api-grade uses npm as its package manager — use npm, not yarn
-npm run build
-cd -   # returns to backstage-apiportal-lab/
-
-# Move into the Backstage instance:
-cd labs/lab-01-base-backstage/backstage
-
-# api-grade-core is a transitive dependency of backstage-plugin-api-grade that is not
-# published to npm. Add a yarn resolution to the workspace root package.json so yarn
-# resolves it from the local build instead of looking it up on the npm registry.
-#
-# Open labs/lab-01-base-backstage/backstage/package.json and add the following at the
-# top level of the JSON object (alongside "name", "private", "workspaces", etc.):
-#
-#   "resolutions": {
-#     "api-grade-core": "file:../../../../api-grade/packages/api-grade-core"
-#   }
-#
-# Or run this node one-liner from labs/lab-01-base-backstage/backstage/ to add it automatically:
-node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.resolutions=Object.assign({},p.resolutions,{'api-grade-core':'file:../../../../api-grade/packages/api-grade-core'});fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
-
-# Apply the resolution — yarn reads the resolutions field during install:
-yarn install
-
-# Now install the frontend plugin:
-yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
-```
-
-**Windows (PowerShell)**:
-
-```powershell
-# From backstage-apiportal-lab\ (repository root):
-git clone https://github.com/DawMatt/api-grade ..\api-grade
-Set-Location ..\api-grade    # cd - is not available in PowerShell; use Set-Location
-npm install                  # api-grade uses npm as its package manager
-npm run build
-
-# Return to the Backstage instance (adjust the path to your repo location):
-Set-Location ..\backstage-apiportal-lab\labs\lab-01-base-backstage\backstage
-
-# api-grade-core is a transitive dependency of backstage-plugin-api-grade that is not
-# published to npm. Add a yarn resolution to the workspace root package.json.
-#
-# Open labs/lab-01-base-backstage/backstage/package.json and add the following at the
-# top level of the JSON object:
-#
-#   "resolutions": {
-#     "api-grade-core": "file:../../../../api-grade/packages/api-grade-core"
-#   }
-#
-# Or run this node one-liner from labs/lab-01-base-backstage/backstage\ to add it automatically:
-node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.resolutions=Object.assign({},p.resolutions,{'api-grade-core':'file:../../../../api-grade/packages/api-grade-core'});fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
-
-# Apply the resolution:
-yarn install
-
-# Now install the frontend plugin:
-yarn --cwd packages\app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
-```
-
-**Why 6 levels?** `yarn --cwd packages/app` resolves `file:` paths relative to the
-`packages/app` directory, not the shell working directory. Counting up from `packages/app`:
-`packages` → `backstage` → `lab-01-base-backstage` → `labs` → `backstage-apiportal-lab` →
-parent directory → `api-grade`. That is six `../` steps. Using only four steps reaches `labs/`
-inside the repo (not the sibling directory), which produces a `no such file or directory` error.
-
-> **Windows path note**: The `file:` protocol path always uses forward slashes (`/`), even
-> on Windows. Do not replace the slashes with backslashes in the `file:` argument — yarn
-> requires forward slashes here regardless of platform.
-
-**Verify the path before installing** (optional but recommended): Confirm the cloned
-repository is reachable at the expected path before running `yarn add`:
-
-```bash
-# macOS / Linux — from the Backstage instance directory (labs/lab-01-base-backstage/backstage/):
-ls ../../../../../../api-grade/packages/
-```
-
-```powershell
-# Windows (PowerShell) — from the Backstage instance directory:
-Get-ChildItem ..\..\..\..\..\..\api-grade\packages\
-```
-
-You should see `api-grade-core`, `backstage-plugin-api-grade`, and
-`backstage-plugin-api-grade-backend` listed. If you see an error, the clone did not land
-in the expected sibling location — re-run the clone from the repository root
-(`backstage-apiportal-lab/`).
-
-**Which package manager to use at each stage:**
-
-| Stage | Command | Why |
-|-------|---------|-----|
-| Build the api-grade repo | `npm install` / `npm run build` | api-grade uses npm internally; `yarn install` fails on this repo |
-| Install into Backstage (packages/app, packages/backend) | `yarn --cwd ...` | Yarn 4.x silently ignores the `@material-ui/core@4` / `@types/react@18` peer dependency mismatch; npm raises an ERESOLVE error for the same conflict |
-
-**If npm raises an ERESOLVE peer dependency error**: If you prefer npm or cannot use yarn
-for the Backstage install step, add `--legacy-peer-deps`. This flag tells npm to ignore peer
-dependency version mismatches — it applies only to this one install command, not to your
-global npm config:
-
-```bash
-# macOS / Linux (from the Backstage instance directory):
-cd packages/app
-npm install "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core" --legacy-peer-deps
-npm install "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade" --legacy-peer-deps
-cd ../..
-```
-
-```powershell
-# Windows (PowerShell):
-Set-Location packages\app
-npm install "api-grade-core@file:../../../../../../api-grade/packages/api-grade-core" --legacy-peer-deps
-npm install "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade" --legacy-peer-deps
-Set-Location ..\..
-```
-
-The flag is safe here: the conflict is a type declaration version mismatch only — Backstage
-runs React 18 and Material UI v4 together in production without issues. Note that when using
-`npm install` from inside `packages/app`, the `file:` path is still six levels up (same as
-`yarn --cwd packages/app`) because both resolve relative to the `packages/app` directory.
+No source build is required. `@dawmatt/api-grade-core` (the shared grading engine that
+bundles the Spectral packages) is a declared dependency of the plugin and is installed
+automatically — you do not need to add it separately.
 
 ---
 
 ## Step 2b — Install the api-grade Backend Plugin
 
-The backend package lives in the same GitHub repository as the frontend. If npm shows the
-frontend as published, the backend will be too.
-
-**If published to npm**:
+`@dawmatt/backstage-plugin-api-grade-backend` is also published to npm:
 
 ```bash
-yarn --cwd packages/backend add backstage-plugin-api-grade-backend
+yarn --cwd packages/backend add @dawmatt/backstage-plugin-api-grade-backend
 ```
 
-**If building from GitHub source** (using the cloned and built repo from Step 2a):
-
-```bash
-# macOS / Linux — same 6-level path as the frontend install:
-yarn --cwd packages/backend add "backstage-plugin-api-grade-backend@file:../../../../../../api-grade/packages/backstage-plugin-api-grade-backend"
-```
-
-```powershell
-# Windows (PowerShell) — use forward slashes in the file: path even on Windows:
-yarn --cwd packages\backend add "backstage-plugin-api-grade-backend@file:../../../../../../api-grade/packages/backstage-plugin-api-grade-backend"
-```
-
-**If npm raises an ERESOLVE error** (same peer dependency conflict as Step 2a — apply
-`--legacy-peer-deps` as a command-line flag, not a global config change):
-
-```bash
-# macOS / Linux:
-cd packages/backend
-npm install "backstage-plugin-api-grade-backend@file:../../../../../../api-grade/packages/backstage-plugin-api-grade-backend" --legacy-peer-deps
-cd ../..
-```
-
-```powershell
-# Windows (PowerShell):
-Set-Location packages\backend
-npm install "backstage-plugin-api-grade-backend@file:../../../../../../api-grade/packages/backstage-plugin-api-grade-backend" --legacy-peer-deps
-Set-Location ..\..
-```
-
-The backend plugin depends on `api-grade-core`, which bundles the Spectral packages
-(`@stoplight/spectral-core`, `@stoplight/spectral-rulesets`, etc.). You do NOT need to
-install additional Spectral packages in your Backstage backend, and you do NOT need to
-pre-install `api-grade-core` separately for the backend (unlike Step 2a, the backend plugin
-package resolves it differently).
+The backend plugin also depends on `@dawmatt/api-grade-core`, which bundles the Spectral
+packages (`@stoplight/spectral-core`, `@stoplight/spectral-rulesets`, etc.). You do NOT need
+to install additional Spectral packages in your Backstage backend.
 
 ---
 
@@ -317,7 +140,7 @@ Create the file `packages/app/src/modules/apiGrade/index.ts`:
 import { createFrontendModule } from '@backstage/frontend-plugin-api';
 import { EntityCardBlueprint } from '@backstage/plugin-catalog-react/alpha';
 import React from 'react';
-import { ApiGradeCard } from 'backstage-plugin-api-grade';
+import { ApiGradeCard } from '@dawmatt/backstage-plugin-api-grade';
 
 const apiGradeCard = EntityCardBlueprint.make({
   name: 'api-grade',
@@ -382,7 +205,7 @@ Open `packages/backend/src/index.ts` and add one line after the existing `backen
 calls:
 
 ```typescript
-backend.add(import('backstage-plugin-api-grade-backend'));
+backend.add(import('@dawmatt/backstage-plugin-api-grade-backend'));
 ```
 
 ---
@@ -700,7 +523,7 @@ catalog location entry is in `app-config.yaml` with `allow: [User]`; check that
 **Pass**: Grade card visible in the Info column for all API entity pages  
 **Fail (card missing)**: Check that `apiGradeModule` is in the `features` array in `App.tsx`;
 verify the module file exists and is imported correctly; check browser console for errors  
-**Fail (grade shows error/blank)**: Check that `backstage-plugin-api-grade-backend` is
+**Fail (grade shows error/blank)**: Check that `@dawmatt/backstage-plugin-api-grade-backend` is
 registered in `packages/backend/src/index.ts`; check backend logs for Spectral errors;
 verify `apiGrade.ruleset.url` is reachable in a browser
 
@@ -792,79 +615,19 @@ starting with `.`).
 
 ### api-grade plugin fails to install from npm
 
-**Symptom**: `yarn add backstage-plugin-api-grade` fails or installs an incorrect version.
+**Symptom**: `yarn add @dawmatt/backstage-plugin-api-grade` fails or installs an incorrect
+version.
 
-**Cause**: The package may not yet be published to npm, or a published version may not be
-compatible with Backstage 1.51.0.
+**Cause**: A published version may not be compatible with your Backstage release, or a
+stale yarn cache/lockfile is interfering with resolution.
 
-**Fix**: Follow the GitHub source build fallback in Steps 2a and 2b.
-
----
-
-### Source build install fails — `no such file or directory` or `Package not found`
-
-**Symptom A**: `yarn add "backstage-plugin-api-grade@file:..."` fails with `ENOENT: no such
-file or directory` or `lstat '...'` pointing to an unexpected location (e.g.,
-`labs/api-grade/...` instead of a sibling directory).
-
-**Cause**: The `file:` path is wrong. The `api-grade` repository must be cloned as a *sibling*
-of `backstage-apiportal-lab` (i.e., `../api-grade` from the repo root), and the install
-command must be run from the Backstage instance directory
-(`labs/lab-01-base-backstage/backstage`). Cloning from inside the Backstage directory, or
-using the wrong number of `../` steps, produces this error.
-
-**Fix**: Verify the clone location first:
+**Fix**: Confirm the published version and compatibility first:
 ```bash
-ls ../../../../../../api-grade/packages/   # macOS/Linux from Backstage instance dir
+npm view @dawmatt/backstage-plugin-api-grade version
+npm view @dawmatt/backstage-plugin-api-grade-backend version
 ```
-If this fails, re-clone from `backstage-apiportal-lab/` with `git clone https://github.com/DawMatt/api-grade ../api-grade`.
-
-**Symptom B**: `yarn add "backstage-plugin-api-grade@file:..."` fails with
-`api-grade-core@npm:* Package not found` (yarn tries to resolve `api-grade-core` from the
-npm registry and fails because it is not published).
-
-**Cause**: `api-grade-core` is a transitive dependency of `backstage-plugin-api-grade` that
-is not published to npm. Yarn v4 resolves each package's dependencies independently — even
-if you pre-install `api-grade-core@file:...` as a direct dependency, yarn will still try to
-resolve `api-grade-core@npm:*` separately when processing `backstage-plugin-api-grade`'s
-own `package.json`. The two resolution keys (`file:` vs `npm:`) are treated as different
-entries and do not match.
-
-**Fix**: Add a `resolutions` override to the workspace root `package.json`
-(`labs/lab-01-base-backstage/backstage/package.json`) before installing the plugin.
-The `resolutions` field tells yarn to use the local file path for `api-grade-core`
-regardless of which package requests it:
-
-```bash
-# From labs/lab-01-base-backstage/backstage/:
-node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.resolutions=Object.assign({},p.resolutions,{'api-grade-core':'file:../../../../api-grade/packages/api-grade-core'});fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
-yarn install
-yarn --cwd packages/app add "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade"
-```
-
-Or edit `package.json` manually: add `"resolutions": { "api-grade-core": "file:../../../../api-grade/packages/api-grade-core" }` at the top level of the JSON object, then run `yarn install` before `yarn add`.
-
----
-
-### npm raises ERESOLVE peer dependency error during source build install
-
-**Symptom**: `npm install "backstage-plugin-api-grade@file:..."` fails with an ERESOLVE
-error referencing `@material-ui/core@4.12.4` and `@types/react`.
-
-**Cause**: `@material-ui/core@4` declares a peer dependency on `@types/react@"^16 || ^17"`,
-but Backstage 1.51.0 installs `@types/react@18`. npm raises this as an error; yarn 4.x
-silently ignores the mismatch (which is safe — it is a type declaration version conflict, not
-a runtime incompatibility).
-
-**Fix (preferred)**: Use `yarn --cwd packages/app add "file:..."` instead of npm — yarn
-tolerates this conflict without any flags.
-
-**Fix (if npm required)**: Add `--legacy-peer-deps` as a one-time command-line flag:
-```bash
-npm install "backstage-plugin-api-grade@file:../../../../../../api-grade/packages/backstage-plugin-api-grade" --legacy-peer-deps
-```
-This flag applies only to this single install command and does not change your global npm
-configuration.
+If the install still fails, clear the yarn cache (`yarn cache clean`) and retry, or check
+the package's npm page for a Backstage compatibility note.
 
 ---
 

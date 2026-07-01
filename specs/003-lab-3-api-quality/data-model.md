@@ -263,7 +263,7 @@ content area).
 
 | Change | Description |
 |--------|-------------|
-| Add | `backend.add(import('backstage-plugin-api-grade-backend'))` |
+| Add | `backend.add(import('@dawmatt/backstage-plugin-api-grade-backend'))` |
 
 Self-registers under the `api-grade` plugin ID; exposes `GET /api/api-grade/grade`.
 Wires to Catalog client and identity services via the New Backend System's DI. No manual
