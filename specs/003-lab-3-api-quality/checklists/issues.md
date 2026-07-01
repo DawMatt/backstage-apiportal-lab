@@ -232,3 +232,91 @@ TypeError: Cannot use 'in' operator to search for '$$type' in undefined
     at async BackstageBackend.start (/Users/matt/Code/DawMatt/backstage-apiportal-lab/labs/lab-01-base-backstage/backstage/node_modules/@backstage/backend-app-api/src/wiring/BackstageBackend.ts:48:12)
 ```
 
+**Resolution (2026-07-01)**: `backend.add(import(...))` unwraps the awaited module's `default`
+export as the `BackendFeature`. The `TypeError: Cannot use 'in' operator to search for '$$type'
+in undefined` means that export was `undefined` — the locally source-built
+`backstage-plugin-api-grade-backend` (built from the unpublished GitHub repo per Run 1–3) did
+not produce a `default` export in its build output. Confirmed the now-published npm package
+`@dawmatt/backstage-plugin-api-grade-backend@0.5.0` exports `export { default } from
+'./plugin.js'` correctly (verified via `npm pack` and inspecting `dist/index.d.ts`). Since
+Step 2a/2b now install directly from npm (source build removed entirely — see
+labs/lab-03-api-quality/README.md), this failure mode no longer applies.
+
+## Run 6 - 2026/07/01
+
+- [X] Error returned when clicking on the Spectral tab
+
+```
+Error
+Routable extension component with mount point routeRef{type=absolute,id=api-docs-spectral-linter} was not discovered in the app element tree. Routable extension components may not be rendered by other components and must be directly available as an element within the App provider component.
+Call Stack
+ RoutableExtensionWrapper
+  node_modules/@dweber019/backstage-plugin-api-docs-spectral-linter/node_modules/@backstage/core-plugin-api/dist/extensions/extensions.esm.js:44:23
+ renderWithHooks
+  node_modules/react-dom/cjs/react-dom.development.js:15486:18
+ updateFunctionComponent
+  node_modules/react-dom/cjs/react-dom.development.js:19612:20
+ mountLazyComponent
+  node_modules/react-dom/cjs/react-dom.development.js:19983:17
+ beginWork
+  node_modules/react-dom/cjs/react-dom.development.js:21627:16
+ HTMLUnknownElement.callCallback
+  node_modules/react-dom/cjs/react-dom.development.js:4164:14
+ Object.invokeGuardedCallbackDev
+  node_modules/react-dom/cjs/react-dom.development.js:4213:16
+ invokeGuardedCallback
+  node_modules/react-dom/cjs/react-dom.development.js:4277:31
+ beginWork$1
+  node_modules/react-dom/cjs/react-dom.development.js:27485:7
+ performUnitOfWork
+  node_modules/react-dom/cjs/react-dom.development.js:26591:12
+```
+
+**Resolution (2026-07-01)**: `EntityApiDocsSpectralLinterContent` is a *routable extension*
+built on Backstage's old plugin system (`createPlugin` + `createRoutableExtension`,
+confirmed via `@dweber019/backstage-plugin-api-docs-spectral-linter`'s `dist/index.d.ts`,
+which shows `apiDocsSpectralLinterPlugin: BackstagePlugin<{ root: RouteRef<undefined> }>`).
+It expects its `root` routeRef to be registered in the app's route tree the way the old
+`createApp` (from `@backstage/core-app-api`) does automatically for routable extensions
+reachable from the app root. This Backstage instance uses the *new* frontend system
+(`createApp` from `@backstage/frontend-defaults`), which has no equivalent route tree entry
+for old-system plugins — rendering the component directly inside the new-system
+`EntityContentBlueprint` loader leaves its routeRef undiscovered, producing this error.
+
+Fixed by wrapping the component in `compatWrapper(...)` from `@backstage/core-compat-api`
+(already a transitive dependency of `@backstage/frontend-defaults`, added as a direct
+dependency): `return compatWrapper(<EntityApiDocsSpectralLinterContent />);` in
+`SpectralLinterContent.tsx`. `compatWrapper` provides the old-system context (including
+route-ref resolution) that the routable extension needs, without converting the whole app
+back to the old plugin system. README Step 7 (dependency install) and Step 8 (component code
++ WHY explanation) updated, plus a new Troubleshooting entry added.
+
+## Run 7 - 2026/07/01
+
+- [ ] Error returned when clicking on the Spectral tab is below. It seems the same as run 6, but run 6 returned this error 4 times and run 7 returned it only 2 times.
+
+```
+Error
+Routable extension component with mount point routeRef{type=absolute,id=api-docs-spectral-linter} was not discovered in the app element tree. Routable extension components may not be rendered by other components and must be directly available as an element within the App provider component.
+Call Stack
+ RoutableExtensionWrapper
+  node_modules/@dweber019/backstage-plugin-api-docs-spectral-linter/node_modules/@backstage/core-plugin-api/dist/extensions/extensions.esm.js:44:23
+ renderWithHooks
+  node_modules/react-dom/cjs/react-dom.development.js:15486:18
+ updateFunctionComponent
+  node_modules/react-dom/cjs/react-dom.development.js:19612:20
+ mountLazyComponent
+  node_modules/react-dom/cjs/react-dom.development.js:19983:17
+ beginWork
+  node_modules/react-dom/cjs/react-dom.development.js:21627:16
+ HTMLUnknownElement.callCallback
+  node_modules/react-dom/cjs/react-dom.development.js:4164:14
+ Object.invokeGuardedCallbackDev
+  node_modules/react-dom/cjs/react-dom.development.js:4213:16
+ invokeGuardedCallback
+  node_modules/react-dom/cjs/react-dom.development.js:4277:31
+ beginWork$1
+  node_modules/react-dom/cjs/react-dom.development.js:27485:7
+ performUnitOfWork
+  node_modules/react-dom/cjs/react-dom.development.js:26591:12
+```

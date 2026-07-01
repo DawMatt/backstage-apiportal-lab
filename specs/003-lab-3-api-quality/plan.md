@@ -41,6 +41,7 @@ open-source, and cross-platform. No paid accounts or external services are requi
 - `@dawmatt/backstage-plugin-api-grade-backend@0.5.0` — on npm
 - `@dawmatt/api-grade-core@0.5.0` — on npm; installed automatically as a declared dependency of both api-grade plugins
 - `@dweber019/backstage-plugin-api-docs-spectral-linter@0.5.2` — on npm
+- `@backstage/core-compat-api` — bridges the Spectral linter's old-system routable extension into the new frontend system (see research.md R-007 Run 6 update); transitive dependency of `@backstage/frontend-defaults`, added as a direct dependency
 - No additional Spectral npm packages required (bundled in api-grade-core and linter plugin)
 
 **Storage**: YAML files (Spectral ruleset, one new User catalog descriptor); updates to

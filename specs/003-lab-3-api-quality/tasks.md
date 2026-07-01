@@ -127,6 +127,21 @@ description: "Task list for Lab 3 — API Quality"
 
 ---
 
+## Phase 8: Issue Remediation (checklists/issues.md)
+
+**Purpose**: Fix issues discovered during manual lab testing (checklists/issues.md) that were not caught by the original task set. Both issues below stem from real testing runs against the student's Backstage instance.
+
+- [X] T025 [US2] Verify Run 4 (backend.add crash, `Cannot use 'in' operator to search for '$$type' in undefined`) is resolved by the Step 2b npm-install change: confirm `@dawmatt/backstage-plugin-api-grade-backend@0.5.0`'s published `dist/index.d.ts` exports a proper `default` (the crash was caused by a broken `default` export in the old local source build, now eliminated since Step 2a/2b no longer build from source); document the root cause and resolution in specs/003-lab-3-api-quality/checklists/issues.md
+- [X] T026 [US3] Add `@backstage/core-compat-api` to the Step 7 install command in labs/lab-03-api-quality/README.md and explain WHY it's needed (bridges the Spectral linter's old-system routable extension into the new frontend system) per updated R-006/R-007 in research.md
+- [X] T027 [US3] Update the SpectralLinterContent.tsx code listing (README Step 8) to import `compatWrapper` from `@backstage/core-compat-api` and wrap the final return value: `return compatWrapper(<EntityApiDocsSpectralLinterContent />);`; add a WHY explanation of the old-system/new-system routable-extension mismatch that caused Run 6's error in labs/lab-03-api-quality/README.md
+- [X] T028 [US3] Add a new Troubleshooting entry for the Run 6 error ("Routable extension component ... was not discovered in the app element tree") documenting cause and fix (install `@backstage/core-compat-api`; wrap component in `compatWrapper`) in labs/lab-03-api-quality/README.md
+- [X] T029 [P] Update research.md R-006 and R-007 with the `compatWrapper` decision, updated code sample, and updated Import sources table; update plan.md's Primary Dependencies list to include `@backstage/core-compat-api` in specs/003-lab-3-api-quality/research.md and specs/003-lab-3-api-quality/plan.md
+- [X] T030 [P] Mark Run 4 and Run 6 resolved in specs/003-lab-3-api-quality/checklists/issues.md with resolution notes matching the README and research.md changes
+
+**Checkpoint**: Both outstanding issues.md items (Run 4 confirmed resolved by npm publish, Run 6 fixed via compatWrapper) are documented and reflected in the README and design docs.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -138,6 +153,7 @@ description: "Task list for Lab 3 — API Quality"
 - **US3 (Phase 5)**: Depends on US1 (ruleset URL needed for app-config); can proceed in parallel with US2 (different files)
 - **US4 (Phase 6)**: Depends on Phase 2 (README skeleton); T016 and T017 can run in parallel; T018/T019 depend on T016 and T017 completing
 - **Polish (Phase 7)**: Depends on all story phases complete; T022 and T023 can run in parallel
+- **Issue Remediation (Phase 8)**: Depends on Phase 4 (US2 npm install) and Phase 5 (US3 Spectral linter component) being written; addresses issues discovered during manual testing after the original phases were completed
 
 ### User Story Dependencies
 

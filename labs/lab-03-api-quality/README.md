@@ -249,11 +249,20 @@ Unlike the api-grade plugins, `@dweber019/backstage-plugin-api-docs-spectral-lin
 published to npm and can be installed directly:
 
 ```bash
-yarn --cwd packages/app add @dweber019/backstage-plugin-api-docs-spectral-linter
+yarn --cwd packages/app add @dweber019/backstage-plugin-api-docs-spectral-linter @backstage/core-compat-api
 ```
 
 No source build is required. The package is compatible with React 18 and react-router-dom 6,
 both already present in this Backstage instance.
+
+**Why `@backstage/core-compat-api` too?** `@dweber019/backstage-plugin-api-docs-spectral-linter`
+is built on Backstage's old plugin system (`createPlugin` + `createRoutableExtension`). Its
+`EntityApiDocsSpectralLinterContent` component is a *routable extension* tied to a `routeRef`
+that the old system expects to find registered in the app's route tree. This Backstage
+instance uses the new frontend system (`createApp`), which has no such route tree for
+old-system plugins. Rendering the component directly fails with a runtime error (see Step 8).
+`compatWrapper` from `@backstage/core-compat-api` bridges the two systems so the component
+can be rendered inside a new-system `EntityContentBlueprint` extension.
 
 ---
 
@@ -274,6 +283,22 @@ This approach — showing an access-restricted message rather than a blank tab �
 educational: it makes the permission boundary visible and explains why the content is
 restricted.
 
+**Why `compatWrapper`?** `EntityApiDocsSpectralLinterContent` is a routable extension built
+on the old plugin system (see Step 7). Rendered directly inside the new frontend system's
+`EntityContentBlueprint`, it fails at runtime with:
+
+```
+Error
+Routable extension component with mount point routeRef{type=absolute,id=api-docs-spectral-linter}
+was not discovered in the app element tree. Routable extension components may not be rendered
+by other components and must be directly available as an element within the App provider
+component.
+```
+
+Wrapping the returned element in `compatWrapper(...)` from `@backstage/core-compat-api`
+supplies the old-system routing context the component expects, without requiring the whole
+app to fall back to the old plugin system.
+
 Create the file `packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx`:
 
 ```typescript
@@ -283,6 +308,7 @@ import { useEntityOwnership } from '@backstage/plugin-catalog-react';
 import { EntityApiDocsSpectralLinterContent } from '@dweber019/backstage-plugin-api-docs-spectral-linter';
 import { InfoCard } from '@backstage/core-components';
 import { Typography } from '@material-ui/core';
+import { compatWrapper } from '@backstage/core-compat-api';
 
 export function SpectralLinterContent() {
   const identityApi = useApi(identityApiRef);
@@ -313,7 +339,7 @@ export function SpectralLinterContent() {
     );
   }
 
-  return <EntityApiDocsSpectralLinterContent />;
+  return compatWrapper(<EntityApiDocsSpectralLinterContent />);
 }
 ```
 
@@ -628,6 +654,30 @@ npm view @dawmatt/backstage-plugin-api-grade-backend version
 ```
 If the install still fails, clear the yarn cache (`yarn cache clean`) and retry, or check
 the package's npm page for a Backstage compatibility note.
+
+---
+
+### Spectral tab shows a "Routable extension component ... was not discovered" error
+
+**Symptom**: Clicking the Spectral tab shows an error page instead of lint results or the
+access-restricted message:
+```
+Routable extension component with mount point routeRef{type=absolute,id=api-docs-spectral-linter}
+was not discovered in the app element tree. Routable extension components may not be rendered
+by other components and must be directly available as an element within the App provider
+component.
+```
+
+**Cause**: `EntityApiDocsSpectralLinterContent` is a routable extension built on the old
+Backstage plugin system. This Backstage instance uses the new frontend system (`createApp`),
+which has no route tree entry for old-system routable extensions. Rendering the component
+directly — without a compatibility wrapper — triggers this error.
+
+**Fix**: Wrap the component in `compatWrapper(...)` from `@backstage/core-compat-api` (see
+Step 7 and Step 8). Confirm:
+1. `@backstage/core-compat-api` is installed: `yarn --cwd packages/app add @backstage/core-compat-api`
+2. `SpectralLinterContent.tsx` imports `compatWrapper` and returns
+   `compatWrapper(<EntityApiDocsSpectralLinterContent />)` — not the bare component.
 
 ---
 

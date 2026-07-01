@@ -246,8 +246,10 @@ and react-router-dom 6, both already present in this Backstage instance.
 
 **Installation**:
 ```bash
-yarn --cwd packages/app add @dweber019/backstage-plugin-api-docs-spectral-linter
+yarn --cwd packages/app add @dweber019/backstage-plugin-api-docs-spectral-linter @backstage/core-compat-api
 ```
+`@backstage/core-compat-api` is required to bridge the plugin's old-system routable extension
+into the new frontend system — see R-007's Run 6 update.
 
 **App-config configuration**:
 ```yaml
@@ -274,6 +276,18 @@ visibility gating (unlike the api-grade plugin which handles this via backend re
 filtering). The plugin also predates the new Backstage declarative frontend and does not
 export a blueprint extension. We must wrap it manually.
 
+**Update (2026-07-01, Run 6 issue)**: `EntityApiDocsSpectralLinterContent` is a *routable
+extension* built on the old plugin system (`createPlugin` + `createRoutableExtension` —
+confirmed via the package's `dist/index.d.ts`, which exposes
+`apiDocsSpectralLinterPlugin: BackstagePlugin<{ root: RouteRef<undefined> }>`). Rendered
+directly inside the new-system `EntityContentBlueprint` loader, it fails at runtime with
+"Routable extension component ... was not discovered in the app element tree" — the old
+system's routeRef has no route tree entry in a `createApp` (new frontend system) app. Fixed
+by wrapping the returned element in `compatWrapper(...)` from `@backstage/core-compat-api`,
+which bridges old-system context (including routeRef resolution) into new-system apps.
+`@backstage/core-compat-api` is already a transitive dependency of `@backstage/frontend-defaults`
+and is added as a direct dependency in Step 7.
+
 The `EntityContentBlueprint` `filter` attribute supports entity-based predicates but does
 not have access to the requesting user's identity, so the tab itself cannot be hidden via
 the filter. Instead, the tab appears for all users on API entity pages, but the CONTENT
@@ -291,6 +305,7 @@ import { useEntityOwnership } from '@backstage/plugin-catalog-react';
 import { EntityApiDocsSpectralLinterContent } from '@dweber019/backstage-plugin-api-docs-spectral-linter';
 import { InfoCard } from '@backstage/core-components';
 import { Typography } from '@material-ui/core';
+import { compatWrapper } from '@backstage/core-compat-api';
 
 export function SpectralLinterContent() {
   const identityApi = useApi(identityApiRef);
@@ -321,7 +336,7 @@ export function SpectralLinterContent() {
     );
   }
 
-  return <EntityApiDocsSpectralLinterContent />;
+  return compatWrapper(<EntityApiDocsSpectralLinterContent />);
 }
 ```
 
@@ -358,6 +373,7 @@ export const spectralLinterModule = createFrontendModule({
 | `createFrontendModule` | `@backstage/frontend-plugin-api` | Stable | Yes (Lab 2) |
 | `InfoCard` | `@backstage/core-components` | Stable | Yes |
 | `Typography` | `@material-ui/core` | Stable | Yes |
+| `compatWrapper` | `@backstage/core-compat-api` | Stable | New in Lab 3 (added as direct dep, Run 6 fix) |
 | `EntityApiDocsSpectralLinterContent` | `@dweber019/backstage-plugin-api-docs-spectral-linter` | — | New in Lab 3 |
 
 **Platform team check via ownershipEntityRefs**: `identityApi.getBackstageIdentity()` returns
