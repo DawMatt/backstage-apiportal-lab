@@ -21,23 +21,33 @@ Constitution Principle II.
    data-model.md for keys/defaults).
 4. **Add the two new sample files**:
    - `labs/lab-04-auto-registration/apis/galaxy/galaxy-openapi.yaml` (vendored Scalar Galaxy API
-     with an `info.x-examplecorp` object added) — no pre-existing `catalog-info.yaml`.
+     with an `info.x-examplecorp` object added, `visibility: shared`) — no pre-existing
+     `catalog-info.yaml`.
    - `labs/lab-04-auto-registration/apis/precedence-demo/precedence-demo-openapi.yaml` +
-     `precedence-demo-catalog-info.yaml` — demonstrates FR-011 precedence.
+     `precedence-demo-catalog-info.yaml` (hand-authored, `example.com/visibility: private`,
+     owner a non-platform team) — demonstrates FR-011 precedence and gives a real
+     private/shared contrast to check in step 5.
 5. **Start Backstage** (`yarn start` from the Lab 1 backstage workspace) and confirm:
    - The Galaxy API appears in the catalog within one discovery cycle (~30s), with no manually
      written catalog file (US1, SC-001).
    - Its `spec.owner` and `spec.lifecycle` match the `info.x-examplecorp` values, and its tags
      match the spec's native `tags` array — not duplicated into `x-examplecorp` (US2, SC-002).
+   - The Galaxy API (`visibility: shared`) is visible to any authenticated user, while the
+     precedence-demo API (`visibility: private`, hand-authored) is visible only to its owning
+     team and platform-team — logging in as a non-owning, non-platform user confirms the
+     difference (SC-006).
    - The precedence-demo API's catalog entity reflects the hand-authored
-     `precedence-demo-catalog-info.yaml`, not the auto-sourced values (FR-011).
+     `precedence-demo-catalog-info.yaml` throughout (owner, visibility), not the auto-sourced
+     values (FR-011).
 6. **Verify update-in-place**: edit `galaxy-openapi.yaml`'s `info.description`, wait one cycle,
    confirm the existing entity updates rather than duplicating (FR-003).
 7. **Verify removal**: temporarily rename `galaxy-openapi.yaml` out of the discovery pattern, wait
    one cycle, confirm the entity is no longer listed as active (FR-004, SC-005); rename it back.
 8. **Verify error handling**: temporarily break the YAML syntax in one file, confirm a log line
    identifies the file; temporarily set `info.x-examplecorp.owner` to a nonexistent team, confirm a
-   catalog processing error is visible on that entity (FR-008, SC-003).
+   catalog processing error is visible on that entity (FR-008, SC-003); temporarily set
+   `info.x-examplecorp.visibility` to an unrecognized value (e.g. `public`), confirm the same kind
+   of visible error rather than a silent default.
 
 ## Out of scope for this quickstart
 
@@ -62,10 +72,13 @@ A second "Scaling to multiple source repositories" note (research.md R7) covers:
 - The `autoApiRegistration.sources[]` config list — the lab's own `app-config.yaml` uses the flat
   single-source shorthand, but the README shows the equivalent explicit `sources: [{ id: default,
   ... }]` form alongside a second example entry, so learners can see exactly what changes to add a
-  team or pre-production repo (a different `rootPath`, `defaultOwner`, and `xNamespace`).
+  team or pre-production repo (a different `rootPath`, `defaultOwner`, `defaultVisibility`, and
+  `xNamespace`).
 - Why `defaultOwner` and `xNamespace` are per-source with no built-in global fallback (a repo
   onboarding to auto-registration shouldn't have to adopt the platform mono-repo's team or vendor
-  namespace to participate).
+  namespace to participate), while `defaultVisibility` is per-source but *does* have a built-in
+  global fallback (`private`) — visibility is the one setting where "unconfigured" must still be
+  safe by default, not just adaptable.
 - Why collision detection and `catalog-info.yaml` precedence checks are explicitly called out as
   *global* across sources, not per-source — two teams' repos producing the same entity name must
   still surface a visible conflict, not silently coexist.

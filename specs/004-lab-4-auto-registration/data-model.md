@@ -16,6 +16,7 @@ A file on disk matched by the discovery glob (`**/*-openapi.yaml`, `**/*-asyncap
 | `tags[].name` | string[] | Optional, native top-level OpenAPI/AsyncAPI field (not under `info`, not under `x-examplecorp`). Default `[]` if absent. |
 | `info.x-examplecorp.owner` | string | Optional. Owner entity ref (kind defaults to `group:default/` if unprefixed). Absent → registration still succeeds using a documented default — see Mapping Rule 1 below. |
 | `info.x-examplecorp.lifecycle` | string | Optional. One of `experimental` \| `production` \| `deprecated` (Backstage's standard lifecycle values). Default: `experimental`. |
+| `info.x-examplecorp.visibility` | string | Optional. One of `private` \| `shared` — the same two values Lab 2 established. Absent → falls back to that file's source's configured `defaultVisibility` (source-level default is `'private'` if the source doesn't set one — research.md R3/R7). Present-but-unrecognized → marker/error entity, not silently defaulted (research.md R4). |
 
 ## Entity: Catalog API Entity (output)
 
@@ -28,7 +29,8 @@ Standard Backstage `API` kind entity, produced by the EntityProvider's full muta
 | `metadata.description` | `info.description` | Verbatim if present, else omitted. |
 | `metadata.tags` | `tags[].name` | Native top-level spec field, not `x-examplecorp`. Default `[]` if absent. |
 | `metadata.annotations['backstage.io/managed-by-location']` | discovery | Set to the source file's resolved path/URL, identifying this entity as auto-sourced (used for the FR-011 precedence check and for the "which file caused this" debugging path in SC-003). |
-| `metadata.annotations['apiportal-lab.io/registration-error']` | discovery | Present **only** on marker/error entities (invalid owner ref or name collision); absent on normally-registered entities. |
+| `metadata.annotations['example.com/visibility']` | `info.x-examplecorp.visibility` | **The exact same annotation key the Lab 2/3 permission policy already reads** (`packages/backend/src/extensions/permissionPolicy.ts`) — no new annotation, no policy change. **Mapping Rule 2**: if absent, falls back to that file's source's configured `defaultVisibility` — itself optional per-source, falling back to the fixed `'private'` "default default" if the source doesn't set one either (research.md R3/R7, FR-006a). An unrecognized (non-`private`/`shared`) value is never silently defaulted — it's a marker/error entity instead (research.md R4). Reused verbatim rather than reinvented, per research.md R3. |
+| `metadata.annotations['apiportal-lab.io/registration-error']` | discovery | Present **only** on marker/error entities (invalid owner ref, invalid visibility value, or name collision); absent on normally-registered entities. |
 | `spec.type` | discovery | `openapi` if the file has a top-level `openapi` field, `asyncapi` if it has a top-level `asyncapi` field. |
 | `spec.lifecycle` | `info.x-examplecorp.lifecycle` | Default `experimental` if absent (FR-007). |
 | `spec.owner` | `info.x-examplecorp.owner` | **Mapping Rule 1**: if absent, registration still succeeds (FR-007) using that file's source's configured `defaultOwner` (the lab's single source defaults this to `group:default/platform-team`, the same shared/fallback team introduced in Lab 3 — but this is per-source, not global, per research.md R7), rather than blocking. If present but unresolvable against the catalog's known `User`/`Group` entities, the file is registered as a marker/error entity instead (see research.md R4). |
@@ -54,12 +56,14 @@ autoApiRegistration:
       reconciliation: { frequencySeconds: 900 }   # watch mode only
       parseConcurrency: 4
       defaultOwner: group:default/platform-team
+      defaultVisibility: private   # optional — falls back to the fixed 'private' default if unset
       xNamespace: examplecorp
     - id: team-checkout-api      # a second source: a different team's repo, a local sibling
       rootPath: ../team-checkout-api               # checkout for the lab; a real remote repo's
       patterns: ['**/*-openapi.yaml']              # synced local worktree in production (R7
       defaultOwner: group:default/checkout-team    # Problem 4)
-      xNamespace: checkoutteam
+      defaultVisibility: shared    # e.g. a pre-production repo where every API should default
+      xNamespace: checkoutteam                     # to shared visibility unless a spec says otherwise
 ```
 
 | Key (per source, under `sources[]`, or flat for the single-source shorthand) | Type | Default | Purpose |
@@ -73,7 +77,8 @@ autoApiRegistration:
 | `reconciliation.frequencySeconds` | number | `900` | `watch` mode only: interval for the periodic full-sweep safety net that catches missed watcher events (research.md R6, Problem 3). |
 | `parseConcurrency` | number | `4` | Max files parsed concurrently per cycle/event batch — bounds memory/event-loop impact when many files change at once (research.md R6). |
 | `defaultOwner` | string | *(no global default — each source must set its own, or inherit `autoApiRegistration.defaults.defaultOwner` if configured)* | Fallback owner ref applied when `x-<namespace>.owner` is absent (FR-007). Deliberately per-source, not global — a team/pre-production repo plausibly has a different fallback owner than the platform mono-repo (research.md R7, Problem 2). |
-| `xNamespace` | string | *(no global default — see `defaultOwner`)* | The vendor namespace under `info.x-<namespace>` this source reads owner/lifecycle from. Per-source so a repo that already has its own established `x-*` convention isn't forced to rename it to onboard (research.md R7, Problem 2). The lab's single source sets this to `'examplecorp'`. |
+| `defaultVisibility` | `'private' \| 'shared'` | `'private'` (the one fixed, hardcoded fallback in the whole config surface — the "default default") | Fallback visibility applied when `x-<namespace>.visibility` is absent for a file in this source (research.md R3/R4). Per-source, like `defaultOwner` — e.g. a pre-production repo may reasonably default every undeclared API to `shared`, while the platform mono-repo keeps the conservative `private` fallback. Unlike `defaultOwner`/`xNamespace`, this key is optional even at the source level: a source that omits it gets `private`, so a learner adding a new source doesn't have to think about visibility defaults unless they want to change them. |
+| `xNamespace` | string | *(no global default — see `defaultOwner`)* | The vendor namespace under `info.x-<namespace>` this source reads owner/lifecycle/visibility from. Per-source so a repo that already has its own established `x-*` convention isn't forced to rename it to onboard (research.md R7, Problem 2). The lab's single source sets this to `'examplecorp'`. |
 
 ## Scan-state cache (persisted, `coreServices.database`)
 
@@ -120,6 +125,9 @@ Problem 3) even though discovery itself runs per source.
       Problem 3).
    e. Resolve `x-<namespace>.owner` (falling back to this source's `defaultOwner` if absent)
       against known `User`/`Group` entities → unresolvable owners become marker/error entities.
+      Resolve `x-<namespace>.visibility` (falling back to this source's `defaultVisibility`, or
+      `'private'` if the source doesn't set one, if absent) → validate against `{private, shared}`
+      → an unrecognized (present-but-invalid) value becomes a marker/error entity (research.md R4).
    f. Check for a pre-existing, non-auto-sourced entity at the same name anywhere in the catalog
       (hand-authored `catalog-info.yaml`) → if found, skip the auto-sourced candidate for this name
       (FR-011).

@@ -83,6 +83,30 @@ top-level `info` object, for both OpenAPI and AsyncAPI (per the Clarifications s
 2026-07-03 update):
 - `info.x-examplecorp.owner` → `spec.owner`
 - `info.x-examplecorp.lifecycle` → `spec.lifecycle` (default: `experimental`, if absent)
+- `info.x-examplecorp.visibility` → `metadata.annotations['example.com/visibility']` (default: that
+  file's source's configured `defaultVisibility`, itself defaulting to `private` if the source
+  doesn't set one — see rationale below and R7)
+
+**Visibility is deliberately reused, not reinvented.** Lab 2/3 already established
+`example.com/visibility: private | shared` as the annotation the permission policy
+(`packages/backend/src/extensions/permissionPolicy.ts`) reads to decide access: `shared` bypasses
+ownership entirely (visible to all authenticated users); anything else (including the annotation
+being absent) falls through to the ownership-only rule. This lab adds a **third way to set that
+same annotation** — sourced from `x-examplecorp.visibility` instead of hand-authored in
+`catalog-info.yaml` — it does not add a new visibility concept, a new annotation key, or touch the
+permission policy at all. The absent-field default is **per-source**, not a single hardcoded
+value: each source in `autoApiRegistration.sources[]` may set its own `defaultVisibility`
+(`private` or `shared`) for files that don't declare one — e.g. a pre-production repo where most
+APIs are intentionally shared for cross-team testing might reasonably default to `shared`, while
+the platform mono-repo keeps the conservative default. The "default default" — what a source gets
+if it doesn't configure `defaultVisibility` at all — is `private`, mirroring the permission
+policy's own existing fallback behavior when the annotation is missing entirely (Rule 3,
+ownership-only), so a freshly-added source with no visibility configuration behaves identically to
+a hand-authored entity with no visibility annotation. An `x-examplecorp.visibility` value that is
+present but not `private` or `shared` is treated as malformed input (Edge Cases) — surfaced via
+the same marker-entity + processor-error path as an invalid owner reference (R4), not silently
+coerced to a default (source-level or otherwise), since silently defaulting a security-relevant
+setting is exactly the kind of mistake that must stay visible.
 
 `examplecorp` is this lab's fictional company namespace (documented as the one thing every
 learner renames first, per FR-010/US3). The field names deliberately omit `backstage` — this
@@ -141,6 +165,13 @@ no bespoke error-reporting system is built:
 no kind prefix is given, consistent with how `teams.yaml` entities are referenced elsewhere in the
 repo). Unresolvable owners produce the marker-entity + processor-error path above.
 
+**Visibility validation**: `x-examplecorp.visibility`, if present, is checked against the fixed
+set of values the existing permission policy understands (`private`, `shared`) — this is a static
+enum check, not a catalog lookup, so it's cheap regardless of scale. An unrecognized value follows
+the same marker-entity + processor-error path as an invalid owner reference. If absent, the value
+comes from that file's source's `defaultVisibility` (falling back to `private` if the source
+doesn't configure one) — see R3 for the full rationale and R7 for why this is per-source.
+
 **Name collisions**: if two discovered files slugify to the same candidate entity name, the first
 (sorted by file path for determinism) is registered normally; the second is emitted as a marker
 entity (suffixed, e.g. `<slug>-collision`) carrying the registration-error annotation so the
@@ -166,8 +197,10 @@ processed — a hand-authored file anywhere wins over an auto-sourced candidate 
 github.com/scalar/scalar, published build at
 `https://cdn.jsdelivr.net/npm/@scalar/galaxy/dist/3.1.yaml`) as
 `labs/lab-04-auto-registration/apis/galaxy/galaxy-openapi.yaml`, with an `info.x-examplecorp`
-object (`owner`, `lifecycle`) added directly in the vendored copy; its existing native `tags`
-array is used as-is for `metadata.tags`. The upstream file is a single self-contained OpenAPI 3.1
+object (`owner`, `lifecycle`, `visibility: shared` — chosen so the quickstart's SC-006 visibility
+check has a real difference to demonstrate against the precedence-demo API below) added directly
+in the vendored copy; its existing native `tags` array is used as-is for `metadata.tags`. The
+upstream file is a single self-contained OpenAPI 3.1
 document (confirmed: 1469 lines,
 all `$ref` usages are internal `#/components/...` references, no network-reachable `$ref`s),
 covering a "planets/spaceships/users" domain distinct from the Museum, Train Travel, and
@@ -292,19 +325,23 @@ cannot stall or break discovery for any other source. For backward/simple compat
 single implicit source named `default` — this is what the lab's own `app-config.yaml` uses, so
 the single-repo lab config does not need to change shape.
 
-**Problem 2 — some settings are legitimately per-repo, not global.** The two called out
-explicitly: `defaultOwner` (a pre-production or team repo plausibly has a different fallback team
-than the platform mono-repo's `platform-team`) and, less obviously, `xNamespace` — a team repo
-that already has its own established `x-*` vendor-extension convention before onboarding to
-auto-registration shouldn't be forced to rename it to match the platform mono-repo's convention
-just to participate.
+**Problem 2 — some settings are legitimately per-repo, not global.** Called out explicitly:
+`defaultOwner` (a pre-production or team repo plausibly has a different fallback team than the
+platform mono-repo's `platform-team`); `defaultVisibility` (a pre-production repo might reasonably
+default undeclared APIs to `shared` for cross-team testing, while the platform mono-repo keeps a
+conservative `private` default — R3); and, less obviously, `xNamespace` — a team repo that already
+has its own established `x-*` vendor-extension convention before onboarding to auto-registration
+shouldn't be forced to rename it to match the platform mono-repo's convention just to participate.
 
-**Decision**: `defaultOwner` and `xNamespace` are per-source config keys with no global fallback
-required (each source must set its own, or inherit an explicit `autoApiRegistration.defaults.*`
-block if the learner wants shared values) — see data-model.md's per-source schema. `patterns`,
-`ignore`, `mode`, and scheduling are also per-source for the same reason (a small pre-production
-repo may reasonably use `mode: 'poll'` with a short interval while the platform mono-repo runs
-`mode: 'watch'` at scale, per R6).
+**Decision**: `defaultOwner`, `defaultVisibility`, and `xNamespace` are per-source config keys —
+see data-model.md's per-source schema. `defaultOwner` and `xNamespace` have no global fallback
+(each source must set its own, or inherit an explicit `autoApiRegistration.defaults.*` block if
+the learner wants shared values); `defaultVisibility` is the one exception with a genuine global
+fallback (`private`, R3) precisely because leaving visibility completely unconfigured must still
+be safe by default — a source shouldn't have to opt into a safe default, only opt out of it.
+`patterns`, `ignore`, `mode`, and scheduling are also per-source for the same reason (a small
+pre-production repo may reasonably use `mode: 'poll'` with a short interval while the platform
+mono-repo runs `mode: 'watch'` at scale, per R6).
 
 **Problem 3 — collision detection and `catalog-info.yaml` precedence (R4) must stay global, not
 per-source.** Two different teams' repos can trivially produce the same slugified entity name

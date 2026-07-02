@@ -21,24 +21,30 @@ instance with its own schedule, default owner, and `x-*` namespace, so a platfor
 one or more separate team/pre-production repos can each be discovered with their own settings
 while collision and `catalog-info.yaml`-precedence checks stay global across all of them). Only
 the config *values and entry count* differ between the lab demo (one small source) and a
-production-scale, multi-repo deployment, not the architecture. Catalog owner/lifecycle metadata
-is sourced from a single vendor-namespaced
-`info.x-examplecorp` object (`owner`, `lifecycle`) — tool-agnostic field names, grouped under one
-namespace learners rename to their own company (FR-005–FR-006), with documented defaults when
-absent (FR-007). Metadata that already has a natural home in the spec — name (`info.title`),
+production-scale, multi-repo deployment, not the architecture. Catalog owner/lifecycle/visibility
+metadata is sourced from a single vendor-namespaced
+`info.x-examplecorp` object (`owner`, `lifecycle`, `visibility`) — tool-agnostic field names,
+grouped under one namespace learners rename to their own company (FR-005–FR-006, FR-006a), with
+documented defaults when absent (FR-007). The `visibility` value reuses the exact
+`example.com/visibility` annotation and `private`/`shared` values the Lab 2/3 permission policy
+already enforces — no new visibility mechanism is introduced, only a new way of setting the
+existing annotation. Metadata that already has a natural home in the spec — name (`info.title`),
 description (`info.description`), tags (native top-level `tags`) — is sourced from there instead
-of being duplicated into `x-examplecorp`. Errors (malformed files, unresolvable owners, name collisions)
-are surfaced via backend logs and, where an entity can be identified, via Backstage's native
-catalog processing-error UI through a companion `CatalogProcessor` that throws on a marker
-annotation (FR-008). A hand-authored `catalog-info.yaml`, where one exists alongside a
-discovered file, takes precedence over auto-sourced metadata (FR-011).
+of being duplicated into `x-examplecorp`. Errors (malformed files, unresolvable owners, invalid
+visibility values, name collisions) are surfaced via backend logs and, where an entity can be
+identified, via Backstage's native catalog processing-error UI through a companion
+`CatalogProcessor` that throws on a marker annotation (FR-008). A hand-authored
+`catalog-info.yaml`, where one exists alongside a discovered file, takes precedence over
+auto-sourced metadata (FR-011).
 
 Two new sample files support the lab: a vendored copy of the MIT-licensed Scalar Galaxy API
-(`galaxy-openapi.yaml`) with no pre-existing catalog registration, demonstrating genuine
-"previously unregistered API" discovery (US1); and a small `precedence-demo-openapi.yaml` +
-hand-authored `precedence-demo-catalog-info.yaml` pair demonstrating the precedence rule.
-Lab documentation calls out which parts (glob patterns, root path, `x-*` field names) are
-adaptable conventions per Constitution Principle VIII (FR-010, US3).
+(`galaxy-openapi.yaml`, `x-examplecorp.visibility: shared`) with no pre-existing catalog
+registration, demonstrating genuine "previously unregistered API" discovery (US1) and, alongside
+the precedence-demo API's differing visibility, a real private/shared contrast to verify (SC-006);
+and a small `precedence-demo-openapi.yaml` + hand-authored `precedence-demo-catalog-info.yaml`
+pair demonstrating the precedence rule. Lab documentation calls out which parts (glob patterns,
+root path, `x-*` field names) are adaptable conventions per Constitution Principle VIII (FR-010,
+US3).
 
 ## Technical Context
 
@@ -99,7 +105,7 @@ APIs left untouched. Designed-for scale (config change only, no code change, per
 | Principle | Gate | Status |
 |-----------|------|--------|
 | I. Feature-Focused Learning | Lab demonstrates concrete Backstage features: custom `EntityProvider` for filesystem-based catalog discovery, `x-*` vendor-extension metadata sourcing, native catalog processing-error surfacing via a custom `CatalogProcessor`, full-mutation-based create/update/retract lifecycle | ✅ Pass |
-| II. Process-Oriented Documentation | README must explain WHY an `EntityProvider` (not a processor or GitHub discovery) was chosen (research.md R1), WHY errors ride on Backstage's native processing-error UI instead of a bespoke system (R4), and WHY hand-authored `catalog-info.yaml` takes precedence over auto-sourced metadata (FR-011) | ✅ Pass |
+| II. Process-Oriented Documentation | README must explain WHY an `EntityProvider` (not a processor or GitHub discovery) was chosen (research.md R1), WHY errors ride on Backstage's native processing-error UI instead of a bespoke system (R4), WHY hand-authored `catalog-info.yaml` takes precedence over auto-sourced metadata (FR-011), and WHY visibility reuses the Lab 2/3 `example.com/visibility` annotation/policy verbatim instead of introducing a parallel mechanism (FR-006a) | ✅ Pass |
 | III. Cross-Platform Compatibility | All new code is TypeScript/YAML; `fast-glob` and `js-yaml` are pure-JS, no native/platform-specific dependencies; `yarn add` and `yarn start` work identically on Windows and macOS; root-path resolution documented with platform-neutral relative paths | ✅ Pass |
 | IV. Self-Contained Prerequisites | No new prerequisites beyond Labs 1–3's existing Node/Yarn setup — `fast-glob`/`js-yaml` are installed via the existing `yarn add` workflow; README documents the install step | ✅ Pass |
 | V. Zero-Cost Operation | `fast-glob` and `js-yaml` are MIT-licensed OSS; Scalar Galaxy API is MIT-licensed; no cloud services, GitHub Apps, or webhooks required — mono-repo discovery runs entirely against the local filesystem | ✅ Pass |
