@@ -37,22 +37,21 @@ spec:
     - diana
 ---
 # platform-team owns shared platform APIs that are visible to all authenticated users.
-# It has no individual members by design — visibility of its APIs is controlled by the
-# example.com/visibility: shared annotation on each API entity, not by group membership.
-# This separates organisational ownership (who is responsible) from access control (who
-# can see it), which is a common pattern in real Backstage deployments.
+# Lab 3 addition: eve is added as the first platform team member to demonstrate
+# cross-API quality visibility for platform engineers.
 apiVersion: backstage.io/v1alpha1
 kind: Group
 metadata:
   name: platform-team
   namespace: default
   description: >
-    Owns shared platform APIs that are visible to all authenticated users regardless of
-    team membership. Visibility is controlled by the example.com/visibility annotation on
-    each API, not by group membership — so this group intentionally has no members.
+    Owns shared platform APIs and is responsible for the Backstage developer portal.
+    Platform team members can view detailed API quality information for all APIs
+    regardless of ownership.
 spec:
   type: team
   profile:
     displayName: Platform Team
   children: []
-  members: []
+  members:
+    - eve        # added in Lab 3 — platform team member
