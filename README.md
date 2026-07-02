@@ -2,7 +2,8 @@
 
 A progressive series of hands-on labs for building a fully functional
 [Backstage](https://backstage.io/) API Developer Portal — from a blank installation to a
-portal with users, roles, automated API registration, linting, and a technology radar.
+portal with users, roles, API quality tooling, automated registration, mocking, lifecycle
+management, and a technology radar.
 
 Each lab is self-contained, cross-platform (Windows and macOS), and costs nothing to run.
 
@@ -13,12 +14,15 @@ Each lab is self-contained, cross-platform (Windows and macOS), and costs nothin
 | Lab | Title | What you build |
 |-----|-------|----------------|
 | [Lab 1](labs/lab-01-base-backstage/) | Base Backstage | Install Backstage locally; register a REST API (OpenAPI) and an event API (AsyncAPI); verify both are visible and searchable |
-| Lab 2 *(coming soon)* | Users, Roles & Teams | Add users, groups, and role-based visibility; see how the catalog changes depending on who is signed in |
-| Lab 3 *(coming soon)* | Automatic API Registration | Auto-discover and register APIs from your codebase; pull catalog metadata from `x-*` fields in the spec itself |
-| Lab 4 *(coming soon)* | API Linting with Spectral | Install the Spectral plugin; run a pre-defined ruleset against registered APIs; surface lint results in the portal |
-| Lab 5 *(coming soon)* | Thoughtworks Radar | Add the Technology Radar plugin; register blips; see your API landscape plotted on the radar |
+| [Lab 2](labs/lab-02-users-roles/) | Users, Roles & API Visibility | Add users, teams, and a custom permission policy; private APIs are visible only to their owning team, shared APIs are visible to everyone |
+| [Lab 3](labs/lab-03-api-quality/) | API Quality | Add a shared Spectral ruleset, the api-grade quality plugin, and the Spectral linter plugin; API owners and a platform team see detailed quality/lint results, everyone else sees a summary grade |
+| Lab 4 *(coming soon)* | Auto Registration | Auto-discover and register APIs from a Git mono-repo; pull catalog metadata from `x-*` fields in the spec itself |
+| Lab 5 *(coming soon)* | Mocking & Testing | Dynamically mock or exercise a test implementation of any registered API, with support for user-supplied non-production credentials |
+| Lab 6 *(coming soon)* | API Lifecycle Management | Register multiple major versions of an API in parallel; track lifecycle state (development/test/production) and deprecation/retirement per version |
+| Lab 7 *(coming soon)* | Other Documentation | Add the Thoughtworks Tech Radar plugin; register blips to plot your API landscape |
 
-Each lab builds on the one before it. Start with Lab 1 and work through them in order.
+Each lab builds on the one before it. Start with Lab 1 and work through them in order. See
+[GOAL.md](GOAL.md) for the full series plan and the constitution the labs are held to.
 
 ---
 
@@ -48,16 +52,24 @@ Then open the lab you want to run and follow its `README.md`:
 
 ```
 labs/
-└── lab-01-base-backstage/
-    ├── README.md                  ← start here
-    ├── apis/
-    │   ├── museum/
-    │   │   ├── openapi.yaml       ← Museum REST API (OpenAPI 3.1)
-    │   │   └── catalog-info.yaml
-    │   └── streetlights/
-    │       ├── asyncapi.yaml      ← Streetlights Event API (AsyncAPI 2.6)
-    │       └── catalog-info.yaml
-    └── backstage/                 ← created by you during the lab (gitignored)
+├── lab-01-base-backstage/
+│   ├── README.md                  ← start here
+│   ├── apis/
+│   │   ├── museum/
+│   │   │   ├── openapi.yaml       ← Museum REST API (OpenAPI 3.1)
+│   │   │   └── catalog-info.yaml
+│   │   └── streetlights/
+│   │       ├── asyncapi.yaml      ← Streetlights Event API (AsyncAPI 2.6)
+│   │       └── catalog-info.yaml
+│   └── backstage/                 ← created by you during Lab 1 (gitignored); every later
+│                                     lab continues to build on this same running instance
+├── lab-02-users-roles/
+│   ├── README.md                  ← continue here after Lab 1
+│   └── catalog/                   ← teams.yaml, users, and updated API owners/visibility
+└── lab-03-api-quality/
+    ├── README.md                  ← continue here after Lab 2
+    ├── .spectral.yaml             ← shared Spectral ruleset used by both quality plugins
+    └── catalog/                   ← platform team member (eve) added in this lab
 ```
 
 ---
@@ -67,9 +79,13 @@ labs/
 ```
 backstage-apiportal-lab/
 ├── labs/                          ← one directory per lab
-│   └── lab-01-base-backstage/
+│   ├── lab-01-base-backstage/
+│   ├── lab-02-users-roles/
+│   └── lab-03-api-quality/
 ├── specs/                         ← SDD artifacts (spec, plan, tasks per lab)
-│   └── 001-lab-1-base-backstage/
+│   ├── 001-lab-1-base-backstage/
+│   ├── 002-lab-2-users-roles/
+│   └── 003-lab-3-api-quality/
 ├── .specify/                      ← Speckit configuration and templates
 ├── GOAL.md                        ← high-level goals for the full lab series
 ├── CONTRIBUTING.md                ← how to contribute new labs
