@@ -76,11 +76,26 @@ YAML/JSON **and** contains either an `openapi` or `asyncapi` top-level version f
 `info.title` string. Anything else (parse failure, missing both version fields, missing title) is
 treated as malformed per the Edge Cases section.
 
-Recognized `x-*` fields are read from the top-level `info` object for both OpenAPI and AsyncAPI
-(per the Clarifications session):
-- `info.x-backstage-owner` → `spec.owner`
-- `info.x-backstage-lifecycle` → `spec.lifecycle` (default: `experimental`, if absent)
-- `info.x-backstage-tags` → `metadata.tags` (default: `[]`, if absent)
+Recognized `x-*` metadata is read from a single vendor-namespaced object nested under the
+top-level `info` object, for both OpenAPI and AsyncAPI (per the Clarifications session,
+2026-07-03 update):
+- `info.x-examplecorp.owner` → `spec.owner`
+- `info.x-examplecorp.lifecycle` → `spec.lifecycle` (default: `experimental`, if absent)
+
+`examplecorp` is this lab's fictional company namespace (documented as the one thing every
+learner renames first, per FR-010/US3). The field names deliberately omit `backstage` — this
+metadata (who owns an API, what lifecycle stage it's in) is meaningful to any consumer of the
+spec, not just this tool, so the namespace names the company, not the tool.
+
+Metadata with a natural home elsewhere in the spec is read from there instead, never duplicated
+into `x-examplecorp`:
+- `info.title` → `metadata.title` / entity name (already established, unchanged)
+- `info.description` → `metadata.description` (already established, unchanged)
+- top-level `tags[].name` → `metadata.tags` (default: `[]`, if the spec has no `tags` array) —
+  **changed from the original `x-backstage-tags` design**: both OpenAPI and AsyncAPI already
+  define a native top-level `tags` field for exactly this purpose, so sourcing tags from `x-*` as
+  well would create two places that could drift apart. `tags[].name` (ignoring
+  `tags[].description`, which has no catalog equivalent) is the source of truth.
 
 **Rationale**: Full JSON-Schema validation against the OpenAPI/AsyncAPI meta-schemas (e.g. via
 `@apidevtools/swagger-parser`, also present in `node_modules`) is available but deliberately not
@@ -120,7 +135,7 @@ no bespoke error-reporting system is built:
 
 **Owner validation**: before emitting the full mutation, the provider fetches all existing
 `User`/`Group` entities via the in-process `CatalogService` and checks each candidate's
-`x-backstage-owner` value resolves to a known entity ref (defaulting kind to `group:default/` if
+`x-examplecorp.owner` value resolves to a known entity ref (defaulting kind to `group:default/` if
 no kind prefix is given, consistent with how `teams.yaml` entities are referenced elsewhere in the
 repo). Unresolvable owners produce the marker-entity + processor-error path above.
 
@@ -144,9 +159,10 @@ hand-authored entity wins, matching the documented Assumption.
 **Decision**: Vendor a trimmed copy of the **Scalar Galaxy API** (MIT-licensed,
 github.com/scalar/scalar, published build at
 `https://cdn.jsdelivr.net/npm/@scalar/galaxy/dist/3.1.yaml`) as
-`labs/lab-04-auto-registration/apis/galaxy/galaxy-openapi.yaml`, with `x-backstage-owner`,
-`x-backstage-lifecycle`, and `x-backstage-tags` fields added under `info` directly in the vendored
-copy. The upstream file is a single self-contained OpenAPI 3.1 document (confirmed: 1469 lines,
+`labs/lab-04-auto-registration/apis/galaxy/galaxy-openapi.yaml`, with an `info.x-examplecorp`
+object (`owner`, `lifecycle`) added directly in the vendored copy; its existing native `tags`
+array is used as-is for `metadata.tags`. The upstream file is a single self-contained OpenAPI 3.1
+document (confirmed: 1469 lines,
 all `$ref` usages are internal `#/components/...` references, no network-reachable `$ref`s),
 covering a "planets/spaceships/users" domain distinct from the Museum, Train Travel, and
 Streetlights examples already used in Labs 1–3, satisfying Constitution Principle VII.

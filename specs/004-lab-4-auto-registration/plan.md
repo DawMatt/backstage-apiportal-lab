@@ -17,10 +17,12 @@ restart skip re-parsing unchanged files, delta (not full) mutations are emitted 
 first cycle, and an optional `chokidar` watch mode replaces repeated full-tree polling as the
 steady-state discovery signal — see research.md R6 for the full scaling rationale; only the
 config *values* differ between the lab demo and a production-scale deployment, not the
-architecture. Catalog metadata (owner,
-lifecycle, tags) is sourced from `x-backstage-owner`, `x-backstage-lifecycle`, and
-`x-backstage-tags` fields under each spec's `info` object (FR-005–FR-006), with documented
-defaults when absent (FR-007). Errors (malformed files, unresolvable owners, name collisions)
+architecture. Catalog owner/lifecycle metadata is sourced from a single vendor-namespaced
+`info.x-examplecorp` object (`owner`, `lifecycle`) — tool-agnostic field names, grouped under one
+namespace learners rename to their own company (FR-005–FR-006), with documented defaults when
+absent (FR-007). Metadata that already has a natural home in the spec — name (`info.title`),
+description (`info.description`), tags (native top-level `tags`) — is sourced from there instead
+of being duplicated into `x-examplecorp`. Errors (malformed files, unresolvable owners, name collisions)
 are surfaced via backend logs and, where an entity can be identified, via Backstage's native
 catalog processing-error UI through a companion `CatalogProcessor` that throws on a marker
 annotation (FR-008). A hand-authored `catalog-info.yaml`, where one exists alongside a
@@ -98,7 +100,7 @@ APIs left untouched. Designed-for scale (config change only, no code change, per
 | V. Zero-Cost Operation | `fast-glob` and `js-yaml` are MIT-licensed OSS; Scalar Galaxy API is MIT-licensed; no cloud services, GitHub Apps, or webhooks required — mono-repo discovery runs entirely against the local filesystem | ✅ Pass |
 | VI. Progressive Lab Structure | Lab 4 requires Labs 1–3 completion; the new `EntityProvider` runs alongside (does not replace) the existing manual `type: url` catalog locations from Labs 2–3, so museum/streetlights/train-travel remain registered exactly as before; no prior lab file is modified | ✅ Pass |
 | VII. Modern & Purposeful API Examples | Scalar Galaxy API (MIT, self-contained, no external `$ref`s, realistic multi-resource domain) is new and distinct from Museum/Train Travel/Streetlights; the small precedence-demo API is a minimal-but-well-formed example used specifically to exercise precedence, not a primary teaching artifact | ✅ Pass |
-| VIII. Support Experimentation | README documents `autoApiRegistration.rootPath`, `.patterns`, and the `x-backstage-*` field names as adaptable conventions (FR-010); User Story 3 is dedicated to this; verification tests outcomes (entity appears/updates/is retracted), not exact file layout | ✅ Pass |
+| VIII. Support Experimentation | README documents `autoApiRegistration.rootPath`, `.patterns`, and the `xNamespace` (`x-examplecorp` → the learner's own company) as adaptable conventions (FR-010); User Story 3 is dedicated to this; verification tests outcomes (entity appears/updates/is retracted), not exact file layout | ✅ Pass |
 | IX. Pragmatic Security for Learning Environments | No new authentication or credential configuration is introduced in Lab 4; the existing guest-provider auth from Lab 2 is unchanged. No Security Note section is required (no insecure practice introduced) | ✅ Pass |
 
 No violations. Complexity Tracking section omitted.
@@ -130,7 +132,7 @@ labs/
     └── apis/
         ├── galaxy/
         │   └── galaxy-openapi.yaml                # New: vendored Scalar Galaxy API (MIT),
-        │                                          # x-backstage-owner/lifecycle/tags added;
+        │                                          # info.x-examplecorp.owner/lifecycle added;
         │                                          # no catalog-info.yaml — pure auto-discovery
         └── precedence-demo/
             ├── precedence-demo-openapi.yaml        # New: minimal spec for the precedence demo

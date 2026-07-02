@@ -11,11 +11,11 @@ A file on disk matched by the discovery glob (`**/*-openapi.yaml`, `**/*-asyncap
 | Field | Type | Notes |
 |---|---|---|
 | `openapi` / `asyncapi` | string | Version field; presence of either identifies the spec type. Exactly one is expected. |
-| `info.title` | string | **Required.** Source of the catalog entity name (slugified) and `metadata.title`. |
-| `info.description` | string | Optional. Maps to `metadata.description` if present. |
-| `info.x-backstage-owner` | string | Optional. Owner entity ref (kind defaults to `group:default/` if unprefixed). Absent → registration proceeds with no `spec.owner` override... actually **required by FR-005/FR-007's documented default** — see Mapping Rule 1 below. |
-| `info.x-backstage-lifecycle` | string | Optional. One of `experimental` \| `production` \| `deprecated` (Backstage's standard lifecycle values). Default: `experimental`. |
-| `info.x-backstage-tags` | string[] | Optional. Default: `[]`. |
+| `info.title` | string | **Required.** Source of the catalog entity name (slugified) and `metadata.title`. Not duplicated into `x-examplecorp`. |
+| `info.description` | string | Optional. Maps to `metadata.description` if present. Not duplicated into `x-examplecorp`. |
+| `tags[].name` | string[] | Optional, native top-level OpenAPI/AsyncAPI field (not under `info`, not under `x-examplecorp`). Default `[]` if absent. |
+| `info.x-examplecorp.owner` | string | Optional. Owner entity ref (kind defaults to `group:default/` if unprefixed). Absent → registration still succeeds using a documented default — see Mapping Rule 1 below. |
+| `info.x-examplecorp.lifecycle` | string | Optional. One of `experimental` \| `production` \| `deprecated` (Backstage's standard lifecycle values). Default: `experimental`. |
 
 ## Entity: Catalog API Entity (output)
 
@@ -26,12 +26,12 @@ Standard Backstage `API` kind entity, produced by the EntityProvider's full muta
 | `metadata.name` | `info.title` | Slugified (lowercase, spaces/punctuation → `-`, per Backstage entity-name character rules). This is the identity used for update-in-place (FR-003) and collision detection. |
 | `metadata.title` | `info.title` | Verbatim. |
 | `metadata.description` | `info.description` | Verbatim if present, else omitted. |
-| `metadata.tags` | `info.x-backstage-tags` | Default `[]` if absent. |
+| `metadata.tags` | `tags[].name` | Native top-level spec field, not `x-examplecorp`. Default `[]` if absent. |
 | `metadata.annotations['backstage.io/managed-by-location']` | discovery | Set to the source file's resolved path/URL, identifying this entity as auto-sourced (used for the FR-011 precedence check and for the "which file caused this" debugging path in SC-003). |
 | `metadata.annotations['apiportal-lab.io/registration-error']` | discovery | Present **only** on marker/error entities (invalid owner ref or name collision); absent on normally-registered entities. |
 | `spec.type` | discovery | `openapi` if the file has a top-level `openapi` field, `asyncapi` if it has a top-level `asyncapi` field. |
-| `spec.lifecycle` | `info.x-backstage-lifecycle` | Default `experimental` if absent (FR-007). |
-| `spec.owner` | `info.x-backstage-owner` | **Mapping Rule 1**: if absent, registration still succeeds (FR-007) using a documented default owner ref (`group:default/platform-team`, the same shared/fallback team introduced in Lab 3), rather than blocking. If present but unresolvable against the catalog's known `User`/`Group` entities, the file is registered as a marker/error entity instead (see research.md R4). |
+| `spec.lifecycle` | `info.x-examplecorp.lifecycle` | Default `experimental` if absent (FR-007). |
+| `spec.owner` | `info.x-examplecorp.owner` | **Mapping Rule 1**: if absent, registration still succeeds (FR-007) using a documented default owner ref (`group:default/platform-team`, the same shared/fallback team introduced in Lab 3), rather than blocking. If present but unresolvable against the catalog's known `User`/`Group` entities, the file is registered as a marker/error entity instead (see research.md R4). |
 | `spec.definition.$text` | discovery | The source file's own path/URL — same `$text` mechanism used by hand-authored entities in Labs 1–3 (per the existing project convention noted in memory: `$text` requires `type: url`-style resolution, not inline embedding). |
 
 ## Config: `autoApiRegistration` (app-config.yaml)
@@ -45,7 +45,8 @@ Standard Backstage `API` kind entity, produced by the EntityProvider's full muta
 | `autoApiRegistration.schedule.frequencySeconds` | number | `30` | `poll` mode: full-sweep interval. `watch` mode: ignored in favor of `reconciliation.frequencySeconds`. |
 | `autoApiRegistration.reconciliation.frequencySeconds` | number | `900` | `watch` mode only: interval for the periodic full-sweep safety net that catches missed watcher events (research.md R6, Problem 3). |
 | `autoApiRegistration.parseConcurrency` | number | `4` | Max files parsed concurrently per cycle/event batch — bounds memory/event-loop impact when many files change at once (research.md R6). |
-| `autoApiRegistration.defaultOwner` | string | `group:default/platform-team` | Fallback owner ref applied when `x-backstage-owner` is absent (FR-007). |
+| `autoApiRegistration.defaultOwner` | string | `group:default/platform-team` | Fallback owner ref applied when `x-examplecorp.owner` is absent (FR-007). |
+| `autoApiRegistration.xNamespace` | string | `'examplecorp'` | The vendor namespace under `info.x-<namespace>` that this discovery instance reads owner/lifecycle from. Adaptable per FR-010/US3 — this is the single setting a learner changes to rename the convention to their own company. |
 
 ## Scan-state cache (persisted, `coreServices.database`)
 
@@ -75,7 +76,7 @@ Not a catalog entity, not written back into the mono-repo — internal backend s
    c. Parse + shape-check changed/new files → valid candidates / log-only errors.
    d. Slugify `info.title` → candidate entity name; check against the cache's `entity_name` index
       (O(1) lookup, not a full re-sort) → collisions become marker/error entities.
-   e. Resolve `x-backstage-owner` against known `User`/`Group` entities → unresolvable owners
+   e. Resolve `x-examplecorp.owner` against known `User`/`Group` entities → unresolvable owners
       become marker/error entities.
    f. Check for a pre-existing, non-auto-sourced entity at the same name (hand-authored
       `catalog-info.yaml`) → if found, skip the auto-sourced candidate for this name (FR-011).

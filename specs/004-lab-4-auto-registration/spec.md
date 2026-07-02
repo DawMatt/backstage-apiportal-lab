@@ -12,11 +12,17 @@
 
 ### Session 2026-07-02
 
-- Q: What naming convention should the recognized `x-*` metadata fields use? → A: `x-backstage-owner`, `x-backstage-lifecycle`, `x-backstage-tags` (namespaced under `x-backstage-*`)
+- Q: What naming convention should the recognized `x-*` metadata fields use? → A: `x-backstage-owner`, `x-backstage-lifecycle`, `x-backstage-tags` (namespaced under `x-backstage-*`) — **superseded, see Session 2026-07-03 below**
 - Q: How is the mono-repo discovery scope defined — fixed folder(s) or filename pattern? → A: No fixed folder; discovery matches a filename pattern (e.g. `*-openapi.yaml`, `*-asyncapi.yaml`) anywhere in the repo
 - Q: Where should discovery/registration errors be surfaced to the learner? → A: Both Backstage's built-in catalog processing errors UI (entity-level) and backend log output
 - Q: How is the catalog entity's name derived from the API definition file? → A: From the spec's own `info.title` field, slugified (not the file path, not a separate `x-*` name field)
 - Q: Where do recognized `x-*` metadata fields live within an AsyncAPI document, relative to OpenAPI? → A: Same placement as OpenAPI — under the document's top-level `info` object for both formats
+
+### Session 2026-07-03
+
+- Q: Should `x-*` fields sit directly in `info`, or nested under a single vendor-namespaced object? → A: Nested under a single `info.x-examplecorp` object (e.g. `info.x-examplecorp.owner`, `info.x-examplecorp.lifecycle`) — `examplecorp` is this lab's fictional company namespace, which learners are expected to rename to their own; a single grouping object avoids polluting `info` with multiple top-level `x-*` keys and makes "which fields are ours" unambiguous at a glance.
+- Q: Should field names retain the `backstage` tool name (`x-backstage-owner`, etc.)? → A: No — the field names describe the metadata (owner, lifecycle), not the tool consuming it. Catalog metadata like ownership is tool-agnostic (equally meaningful to an API gateway or any other consumer), so `backstage` is dropped: `x-examplecorp.owner`, `x-examplecorp.lifecycle`.
+- Q: Should `tags` remain a recognized `x-*` field? → A: No — removed. OpenAPI/AsyncAPI both already have a native top-level `tags` field; sourcing tags from `x-*` as well would duplicate data that already has a natural home in the spec, risking divergence. Catalog `metadata.tags` is now sourced from the spec's native `tags` array (`tags[].name`), not from any `x-*` field. The same reasoning already applied to `info.title` (entity name) and `info.description` (entity description), which were never duplicated into `x-*` fields.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -47,7 +53,7 @@ As an API owner, I want to declare metadata that Backstage needs (such as owning
 **Acceptance Scenarios**:
 
 1. **Given** an API definition containing an `x-*` field identifying the owning team, **When** the entity is registered, **Then** the catalog entity's owner reference matches that team, consistent with the ownership model established in Lab 2.
-2. **Given** an API definition containing `x-*` fields for additional metadata (e.g., lifecycle stage, tags, system grouping), **When** the entity is registered, **Then** those values populate the corresponding catalog entity fields or annotations rather than requiring manual entry.
+2. **Given** an API definition containing `x-*` fields for additional metadata (e.g., lifecycle stage), **When** the entity is registered, **Then** those values populate the corresponding catalog entity fields or annotations rather than requiring manual entry, while metadata with a natural home elsewhere in the spec (name, description, tags) is sourced from there instead of from `x-*`.
 3. **Given** an API definition that omits one or more recognized `x-*` metadata fields, **When** the entity is registered, **Then** the entity is still created successfully using documented default values, and the missing metadata does not block registration.
 4. **Given** an API definition with an `x-*` field referencing a team that does not exist in the catalog, **When** the entity is registered, **Then** the system surfaces a clear, visible error or warning identifying the invalid reference rather than failing silently or crashing discovery for other APIs.
 
@@ -84,7 +90,7 @@ As a learner adapting this repository to my own organization, I want to understa
 - **FR-003**: The system MUST automatically update the corresponding catalog API entity when a previously-registered API definition file's contents change.
 - **FR-004**: The system MUST stop presenting a catalog API entity as active once its source definition file is removed from the mono-repo.
 - **FR-005**: The system MUST extract the owning team from a documented `x-*` field within the API specification and set it as the catalog entity's owner, using the same underlying ownership model relied upon by Lab 2's visibility policy (not a disconnected copy).
-- **FR-006**: The system MUST extract additional catalog metadata (at minimum: lifecycle stage and tags/labels) from documented `x-*` fields — located under the document's top-level `info` object for both OpenAPI and AsyncAPI — and map them into the corresponding catalog entity fields or annotations.
+- **FR-006**: The system MUST extract additional catalog metadata (at minimum: lifecycle stage) from a documented, vendor-namespaced `x-*` object (e.g. `info.x-examplecorp`) located under the document's top-level `info` object for both OpenAPI and AsyncAPI, and map it into the corresponding catalog entity fields or annotations. Metadata that already has a natural home elsewhere in the spec (API name via `info.title`, description via `info.description`, tags via the spec's native top-level `tags` field) MUST be sourced from that native location, not duplicated into an `x-*` field.
 - **FR-007**: The system MUST apply documented default values for any recognized `x-*` metadata field that is absent from a given API definition, rather than failing registration.
 - **FR-008**: The system MUST surface a visible, actionable error — in both Backstage's built-in catalog processing errors UI (entity-level) and backend log output — when an API definition fails to parse, references a non-existent owning team, or produces an entity-name collision with another API definition, and MUST continue processing remaining, unaffected API definitions.
 - **FR-009**: The system MUST support both OpenAPI and AsyncAPI definition files, consistent with the API types introduced in prior labs.
@@ -95,17 +101,17 @@ As a learner adapting this repository to my own organization, I want to understa
 
 ### Key Entities
 
-- **API Definition File**: An OpenAPI or AsyncAPI specification file stored within the mono-repo, containing both the technical API contract and `x-*` vendor extension fields carrying catalog metadata (owning team, lifecycle, tags, etc.).
-- **Catalog API Entity**: The Backstage catalog representation automatically created and kept in sync from an API Definition File; its entity name is derived from the spec's own `info.title` field (slugified), and it carries ownership, lifecycle, and tag metadata sourced from that file's `x-*` fields.
+- **API Definition File**: An OpenAPI or AsyncAPI specification file stored within the mono-repo, containing the technical API contract, its native `info.title`/`info.description`/`tags` fields, and a single vendor-namespaced `info.x-examplecorp` object carrying catalog metadata that has no natural home elsewhere in the spec (owning team, lifecycle).
+- **Catalog API Entity**: The Backstage catalog representation automatically created and kept in sync from an API Definition File; its entity name and description are derived from the spec's own `info.title` (slugified) and `info.description`, its tags from the spec's native `tags` field, and its ownership/lifecycle metadata sourced from `info.x-examplecorp`.
 - **Mono-repo Location**: The designated filename-pattern convention (e.g. `*-openapi.yaml`, `*-asyncapi.yaml`) matched anywhere within the repo, used as the scope for discovery — not tied to a fixed folder.
-- **`x-*` Metadata Mapping**: The documented set of vendor extension field names and their corresponding catalog entity fields/annotations, including default values applied when a field is absent.
+- **`x-*` Metadata Mapping**: The documented mapping from the `info.x-examplecorp` object's fields to catalog entity fields/annotations, including default values applied when a field is absent, and the explicit list of fields sourced natively rather than from `x-*` (name, description, tags).
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
 - **SC-001**: A learner can add a new API definition file to the mono-repo location and see it appear as a registered catalog entity within one discovery cycle, without writing any catalog metadata file by hand.
-- **SC-002**: 100% of the owning-team, lifecycle, and tag metadata visible on a registered API's catalog entity originates from `x-*` fields in its definition file, with zero manual duplication of that metadata elsewhere.
+- **SC-002**: 100% of the owning-team and lifecycle metadata visible on a registered API's catalog entity originates from the `x-*` object in its definition file, and 100% of the name/description/tag metadata originates from that same file's native `info.title`/`info.description`/`tags` fields — with zero fields duplicated between the two, and zero manual duplication of any of this metadata elsewhere.
 - **SC-003**: A learner who introduces a malformed API definition file can identify, from a visible error surfaced in both the Backstage catalog processing errors UI and backend log output, exactly which file and problem caused registration to fail, without needing to inspect system internals.
 - **SC-004**: A learner following the lab can successfully repoint discovery and metadata sourcing at a mono-repo layout that differs from the example (different folder structure or `x-*` field names) using only the lab documentation.
 - **SC-005**: Removing an API definition file from the mono-repo results in its catalog entity no longer being presented as active, without any manual catalog cleanup step.
@@ -114,7 +120,7 @@ As a learner adapting this repository to my own organization, I want to understa
 
 - The "Git mono-repo" referenced in Lab 4 is simulated as a filename-pattern convention (not a fixed folder) within the lab's own repository (or a local sibling repository the learner creates), consistent with the zero-cost, no-external-network constraints established for all labs — it is not assumed to be a real remote Git hosting integration or webhook-driven trigger.
 - "Automatic" registration is achieved via a periodic/on-demand discovery and refresh cycle consistent with Backstage's standard catalog processing model, not a real-time push notification from a Git host.
-- Default `x-*` field names are defined by this lab as `x-backstage-owner`, `x-backstage-lifecycle`, and `x-backstage-tags` (namespaced under `x-backstage-*` to avoid collision with other vendor extensions); learners are expected to adapt these names to their own organization's practices, per Constitution Principle VIII.
+- The default `x-*` convention is a single vendor-namespaced object, `info.x-examplecorp`, containing `owner` and `lifecycle` keys (`examplecorp` being this lab's fictional company namespace); tool-specific naming (e.g. `backstage`) is deliberately excluded from the field name since this metadata is not tool-specific, and fields with a natural home elsewhere in the spec (name, description, tags) are deliberately not duplicated into it. Learners are expected to rename the `x-examplecorp` namespace to their own organization's convention, per Constitution Principle VIII.
 - The ownership model and set of valid owning teams established in Lab 2 (002-lab-2-users-roles) is the source of truth referenced when validating an `x-*` owner field — Lab 4 does not introduce a new/parallel ownership mechanism.
 - When both a hand-authored `catalog-info.yaml` and sourced `x-*` metadata exist for the same API, the hand-authored `catalog-info.yaml` is assumed to take precedence, treating auto-sourced metadata as a default that manual configuration can override; this is documented explicitly for learners.
 - Removal of a catalog entity when its source file disappears is treated as removal from active/discoverable presentation within Backstage's catalog processing, not necessarily an irreversible deletion of historical records.

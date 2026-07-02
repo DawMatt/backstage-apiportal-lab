@@ -21,14 +21,14 @@ Constitution Principle II.
    data-model.md for keys/defaults).
 4. **Add the two new sample files**:
    - `labs/lab-04-auto-registration/apis/galaxy/galaxy-openapi.yaml` (vendored Scalar Galaxy API
-     with `x-backstage-*` fields added) — no pre-existing `catalog-info.yaml`.
+     with an `info.x-examplecorp` object added) — no pre-existing `catalog-info.yaml`.
    - `labs/lab-04-auto-registration/apis/precedence-demo/precedence-demo-openapi.yaml` +
      `precedence-demo-catalog-info.yaml` — demonstrates FR-011 precedence.
 5. **Start Backstage** (`yarn start` from the Lab 1 backstage workspace) and confirm:
    - The Galaxy API appears in the catalog within one discovery cycle (~30s), with no manually
      written catalog file (US1, SC-001).
-   - Its `spec.owner`, `spec.lifecycle`, and tags match the `x-backstage-*` values in the spec
-     file (US2, SC-002).
+   - Its `spec.owner` and `spec.lifecycle` match the `info.x-examplecorp` values, and its tags
+     match the spec's native `tags` array — not duplicated into `x-examplecorp` (US2, SC-002).
    - The precedence-demo API's catalog entity reflects the hand-authored
      `precedence-demo-catalog-info.yaml`, not the auto-sourced values (FR-011).
 6. **Verify update-in-place**: edit `galaxy-openapi.yaml`'s `info.description`, wait one cycle,
@@ -36,7 +36,7 @@ Constitution Principle II.
 7. **Verify removal**: temporarily rename `galaxy-openapi.yaml` out of the discovery pattern, wait
    one cycle, confirm the entity is no longer listed as active (FR-004, SC-005); rename it back.
 8. **Verify error handling**: temporarily break the YAML syntax in one file, confirm a log line
-   identifies the file; temporarily set `x-backstage-owner` to a nonexistent team, confirm a
+   identifies the file; temporarily set `info.x-examplecorp.owner` to a nonexistent team, confirm a
    catalog processing error is visible on that entity (FR-008, SC-003).
 
 ## Out of scope for this quickstart
