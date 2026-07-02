@@ -42,4 +42,18 @@ Constitution Principle II.
 ## Out of scope for this quickstart
 
 - Full JSON-Schema validation of spec files (documented as a learner extension point, not built).
-- Real-time file-watching (documented as a deliberate simplification — 30s poll cycle).
+- Exercising `watch` mode or the reconciliation safety net end-to-end (the lab's 2–3 sample files
+  don't demonstrate anything a poll cycle wouldn't; `mode: 'watch'` is documented, not walked
+  through step-by-step).
+
+## Scaling beyond the lab (documented, not walked through)
+
+The README includes a "Scaling to a real mono-repo" note pointing learners at:
+- Why the default is `mode: 'poll'` + `type: 'full'`-then-`delta'` mutations, and what changes
+  (`mode: 'watch'`, larger `reconciliation.frequencySeconds`, mandatory `ignore` patterns) at
+  1000+ files / 1GB+ (research.md R6).
+- Why scan state is persisted in the backend's own database rather than written back into the
+  mono-repo as generated catalog files (data-model.md, research.md R6 Problem 2).
+- That restart behavior at scale relies on the persisted cache, not a full re-scan — this is
+  called out explicitly since it's the part most likely to surprise a learner who scales this
+  lab up and then wonders why a restart is instant instead of taking minutes.

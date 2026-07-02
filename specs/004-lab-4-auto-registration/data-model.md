@@ -40,18 +40,45 @@ Standard Backstage `API` kind entity, produced by the EntityProvider's full muta
 |---|---|---|---|
 | `autoApiRegistration.rootPath` | string | resolved repo root (see research.md R2) | Root directory the glob scan starts from. Adaptable per FR-010. |
 | `autoApiRegistration.patterns` | string[] | `['**/*-openapi.yaml', '**/*-asyncapi.yaml']` | Filename glob patterns. Adaptable per FR-010. |
-| `autoApiRegistration.schedule.frequencySeconds` | number | `30` | How often the EntityProvider re-scans. |
+| `autoApiRegistration.ignore` | string[] | `['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**']` | Glob exclusions, always applied regardless of `mode` (research.md R2/R6). Extendable, not replaceable, by learners. |
+| `autoApiRegistration.mode` | `'poll' \| 'watch'` | `'poll'` | `poll`: full `fast-glob` sweep every `schedule.frequencySeconds` (lab default — simple, predictable for 2–3 files). `watch`: `chokidar`-driven incremental discovery with `reconciliation.frequencySeconds` as a safety-net sweep interval (research.md R6 — the real-world-scale mode). |
+| `autoApiRegistration.schedule.frequencySeconds` | number | `30` | `poll` mode: full-sweep interval. `watch` mode: ignored in favor of `reconciliation.frequencySeconds`. |
+| `autoApiRegistration.reconciliation.frequencySeconds` | number | `900` | `watch` mode only: interval for the periodic full-sweep safety net that catches missed watcher events (research.md R6, Problem 3). |
+| `autoApiRegistration.parseConcurrency` | number | `4` | Max files parsed concurrently per cycle/event batch — bounds memory/event-loop impact when many files change at once (research.md R6). |
 | `autoApiRegistration.defaultOwner` | string | `group:default/platform-team` | Fallback owner ref applied when `x-backstage-owner` is absent (FR-007). |
+
+## Scan-state cache (persisted, `coreServices.database`)
+
+A table private to this backend module, used to (a) avoid re-parsing unchanged files on restart
+and (b) compute delta mutations after the initial full mutation (research.md R6, Problem 1 & 2).
+Not a catalog entity, not written back into the mono-repo — internal backend state only.
+
+| Column | Type | Purpose |
+|---|---|---|
+| `file_path` | string (PK) | Absolute path of the discovered file. |
+| `mtime_ms` | number | Last-observed file modification time; cheap first-pass change check on restart/reconciliation. |
+| `content_hash` | string | sha1 of file bytes; only computed/compared when `mtime_ms` differs, since hashing every file on every check is itself costly at 1000+ files. |
+| `entity_name` | string | The catalog entity name this file currently maps to — doubles as the slug→path collision index (research.md R4). |
+| `last_error` | string \| null | Last registration error for this file, if any (mirrors the `apiportal-lab.io/registration-error` annotation; lets a restart re-emit the same marker entity without re-deriving the error). |
 
 ## State transitions (per discovery cycle)
 
-1. Glob scan → candidate file list.
-2. Parse + shape-check each file → valid candidates / log-only errors (unparseable files).
-3. Slugify `info.title` → candidate entity name; detect duplicates among this cycle's candidates
-   → second-and-later duplicates become marker/error entities.
-4. Resolve `x-backstage-owner` against known `User`/`Group` entities → unresolvable owners become
-   marker/error entities.
-5. Check for a pre-existing, non-auto-sourced entity at the same name (hand-authored
-   `catalog-info.yaml`) → if found, skip the auto-sourced candidate for this name (FR-011).
-6. Emit a `type: 'full'` mutation containing every entity produced by steps 2–5 (normal +
-   marker/error entities). Entities not included are retracted by the catalog (FR-004).
+1. **First run only**: glob scan (streamed, ignore patterns applied) → parse + shape-check every
+   matched file → build the initial scan-state cache → emit one `type: 'full'` mutation
+   establishing the baseline with the catalog (research.md R6).
+2. **Every subsequent cycle** (`poll` mode: full sweep on `schedule.frequencySeconds`; `watch`
+   mode: per-event, plus a full sweep on `reconciliation.frequencySeconds`):
+   a. Glob scan (or, in `watch` mode, the single changed path from the watcher event).
+   b. For each candidate, `stat()` and compare `mtime_ms` against the cache; only files that
+      differ (or are new) proceed to content-hash comparison and re-parse — unchanged files are
+      skipped entirely (research.md R6, Problem 2).
+   c. Parse + shape-check changed/new files → valid candidates / log-only errors.
+   d. Slugify `info.title` → candidate entity name; check against the cache's `entity_name` index
+      (O(1) lookup, not a full re-sort) → collisions become marker/error entities.
+   e. Resolve `x-backstage-owner` against known `User`/`Group` entities → unresolvable owners
+      become marker/error entities.
+   f. Check for a pre-existing, non-auto-sourced entity at the same name (hand-authored
+      `catalog-info.yaml`) → if found, skip the auto-sourced candidate for this name (FR-011).
+   g. Diff the resulting candidate set against the cache → update cache rows → emit a
+      `type: 'delta'` mutation (`added`/`removed`) for just what changed (FR-002/003/004),
+      **not** a fresh full mutation (research.md R6, Problem 1).

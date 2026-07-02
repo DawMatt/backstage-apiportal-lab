@@ -10,7 +10,14 @@ Lab 4 builds on the running Backstage 1.51.0 instance from Labs 1–3. It replac
 per-API hand-authored `catalog-info.yaml` pattern used in Labs 1–3 with a custom backend
 `EntityProvider` that scans the mono-repo for files matching `*-openapi.yaml` /
 `*-asyncapi.yaml`, parses them, and emits/updates/retracts catalog `API` entities on a 30s
-schedule — no catalog-info.yaml required per API (FR-001–FR-004). Catalog metadata (owner,
+poll schedule for the lab's small sample set — no catalog-info.yaml required per API
+(FR-001–FR-004). The same mechanism is designed to hold up at real-world mono-repo scale
+(1000+ spec files, 1GB+ repos): a persisted scan-state cache (`coreServices.database`) lets a
+restart skip re-parsing unchanged files, delta (not full) mutations are emitted after the
+first cycle, and an optional `chokidar` watch mode replaces repeated full-tree polling as the
+steady-state discovery signal — see research.md R6 for the full scaling rationale; only the
+config *values* differ between the lab demo and a production-scale deployment, not the
+architecture. Catalog metadata (owner,
 lifecycle, tags) is sourced from `x-backstage-owner`, `x-backstage-lifecycle`, and
 `x-backstage-tags` fields under each spec's `info` object (FR-005–FR-006), with documented
 defaults when absent (FR-007). Errors (malformed files, unresolvable owners, name collisions)
@@ -35,6 +42,9 @@ adaptable conventions per Constitution Principle VIII (FR-010, US3).
   in the workspace, promoted to an explicit dependency for the filesystem scan (research.md R2).
 - `js-yaml@4.2.0` — new direct dependency of `packages/backend`; already present transitively,
   promoted to explicit for parsing candidate spec files (research.md R3).
+- `chokidar` — new direct dependency of `packages/backend`; already present transitively; used
+  only when `autoApiRegistration.mode: 'watch'` (not the lab default), to give the discovery
+  mechanism a steady-state path that scales past the lab's poll-based default (research.md R6).
 - `@backstage/plugin-catalog-node` (already installed, `2.2.1`) — supplies `EntityProvider`,
   `CatalogProcessor`, and `catalogProcessingExtensionPoint` used to register the new backend
   module, following the same `createBackendModule` pattern as
@@ -42,9 +52,13 @@ adaptable conventions per Constitution Principle VIII (FR-010, US3).
 - No new frontend dependencies — this lab is backend-only; no new UI surfaces are added (errors
   ride on Backstage's existing built-in processing-error UI).
 
-**Storage**: YAML files only — two new vendored API spec files, one new hand-authored
-`catalog-info.yaml` (precedence demo), and one `app-config.yaml` addition (new
-`autoApiRegistration` block). No database schema changes.
+**Storage**: YAML files (two new vendored API spec files, one new hand-authored
+`catalog-info.yaml` for the precedence demo, one `app-config.yaml` addition) plus one new
+backend-owned database table (`autoApiRegistration` scan-state cache, via `coreServices.database`
+— same pluggable SQLite/Postgres service the catalog already uses) that persists per-file
+mtime/hash/entity-name/error state across restarts so a real-world-scale mono-repo doesn't
+require a full re-parse on every backend start (research.md R6, data-model.md). Not a schema
+change to any existing Backstage table.
 
 **Testing**: Manual browser + log verification per lab README (no automated test suite —
 consistent with Labs 1–3's tutorial-lab testing approach).
@@ -55,17 +69,21 @@ consistent with Labs 1–3's tutorial-lab testing approach).
 TypeScript backend module (EntityProvider + CatalogProcessor).
 
 **Performance Goals**: New/changed API definitions appear in the catalog within one discovery
-cycle (≤30s, SC-001); scan cost is bounded by mono-repo size, acceptable at lab scale (a handful
-of spec files).
+cycle (≤30s at lab scale, SC-001). Mechanism-level goal (not exercised by the lab itself, but
+designed for per research.md R6): a real mono-repo of 1000+ spec files across 1GB+ should incur
+parse cost proportional to *changed* files, not total repo size, on both restart (persisted
+scan-state cache) and steady-state discovery (watch mode + delta mutations).
 
 **Constraints**: Zero cost; cross-platform; no external network access beyond the one-time vendor
 of the Scalar Galaxy API file at authoring time (the vendored copy itself requires no runtime
 network access, per Constitution Principle VII); builds on Labs 1–3 without disrupting existing
 registered APIs (museum, streetlights, train-travel) or the Lab 3 quality tooling.
 
-**Scale/Scope**: 2 new sample API files (Galaxy, precedence-demo), 1 new hand-authored
-`catalog-info.yaml`, 1 new backend module (~2 files: EntityProvider+processor and its
-registration), 1 `app-config.yaml` config block, 3 existing registered APIs left untouched.
+**Scale/Scope**: Lab demo: 2 new sample API files (Galaxy, precedence-demo), 1 new hand-authored
+`catalog-info.yaml`, 1 new backend module (~3 files: EntityProvider+processor, DB migration for
+the scan-state cache, and registration), 1 `app-config.yaml` config block, 3 existing registered
+APIs left untouched. Designed-for scale (config change only, no code change, per research.md R6):
+1000+ spec files, 1GB+ mono-repo size.
 
 ## Constitution Check
 
@@ -127,13 +145,16 @@ but the module source itself IS committed since it is lab teaching content):
 # In the student's Backstage instance (labs/lab-01-base-backstage/backstage/):
 app-config.yaml                                # Modified: add autoApiRegistration config block
 packages/backend/
-├── package.json                               # Modified: add fast-glob, js-yaml
+├── package.json                               # Modified: add fast-glob, js-yaml, chokidar
 └── src/
     ├── index.ts                               # Modified: backend.add(import('./extensions/autoApiRegistration'))
     └── extensions/
-        └── autoApiRegistration.ts             # New: EntityProvider + CatalogProcessor backend
-                                                # module (discovery, parsing, mapping, owner
-                                                # validation, precedence check, error marking)
+        ├── autoApiRegistration.ts             # New: EntityProvider + CatalogProcessor backend
+        │                                      # module (discovery, parsing, mapping, owner
+        │                                      # validation, precedence check, error marking,
+        │                                      # poll/watch mode, delta mutations)
+        └── autoApiRegistrationMigrations/      # New: coreServices.database migration creating
+            └── 001_scan_state_cache.ts         # the scan-state cache table (research.md R6)
 ```
 
 **Structure Decision**: Tutorial-documentation layout, consistent with Labs 1–3. All
