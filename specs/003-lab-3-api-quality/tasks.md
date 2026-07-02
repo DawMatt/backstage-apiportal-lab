@@ -162,6 +162,44 @@ description: "Task list for Lab 3 — API Quality"
 
 ---
 
+## Phase 10: Issue Remediation — Run 13 (checklists/issues.md)
+
+**Purpose**: Fix the open item from Run 13 — Charlie, Alice, and Eve all saw the same
+`Cannot read properties of undefined (reading 'documentationUrl')` crash on the Train
+Travel API's Spectral tab, when only Eve (platform-team, the API's owner group) should
+have seen lint content at all; Charlie and Alice should have seen the access-restricted
+message instead.
+
+**Root cause (verified via source inspection, not the error message alone)**:
+`@backstage/plugin-catalog-react`'s `useEntityOwnership()` hook (`dist/hooks/useEntityOwnership.esm.js`)
+returns `{ loading, isOwnedEntity }` where `isOwnedEntity` is a **function**
+`(entity) => boolean`, not a boolean. `SpectralLinterContent.tsx` (README Step 8) destructures
+it but never calls it — `if (!isOwnedEntity && !isPlatformTeamMember)` negates a function
+reference, which is always truthy, so `!isOwnedEntity` is always `false` and the
+access-restricted branch is dead code: every signed-in user unconditionally renders
+`<EntityApiDocsSpectralLinterContent />` regardless of ownership. This bug has been present
+since Run 8/T036 introduced the current wrapper shape; it was masked on the Museum and
+Streetlights APIs because their linted specs happen not to trigger the separate
+`ruleDocumentationUrl` bug in `@dweber019/backstage-plugin-api-docs-spectral-linter`'s
+`LinterClient.esm.js` (`spectral.ruleset?.rules[code].documentationUrl` throws when a
+diagnostic's rule `code` is absent from `spectral.ruleset.rules`), so non-owners silently saw
+full lint content with no visible symptom — until the Train Travel API's ruleset/diagnostic
+combination hit that separate bug and made the permission failure visible to everyone.
+
+- [X] T042 [US3] Fix `SpectralLinterContent.tsx` in README Step 8 (labs/lab-03-api-quality/README.md): add `import { useEntity, useEntityOwnership } from '@backstage/plugin-catalog-react';` (add `useEntity` to the existing import), call `const { entity } = useEntity();`, and change the gating condition to invoke the ownership function against the current entity: `if (!isOwnedEntity(entity) && !isPlatformTeamMember)`. Apply the identical fix to the on-disk file `labs/lab-01-base-backstage/backstage/packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx` so the student's live instance and the README stay in sync (per the Run 11 process note — doc/code divergence caused a prior multi-run failure loop)
+- [X] T043 [US3] Add a WHY note directly below the Step 8 code listing in labs/lab-03-api-quality/README.md explaining that `useEntityOwnership()` returns `isOwnedEntity` as a per-entity predicate function (`(entity) => boolean`), not a boolean, and that omitting the call makes the access-restricted branch permanently unreachable — this is a general hazard when destructuring hook results with names that read like booleans
+- [X] T044 [US3] Add a new Troubleshooting entry in labs/lab-03-api-quality/README.md for "Spectral tab shows lint results (or a crash) to every user instead of restricting non-owners": diagnosis (`isOwnedEntity` used without calling it as a function), fix (call `isOwnedEntity(entity)`), and a note that this can surface indirectly as an unrelated-looking crash (e.g. `Cannot read properties of undefined (reading 'documentationUrl')` from the linter plugin) on any API whose diagnostics happen to trip a bug in the underlying linter package, because non-owners are reaching lint execution they were never supposed to reach
+- [X] T045 [P] Update research.md R-007 in specs/003-lab-3-api-quality/research.md with the Run 13 root-cause analysis (`isOwnedEntity` function-vs-boolean mistake) and correct the code sample; update data-model.md's visibility table in specs/003-lab-3-api-quality/data-model.md if it documents the gating condition, to reflect `isOwnedEntity(entity)`
+- [X] T046 [P] Mark Run 13 resolved in specs/003-lab-3-api-quality/checklists/issues.md (`- [ ]` → `- [X]`) with a resolution note matching the README and research.md changes, cross-referencing Run 8/T036 as the run that introduced the unfixed wrapper shape
+
+**Checkpoint**: Non-owners (e.g. Charlie, Alice) viewing an API they don't own and aren't
+platform-team members for see the access-restricted message on the Spectral tab, for every
+sample API including Train Travel; owners and platform-team members (e.g. Eve for Train
+Travel) see lint content or a linter-specific error, never a false-restricted or
+false-permitted result.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -175,6 +213,7 @@ description: "Task list for Lab 3 — API Quality"
 - **Polish (Phase 7)**: Depends on all story phases complete; T022 and T023 can run in parallel
 - **Issue Remediation (Phase 8)**: Depends on Phase 4 (US2 npm install) and Phase 5 (US3 Spectral linter component) being written; addresses issues discovered during manual testing after the original phases were completed
 - **Issue Remediation — Run 8 Correction (Phase 9)**: Depends on Phase 8; supersedes T026–T029 and T031–T034's `compatWrapper`/`resolutions` approach after human testing confirmed it made no improvement
+- **Issue Remediation — Run 13 (Phase 10)**: Depends on Phase 9 (T036 introduced the unfixed `isOwnedEntity` wrapper shape this phase corrects); independent of Phase 8's retracted fixes
 
 ### User Story Dependencies
 

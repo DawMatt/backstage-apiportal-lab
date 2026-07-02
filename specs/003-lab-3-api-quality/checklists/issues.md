@@ -619,3 +619,39 @@ changed) and reload an API's Spectral tab — it should now render lint results.
 > resolution. This duplicate-dependency error is a general Backstage-plugin hazard: a plugin
 > that pins an exact `@stoplight/spectral-*` (or any lib with `instanceof` checks) gets a nested
 > copy that fails to interoperate with the hoisted copy used elsewhere.
+
+## Run 13 - 2026/07/02
+
+- [X] Whether logged in as Charlie, Alice or Eve, when I viewed the Train Travel API's Spectral tab I was shown the error message below. Charlie and Alice are not owners of the API and the Spectral tab was expected to show a "you can't see this content" type message. Only Eve should have seen this message.
+
+```
+Warning: Failed to lint API
+Cannot read properties of undefined (reading 'documentationUrl')
+```
+
+**Resolution (2026-07-02)**: Root-caused by reading `@backstage/plugin-catalog-react`'s
+compiled source (`dist/hooks/useEntityOwnership.esm.js`). `useEntityOwnership()` returns
+`{ loading, isOwnedEntity }` where `isOwnedEntity` is a per-entity predicate **function**
+(`(entity) => boolean`), not a boolean. The Run 8/T036 implementation of
+`SpectralLinterContent.tsx` destructured it but never called it —
+`if (!isOwnedEntity && !isPlatformTeamMember)` negates a function reference, which is always
+truthy, so the access-restricted branch was dead code from the moment it was introduced: every
+signed-in user unconditionally rendered the real lint content regardless of ownership.
+
+This was silent on the Museum and Streetlights APIs (non-owners simply saw content they
+shouldn't, with no visible symptom). It surfaced as a visible crash only on the Train Travel
+API because that API's diagnostics separately trip an unrelated bug in
+`@dweber019/backstage-plugin-api-docs-spectral-linter`'s `LinterClient.esm.js`
+(`ruleDocumentationUrl` reads `spectral.ruleset?.rules[code].documentationUrl` without checking
+whether `rules[code]` exists, and throws when a diagnostic's rule `code` is absent from
+`spectral.ruleset.rules`) — that downstream crash is what made the upstream permission bug
+visible to everyone, including Eve, for whom it is a separate, pre-existing third-party issue
+rather than a permission failure.
+
+**Fix**: call `useEntity()` to get the current entity, then invoke the predicate:
+`if (!isOwnedEntity(entity) && !isPlatformTeamMember)`. Applied to both the live source
+(`labs/lab-01-base-backstage/backstage/packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx`)
+and the README Step 8 code listing (`labs/lab-03-api-quality/README.md`), with a new WHY note
+and Troubleshooting entry explaining the function-vs-boolean hazard. research.md R-007 and
+data-model.md updated accordingly. See specs/003-lab-3-api-quality/tasks.md Phase 10
+(T042–T046).

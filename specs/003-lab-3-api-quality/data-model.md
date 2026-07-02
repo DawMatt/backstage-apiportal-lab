@@ -238,7 +238,7 @@ content area).
 
 | Element | Description |
 |---------|-------------|
-| `SpectralLinterContent` | React component; checks `isOwnedEntity` (via `useEntityOwnership`) AND `isPlatformTeamMember` (via `identityApiRef`) |
+| `SpectralLinterContent` | React component; checks `isOwnedEntity(entity)` (via `useEntityOwnership` + `useEntity`) AND `isPlatformTeamMember` (via `identityApiRef`) — `isOwnedEntity` is a per-entity predicate function and must be called with the current entity (see research.md R-007 Run 13 update) |
 | Owner or platform member | Renders `<EntityApiDocsSpectralLinterContent />` |
 | Neither | Renders an `<InfoCard>` with an access-restricted message |
 

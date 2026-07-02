@@ -387,12 +387,13 @@ declare module '@dweber019/backstage-plugin-api-docs-spectral-linter/dist/compon
 // packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx
 import React, { useEffect, useState } from 'react';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
-import { useEntityOwnership } from '@backstage/plugin-catalog-react';
+import { useEntity, useEntityOwnership } from '@backstage/plugin-catalog-react';
 import { EntityApiDocsSpectralLinterContent } from '@dweber019/backstage-plugin-api-docs-spectral-linter/dist/components/EntityApiDocsSpectralLinterContent/index.esm.js';
 import { InfoCard } from '@backstage/core-components';
 import { Typography } from '@material-ui/core';
 
 export function SpectralLinterContent() {
+  const { entity } = useEntity();
   const identityApi = useApi(identityApiRef);
   const { isOwnedEntity, loading: ownershipLoading } = useEntityOwnership();
   const [isPlatformTeamMember, setIsPlatformTeamMember] = useState(false);
@@ -409,7 +410,9 @@ export function SpectralLinterContent() {
 
   if (ownershipLoading || identityLoading) return null;
 
-  if (!isOwnedEntity && !isPlatformTeamMember) {
+  // isOwnedEntity is a per-entity predicate FUNCTION, not a boolean — see
+  // the Run 13 update below for the bug this caused when it wasn't called.
+  if (!isOwnedEntity(entity) && !isPlatformTeamMember) {
     return (
       <InfoCard title="Spectral Linter">
         <Typography variant="body2" color="textSecondary">
@@ -465,7 +468,7 @@ missing-API-implementation error since `linterApiRef` would never be registered.
 | Symbol | Package | Stability | Already installed |
 |--------|---------|-----------|-------------------|
 | `identityApiRef`, `useApi` | `@backstage/core-plugin-api` | Stable | Yes |
-| `useEntityOwnership` | `@backstage/plugin-catalog-react` | Stable | Yes |
+| `useEntity`, `useEntityOwnership` | `@backstage/plugin-catalog-react` | Stable | Yes |
 | `EntityContentBlueprint` | `@backstage/plugin-catalog-react/alpha` | Alpha | Yes (Lab 2) |
 | `createFrontendModule` | `@backstage/frontend-plugin-api` | Stable | Yes (Lab 2) |
 | `InfoCard` | `@backstage/core-components` | Stable | Yes |
@@ -484,6 +487,36 @@ uses (it calls `user?.info.ownershipEntityRefs`) — consistent approach through
 **Verify during implementation**: Confirm that `EntityContentBlueprint` is available from
 `@backstage/plugin-catalog-react/alpha` in Backstage 1.51.0 and that `defaultPath` and
 `defaultTitle` are the correct param names for the installed version.
+
+**Update (2026-07-02, Run 13 issue — verified via source inspection)**: Charlie, Alice, and
+Eve all saw the identical `Cannot read properties of undefined (reading 'documentationUrl')`
+crash on the Train Travel API's Spectral tab, when only Eve (the platform-team owner group)
+should have reached lint content at all — Charlie and Alice (neither owners nor platform-team
+members) should have seen the access-restricted message instead.
+
+Root cause, confirmed by reading `@backstage/plugin-catalog-react`'s compiled source
+(`dist/hooks/useEntityOwnership.esm.js`): `useEntityOwnership()` returns
+`{ loading, isOwnedEntity }` where `isOwnedEntity` is `(entity: Entity) => boolean` — a
+per-entity predicate function, not a boolean value. The Run 8 implementation pattern above
+destructured it but never called it: `if (!isOwnedEntity && !isPlatformTeamMember)` negates a
+function reference, which is always truthy in JavaScript, so `!isOwnedEntity` is always
+`false`. The access-restricted branch was dead code from the moment Run 8/T036 introduced this
+component shape — every signed-in user unconditionally rendered
+`<EntityApiDocsSpectralLinterContent />`, regardless of ownership.
+
+This went unnoticed on the Museum and Streetlights APIs because non-owners simply saw full
+lint content with no visible symptom (no error, just an unintended permission bypass). It
+became visible on the Train Travel API only because that API's diagnostics separately trip an
+unrelated bug in `@dweber019/backstage-plugin-api-docs-spectral-linter`'s `LinterClient`
+(`dist/api/LinterClient.esm.js`): `ruleDocumentationUrl(spectral, code)` does
+`spectral.ruleset?.rules[code].documentationUrl` without checking whether `rules[code]` exists,
+which throws when a diagnostic's rule `code` is absent from `spectral.ruleset.rules`. That
+downstream crash is what made the upstream gating bug visible to everyone, including Eve, for
+whom the crash is an unrelated (pre-existing, third-party) issue rather than a permission bug.
+
+**Fix**: call `useEntity()` to get the current `entity`, then `isOwnedEntity(entity)`:
+`if (!isOwnedEntity(entity) && !isPlatformTeamMember)`. The implementation pattern above and
+the Import sources table have been updated accordingly.
 
 ---
 

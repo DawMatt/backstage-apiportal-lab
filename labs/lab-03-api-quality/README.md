@@ -368,12 +368,13 @@ Create the file `packages/app/src/modules/spectralLinter/SpectralLinterContent.t
 ```typescript
 import React, { useEffect, useState } from 'react';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
-import { useEntityOwnership } from '@backstage/plugin-catalog-react';
+import { useEntity, useEntityOwnership } from '@backstage/plugin-catalog-react';
 import { EntityApiDocsSpectralLinterContent } from '@dweber019/backstage-plugin-api-docs-spectral-linter/dist/components/EntityApiDocsSpectralLinterContent/index.esm.js';
 import { InfoCard } from '@backstage/core-components';
 import { Typography } from '@material-ui/core';
 
 export function SpectralLinterContent() {
+  const { entity } = useEntity();
   const identityApi = useApi(identityApiRef);
   const { isOwnedEntity, loading: ownershipLoading } = useEntityOwnership();
   const [isPlatformTeamMember, setIsPlatformTeamMember] = useState(false);
@@ -390,7 +391,9 @@ export function SpectralLinterContent() {
 
   if (ownershipLoading || identityLoading) return null;
 
-  if (!isOwnedEntity && !isPlatformTeamMember) {
+  // `isOwnedEntity` from useEntityOwnership() is a per-entity predicate
+  // FUNCTION, not a boolean — it must be called with the current entity.
+  if (!isOwnedEntity(entity) && !isPlatformTeamMember) {
     return (
       <InfoCard title="Spectral Linter">
         <Typography variant="body2" color="textSecondary">
@@ -405,6 +408,14 @@ export function SpectralLinterContent() {
   return <EntityApiDocsSpectralLinterContent />;
 }
 ```
+
+**Why is `isOwnedEntity` called as a function?** `useEntityOwnership()` (from
+`@backstage/plugin-catalog-react`) returns `{ loading, isOwnedEntity }` where `isOwnedEntity`
+is a per-entity predicate — `(entity: Entity) => boolean` — not a boolean value itself. A
+function reference is always truthy in JavaScript, so treating it as a boolean (e.g.
+`!isOwnedEntity`) always evaluates to `false` and silently disables the access-restricted
+branch for every user, regardless of ownership. Always call `isOwnedEntity(entity)` with the
+entity from `useEntity()`.
 
 **How the platform team check works:** `identityApi.getBackstageIdentity()` returns the
 current user's `ownershipEntityRefs` — a list that includes the user's own entity ref AND
@@ -852,15 +863,41 @@ percentage — no Quality Assessment, Recommendations, or Diagnostics.
 **Symptom**: Alice (Museum API owner) or Eve (platform team) see the access-restricted
 message instead of lint results.
 
-**Possible causes for Alice**: `useEntityOwnership` is not returning `isOwnedEntity: true`.
-Verify the Museum API has `spec.owner: group:default/museum-team` in its catalog descriptor,
-and that Alice's User entity has `memberOf: [museum-team]`.
+**Possible causes for Alice**: `isOwnedEntity(entity)` is not returning `true` for the current
+entity. Verify the Museum API has `spec.owner: group:default/museum-team` in its catalog
+descriptor, and that Alice's User entity has `memberOf: [museum-team]`.
 
 **Possible causes for Eve**: `getBackstageIdentity()` is not returning
 `group:default/platform-team` in `ownershipEntityRefs`. This happens if the catalog has not
 yet refreshed after adding Eve and updating `teams.yaml`, or if the catalog location for
 `platform-user.yaml` is missing or has a wrong URL. Restart Backstage and wait for the
 catalog to complete its refresh cycle.
+
+---
+
+### Spectral tab shows lint results (or a crash) to every user, not just owners/platform team
+
+**Symptom**: Non-owners (e.g. Charlie or Alice viewing an API neither of them owns and where
+neither is a platform-team member) see full Spectral lint content instead of the
+access-restricted message — or, on some APIs, everyone (owners, platform team, and non-owners
+alike) sees the same crash, such as `Cannot read properties of undefined (reading
+'documentationUrl')` on the Train Travel API's Spectral tab.
+
+**Cause**: `isOwnedEntity` returned by `useEntityOwnership()` is a per-entity predicate
+**function** — `(entity) => boolean` — not a boolean. If the gating condition uses it directly
+(`if (!isOwnedEntity && !isPlatformTeamMember)`), the function reference is always truthy, so
+`!isOwnedEntity` is always `false` and the access-restricted branch never runs: every signed-in
+user unconditionally renders the real lint content, regardless of ownership. On most sample
+APIs this fails silently (non-owners just see content they shouldn't); on APIs whose diagnostics
+happen to trip a separate bug in `@dweber019/backstage-plugin-api-docs-spectral-linter`'s
+`LinterClient` (a rule `code` missing from `spectral.ruleset.rules`, which throws when building
+`documentationUrl`), the permission failure becomes visible to everyone as an identical crash.
+
+**Fix**: Call the predicate with the current entity: `useEntity()` to get `{ entity }`, then
+`if (!isOwnedEntity(entity) && !isPlatformTeamMember)`. Confirm the fix by signing in as a
+non-owner, non-platform-team user (e.g. Charlie) on an API owned by another team (e.g. the
+Museum API or the platform-team-owned Train Travel API) and verifying the access-restricted
+message appears instead of lint content or a crash.
 
 ---
 
