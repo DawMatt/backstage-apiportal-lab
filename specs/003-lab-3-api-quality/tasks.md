@@ -200,6 +200,30 @@ false-permitted result.
 
 ---
 
+## Phase 11: Issue Remediation — Run 14 (Platform Team Catalog Read Permission)
+
+**Goal**: Fix the actual root cause behind README Step 5's broken claim that platform-team
+members "see all APIs": Lab 2's `permissionPolicy.ts` never grants platform-team members
+`catalog-entity` read access to private APIs they don't own, so Museum API and Streetlights
+API are completely unreachable for Eve (absent from the catalog list, absent from search, and
+404 on a direct link) — this is a missing permission-policy rule, not a UI filter or
+`apiGrade` display issue. `spec.md`'s design notes already required this policy extension
+("adds a platform team membership check alongside the existing ownership check") but no prior
+run implemented it.
+
+- [X] T047 [US4] Add new README Step 12a "Grant the Platform Team Catalog Read Access" in labs/lab-03-api-quality/README.md, between Step 12 and Step 13: edit `packages/backend/src/extensions/permissionPolicy.ts` to add an unconditional `catalog-entity` read `ALLOW` for users whose `ownershipEntityRefs` includes `group:default/platform-team`, placed before the existing `anyOf` conditional decision; include a WHY note explaining that `apiGrade.visibility.groups` only governs display on an already-loaded entity page and has no effect on whether the entity is readable at all; note that a backend restart is required
+- [X] T048 [US4] Apply the identical fix to the live file `labs/lab-01-base-backstage/backstage/packages/backend/src/extensions/permissionPolicy.ts` so the student's running instance and the README stay in sync
+- [X] T049 [US4] Revert the Run 14 first-attempt UI-filter framing in labs/lab-03-api-quality/README.md: restore Verification Step 5's title to "Platform Team Sees Detail on All APIs", update its Fail cases to cover "API missing from catalog list/search/direct-link" (permission-policy cause) as well as "detail summary-only" (visibility.groups cause), and replace the Troubleshooting entry with "Platform team member can't find or open a non-owned private API at all" describing the permission-policy root cause and Step 12a fix
+- [X] T050 [P] Update research.md R-005 in specs/003-lab-3-api-quality/research.md to state that platform-team detail visibility requires the entity to be readable first, and that Lab 3 must extend `permissionPolicy.ts` accordingly; mark Run 14 resolved in specs/003-lab-3-api-quality/checklists/issues.md (`- [ ]` → `- [X]`) with a resolution note documenting both the incorrect first attempt and the corrected permission-policy fix
+
+**Checkpoint**: A platform-team member (e.g. Eve) can find Museum API and Streetlights API in
+the catalog list and search, open their entity pages directly, and see the full detailed
+Quality Assessment/Recommendations/Diagnostics and Spectral lint results — matching
+data-model.md's "Eve (platform-team) | All 3 APIs | All 3 APIs" table — without needing any
+non-default catalog filter or search workaround.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -214,6 +238,7 @@ false-permitted result.
 - **Issue Remediation (Phase 8)**: Depends on Phase 4 (US2 npm install) and Phase 5 (US3 Spectral linter component) being written; addresses issues discovered during manual testing after the original phases were completed
 - **Issue Remediation — Run 8 Correction (Phase 9)**: Depends on Phase 8; supersedes T026–T029 and T031–T034's `compatWrapper`/`resolutions` approach after human testing confirmed it made no improvement
 - **Issue Remediation — Run 13 (Phase 10)**: Depends on Phase 9 (T036 introduced the unfixed `isOwnedEntity` wrapper shape this phase corrects); independent of Phase 8's retracted fixes
+- **Issue Remediation — Run 14 (Phase 11)**: Depends on Phase 6 (US4 wrote README Steps 5 and 12); touches `permissionPolicy.ts` (a Lab 2 file reused unmodified until now) plus README Steps 5/12a and Troubleshooting; independent of Phases 8–10's Spectral-tab fixes
 
 ### User Story Dependencies
 

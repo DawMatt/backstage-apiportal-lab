@@ -26,7 +26,7 @@ Lab 3 - API quality
 - Add the plugins backstage-plugin-api-grade and backstage-plugin-api-grade-backend, available here: https://github.com/DawMatt/api-grade
 - Configure the api-grade plugins to use the spectral ruleset defined above, and appear in the Info column below the About entry. This adds basic API grade and quality information for all users, and more detailed quality information for API owners.
 - Add a plugin (Spectral) and use the same pre-defined spectral ruleset to automatically assess each API. The spectral plugin is available here: https://github.com/dweber019/backstage-plugins/tree/main/plugins/api-docs-spectral-linter
-- By default all API quality feaures (e.g. Spectral and API grading) will be visible only to the team owning the API, and the team responsible for the Backstage platform.
+- By default all API quality features (e.g. Spectral and API grading) will be visible only to the team owning the API, and the team responsible for the Backstage platform.
 
 Lab 4 - Auto registration
 

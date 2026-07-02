@@ -563,6 +563,75 @@ Replace `<user>` and `<branch>` with your GitHub username and branch name.
 
 ---
 
+## Step 12a — Grant the Platform Team Catalog Read Access
+
+**Why this step is needed**: Registering Eve as a `platform-team` member (Step 12) and
+configuring `apiGrade.visibility.groups` (Step 6) are not enough on their own. Lab 2's
+permission policy (`packages/backend/src/extensions/permissionPolicy.ts`) restricts
+`example.com/visibility: private` APIs — Museum API and Streetlights API — to their owning
+team only; it has no platform-team rule. Because that policy governs the underlying
+`catalog-entity` **read** permission, a platform-team member who isn't in the owning team
+can't load the entity at all — it won't appear in the APIs catalog list, search, or even a
+direct link. `apiGrade`'s own summary/detail visibility split never runs, because Backstage
+never gets far enough to render the page.
+
+Open `packages/backend/src/extensions/permissionPolicy.ts` and add a platform-team check
+ahead of the existing ownership-based conditional decision:
+
+```typescript
+// packages/backend/src/extensions/permissionPolicy.ts
+class CatalogOwnershipPolicy implements PermissionPolicy {
+  async handle(
+    request: PolicyQuery,
+    user?: PolicyQueryUser,
+  ): Promise<PolicyDecision> {
+    if (isResourcePermission(request.permission, 'catalog-entity')) {
+      // Lab 3: platform-team members can read every catalog entity, including private
+      // APIs owned by other teams. This must be an unconditional allow rather than an
+      // extra `anyOf` clause below — platform-team access doesn't depend on anything
+      // about the entity being read, only on the requesting user's own group membership.
+      if (user?.info.ownershipEntityRefs?.includes('group:default/platform-team')) {
+        return { result: AuthorizeResult.ALLOW };
+      }
+
+      return createCatalogConditionalDecision(
+        request.permission,
+        {
+          anyOf: [
+            { not: catalogConditions.isEntityKind({ kinds: ['API'] }) },
+            catalogConditions.hasAnnotation({
+              annotation: 'example.com/visibility',
+              value: 'shared',
+            }),
+            catalogConditions.isEntityOwner({
+              claims: user?.info.ownershipEntityRefs ?? [],
+            }),
+          ],
+        },
+      );
+    }
+    return { result: AuthorizeResult.ALLOW };
+  }
+}
+```
+
+Only the `if (user?.info.ownershipEntityRefs?.includes(...))` block is new — the rest of the
+file (imports, the `anyOf` rules, and the `createBackendModule` registration) is unchanged
+from Lab 2.
+
+**Why an unconditional allow instead of a fourth `anyOf` clause?** The three existing rules
+are entity-scoped — they inspect the entity being read (its kind, its annotation, its
+`ownedBy` relation). Platform-team access doesn't fit that shape: it should apply regardless
+of who owns the entity. Checking the user's own `ownershipEntityRefs` up front and returning
+an unconditional `ALLOW` is simpler and correct; folding it into `isEntityOwner`'s `claims`
+would incorrectly also require the entity to be *owned by* platform-team, which is only true
+for Train Travel API.
+
+Restart the backend (`yarn start`) after editing — permission policy changes require a
+backend restart to take effect; they are not picked up by a browser refresh alone.
+
+---
+
 ## Step 13 — Switch Identities Using app-config.local.yaml
 
 > ⚠️ **Lab only** — See the Security Note at the top of this README.
@@ -683,14 +752,23 @@ verify Charlie is not a member of platform-team
 ### Step 5 — Platform Team Sees Detail on All APIs
 
 1. Set `app-config.local.yaml` to sign in as Eve (`user:default/eve`)
-2. Restart Backstage → navigate to the **Museum API** entity page (owned by museum-team)
+2. Restart Backstage → navigate to the **Museum API** entity page (owned by museum-team) —
+   Eve can find it via the sidebar **APIs** catalog list or search, the same as any other API
 3. Verify the **API Grade** card shows the full detailed view
 4. Navigate to the **Spectral** tab → verify lint results are visible (not access-restricted)
 5. Repeat for the **Streetlights API** and **Train Travel API**
 
-**Pass**: Eve sees detailed quality information for all three APIs  
-**Fail (Eve sees summary only for Museum/Streetlights)**: Verify `apiGrade.visibility.groups`
-contains `group:default/platform-team`; confirm Eve's catalog entry has `memberOf: [platform-team]`
+**Pass**: Eve sees detailed quality information for all three APIs, and all three appear for
+her in the APIs catalog list and search  
+**Fail (Museum/Streetlights don't appear in the APIs catalog list or search for Eve, or her
+entity-page requests 404)**: This is a catalog *read* permission problem, not an `apiGrade`
+display problem — Eve can't reach the entity at all. Confirm Step 12a's platform-team rule was
+added to `permissionPolicy.ts` and that it checks `user.info.ownershipEntityRefs` (populated
+from Eve's `memberOf: [platform-team]`) before falling through to the ownership-only
+conditional decision; restart the backend after editing  
+**Fail (Eve reaches the entity page but sees summary only for Museum/Streetlights)**: Verify
+`apiGrade.visibility.groups` contains `group:default/platform-team`; confirm Eve's catalog
+entry has `memberOf: [platform-team]`
 
 ---
 
@@ -733,6 +811,29 @@ not exist on GitHub, or the branch has not been pushed yet.
 into a browser. It should return the raw YAML content of `.spectral.yaml`. If you get a 404,
 check that the branch is pushed and that the file path is correct (it is a hidden file
 starting with `.`).
+
+---
+
+### Platform team member can't find or open a non-owned private API at all
+
+**Symptom**: Signed in as a platform-team member (e.g. Eve), an API owned by another team
+(e.g. Streetlights API) doesn't appear in the sidebar **APIs** catalog list or search
+results, and/or navigating directly to its entity page 404s — even though
+`apiGrade.visibility.groups` includes `group:default/platform-team`.
+
+**Cause**: This is a catalog **read permission** problem, not an `apiGrade` display problem.
+`museum-api` and `streetlights-api` are annotated `example.com/visibility: private` (Lab 2),
+and the permission policy in `permissionPolicy.ts` only grants read access to an API's owner
+or to APIs annotated `shared` — platform-team membership alone doesn't satisfy either
+condition. Because Backstage can't even load a private entity a user isn't allowed to read,
+it never appears in the catalog list, search, or a direct-link entity page — and `apiGrade`'s
+own summary/detail visibility split never gets a chance to run.
+
+**Fix**: Add the platform-team check to `permissionPolicy.ts` from Step 12a: before falling
+through to the existing `anyOf` conditional decision, unconditionally allow `catalog-entity`
+reads when `user.info.ownershipEntityRefs` includes `group:default/platform-team`. Restart
+the backend after editing — permission policy changes require a backend restart to take
+effect.
 
 ---
 

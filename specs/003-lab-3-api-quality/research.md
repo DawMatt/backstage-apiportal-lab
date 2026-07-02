@@ -222,7 +222,17 @@ apiGrade:
   and Diagnostics (detailed view).
 - Members of `group:default/platform-team` also see the detailed view for ALL APIs,
   regardless of which team owns the API. This satisfies the platform-team requirement
-  without any custom TypeScript code.
+  without any custom TypeScript code — **but only for APIs the platform team is already
+  permitted to read**. `apiGrade.visibility.groups` governs the summary/detail split on an
+  entity page a user can already load; it has no effect on whether the underlying catalog
+  entity is readable at all. Museum API and Streetlights API are annotated
+  `example.com/visibility: private` (Lab 2), which Lab 2's permission policy restricts to the
+  owning team only — platform-team membership doesn't satisfy that policy on its own. Lab 3
+  must extend `permissionPolicy.ts` with an unconditional `catalog-entity` read allow for
+  platform-team members (see the Run 14 fix in `checklists/issues.md`), otherwise Museum API
+  and Streetlights API are invisible to the platform team in the catalog list, search, and
+  direct links — not merely summary-only — and this visibility config never gets a chance to
+  apply.
 - The custom Spectral ruleset (OAS3 + AsyncAPI defaults) is used instead of the plugin's
   built-in ruleset, ensuring consistency with the Spectral linter plugin.
 

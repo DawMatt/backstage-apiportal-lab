@@ -655,3 +655,33 @@ and the README Step 8 code listing (`labs/lab-03-api-quality/README.md`), with a
 and Troubleshooting entry explaining the function-vs-boolean hazard. research.md R-007 and
 data-model.md updated accordingly. See specs/003-lab-3-api-quality/tasks.md Phase 10
 (T042–T046).
+
+## Run 14 - 2026/07/02
+
+- [X] "Step 5 — Platform Team Sees Detail on All APIs" says that platform team members will see all details for all APIs. This is incorrect because platform team members will only see the APIs they own. APIs like streetlights-api do not show in the APIs view for those users. Note: I think this is a documentation mistake in the readme.
+
+**First attempt (2026-07-02, incorrect)**: Initially misdiagnosed as a UI-only documentation
+issue — assumed the catalog list's default "Owned" personal filter was hiding non-owned APIs
+from Eve, and that switching to "All" or using search would surface them. User confirmed this
+was wrong: search and the "All" filter don't help either — Eve genuinely cannot find or open
+Museum API or Streetlights API by any means.
+
+**Resolution (2026-07-02, corrected)**: Root-caused by reading Lab 2's permission policy
+(`labs/lab-01-base-backstage/backstage/packages/backend/src/extensions/permissionPolicy.ts`).
+Museum API and Streetlights API are annotated `example.com/visibility: private`, and the
+policy's `anyOf` conditions only grant `catalog-entity` read access to non-API entities,
+`shared`-annotated APIs, or the entity's own owning team — there is no platform-team clause.
+Because this governs the underlying catalog **read** permission (not just `apiGrade`'s own
+summary/detail split), a platform-team member who isn't in the owning team can't load the
+entity at all: it's absent from the catalog list, absent from search, and a direct link
+404s. `spec.md`'s own design notes ("the permission policy extension adds a platform team
+membership check alongside the existing ownership check") document this as required Lab 3
+work that was never actually implemented in any prior run.
+
+**Fix**: Added a new README Step 12a instructing an edit to `permissionPolicy.ts`: before the
+existing `anyOf` conditional decision, unconditionally allow `catalog-entity` reads when
+`user.info.ownershipEntityRefs` includes `group:default/platform-team`. Applied the identical
+change to the live file. Updated Verification Step 5's Fail cases and the Troubleshooting
+section to describe the correct symptom (API missing from list/search/direct-link, not just
+summary-only) and point at the permission-policy fix. research.md R-005 updated accordingly.
+See specs/003-lab-3-api-quality/tasks.md Phase 11 (T047–T050).
