@@ -44,6 +44,8 @@ as an adaptable convention (FR-010). Default value resolves from the backend pro
 directory (`packages/backend` under `backstage-cli package start`) up to the repository root —
 exact relative segment count will be confirmed experimentally during implementation and recorded
 here as a Run update, consistent with how Lab 3's research.md captured verified findings.
+(This is the single-source shorthand; R7 generalizes `rootPath` into a per-entry field of an
+`autoApiRegistration.sources[]` list for organizations with more than one source repository.)
 
 **Scaling to a real mono-repo (1000+ files, 1GB+, see R6)**: two changes are load-bearing at scale
 and are therefore built into the mechanism now, not deferred as a "someday" rewrite, even though
@@ -145,14 +147,18 @@ entity (suffixed, e.g. `<slug>-collision`) carrying the registration-error annot
 conflict is independently visible without ever silently overwriting the first. Collision detection
 is done against the persisted slug→path index described in R6, not by re-deriving and sorting the
 full candidate list on every check — at 1000+ files, an O(N log N) sort per cycle (or per watch
-event, in watch mode) is avoidable work; an index lookup is O(1).
+event, in watch mode) is avoidable work; an index lookup is O(1). **This index and check are
+global, across every configured source, not scoped to the source currently being processed** — see
+R7 Problem 3 for why two different teams' repos colliding must not go undetected.
 
 **Precedence with hand-authored `catalog-info.yaml`** (FR-011, Edge Case): before including a
 candidate in its full mutation, the provider queries the catalog for an existing entity of the
 same `kind: API` and `metadata.name` that did **not** originate from this provider (i.e. whose
 `metadata.annotations['backstage.io/managed-by-origin-location']` differs from our provider's
 entity source). If one exists, the auto-sourced candidate is skipped for that name — the
-hand-authored entity wins, matching the documented Assumption.
+hand-authored entity wins, matching the documented Assumption. This check, like collision
+detection, runs against catalog state as a whole and is unaffected by which source is being
+processed — a hand-authored file anywhere wins over an auto-sourced candidate from any source.
 
 ## R5: New sample API for the "previously unregistered" discovery demo
 
@@ -258,3 +264,92 @@ already-built delta-mutation + persisted-cache path — no architectural change.
 - Only a filesystem watcher, no periodic reconciliation sweep — rejected: watchers can miss events
   (coalescing, restart races, some CI/network filesystem limitations); a slow safety-net sweep is
   cheap insurance at any scale and is what makes watch mode trustworthy enough to recommend.
+
+## R7: Multiple source repositories (platform mono-repo + team/pre-production repos)
+
+The lab itself discovers files from one location. A real organization is unlikely to have every
+API definition in the platform team's mono-repo — other teams, and pre-production/experimental
+APIs, plausibly live in their own separate repositories, each wanting different discovery
+settings (in particular, a different default owner — Problem 2 below). The mechanism must
+generalize to N independently-configured sources without becoming N copies of the same code.
+
+**Problem 1 — a single `rootPath` config key can't express "scan these several, separately
+configured locations."** The R1–R6 design (and the lab's `autoApiRegistration.*` config) assumes
+exactly one root and one set of settings.
+
+**Decision**: restructure config around a list, `autoApiRegistration.sources: [...]`, where each
+entry carries its own `id`, `rootPath`, `patterns`, `ignore`, `mode`, `schedule`/`reconciliation`,
+`defaultOwner`, and `xNamespace` (data-model.md has the full per-source schema). At backend-module
+init time, the module reads this list and instantiates **one `EntityProvider` instance per
+source**, each with a distinct `getProviderName()` (`auto-api-registration:<source.id>`) — not one
+provider trying to juggle multiple roots internally. This is the same pattern Backstage's own
+multi-target providers use (e.g. a GitHub discovery provider configured against several
+org/repo targets each becomes its own provider instance): each source gets its own independent
+scheduling, its own independent full-then-delta mutation lifecycle (R6), and a config or scanning
+problem in one source (e.g. an unreadable path for a team repo that hasn't been checked out yet)
+cannot stall or break discovery for any other source. For backward/simple compatibility, a flat
+`autoApiRegistration.rootPath`/`.patterns`/etc. (no `sources` list) is treated as shorthand for a
+single implicit source named `default` — this is what the lab's own `app-config.yaml` uses, so
+the single-repo lab config does not need to change shape.
+
+**Problem 2 — some settings are legitimately per-repo, not global.** The two called out
+explicitly: `defaultOwner` (a pre-production or team repo plausibly has a different fallback team
+than the platform mono-repo's `platform-team`) and, less obviously, `xNamespace` — a team repo
+that already has its own established `x-*` vendor-extension convention before onboarding to
+auto-registration shouldn't be forced to rename it to match the platform mono-repo's convention
+just to participate.
+
+**Decision**: `defaultOwner` and `xNamespace` are per-source config keys with no global fallback
+required (each source must set its own, or inherit an explicit `autoApiRegistration.defaults.*`
+block if the learner wants shared values) — see data-model.md's per-source schema. `patterns`,
+`ignore`, `mode`, and scheduling are also per-source for the same reason (a small pre-production
+repo may reasonably use `mode: 'poll'` with a short interval while the platform mono-repo runs
+`mode: 'watch'` at scale, per R6).
+
+**Problem 3 — collision detection and `catalog-info.yaml` precedence (R4) must stay global, not
+per-source.** Two different teams' repos can trivially produce the same slugified entity name
+(e.g. two teams each shipping a `payments-api`). If collision/precedence checks were scoped to a
+single source's own scan-state rows, cross-source collisions would go undetected and both
+entities would silently coexist as long as neither the collision index nor the "does a
+non-auto-sourced entity already exist" precedence check restricts by source. The scan-state cache
+table already keyed `entity_name` for O(1) collision lookups (R6) — the fix is simply that this
+index (and the query behind the `catalog-info.yaml` precedence check) is queried **across all
+sources**, not scoped to the source currently being processed. The `source_id` column added to
+the cache table (data-model.md) exists precisely so a collision error message can say *which two
+repos* collided — important for SC-003-style debuggability once "which file" becomes "which file,
+in which repo."
+
+**Problem 4 — "other repos" may mean a genuinely separate Git remote, not a local sibling
+directory.** The lab's own Assumptions section already anticipates a local sibling checkout ("a
+local sibling repository the learner creates") for its own zero-network, zero-cost demo — that
+covers the lab's own multi-source walkthrough (see quickstart.md). It does **not** cover a real
+deployment where a team's repo is a separate remote the discovery backend has never had checked
+out locally at all.
+
+**Decision (documented extension point, not built or demonstrated by the lab)**: each source's
+`rootPath` config key is designed to remain a plain local filesystem path — the discovery,
+parsing, and mapping logic (R1–R6) is entirely decoupled from *how bytes arrive on local disk*.
+A production deployment onboarding a genuinely remote repo adds a lightweight sync step ahead of
+the existing glob/parse pipeline — e.g. a shallow `git clone`/`git pull` into a local cache
+directory on each scheduled cycle (or triggered by the same watch/reconciliation cadence as R6) —
+and points that source's `rootPath` at the resulting local worktree. Every other mechanism (glob
+patterns, ignore rules, delta mutations, scan-state cache, collision/precedence checks) is reused
+unchanged; only the sync step differs per source. This keeps the zero-cost constraint intact for
+the lab (no sync step is needed or built when `rootPath` already points at a local sibling
+directory) while giving a real multi-repo deployment a documented, non-invasive path to genuinely
+separate remotes — noted in quickstart.md as a "beyond the lab" extension point, consistent with
+how R6's watch-mode scale-up is documented rather than exercised.
+
+**Alternatives considered**:
+- One `EntityProvider` instance internally looping over multiple roots — rejected: conflates
+  scheduling, failure isolation, and mutation lifecycle across unrelated sources; a parse error or
+  slow filesystem in one team's repo could delay or corrupt discovery for every other source. Per
+  Backstage's own `EntityProvider` contract, provider identity is meant to be 1:1 with "one
+  coherent versioned view of a set of entities" — multiple sources are multiple such views.
+- Making collision detection per-source (accept that two repos could produce the same name) —
+  rejected: silently produces whichever entity happens to process last as the "winner" with no
+  visible error, directly violating the Edge Cases requirement that name collisions must surface a
+  visible conflict rather than being silently resolved.
+- Building real Git-remote syncing (clone/pull) as part of this lab — rejected: requires network
+  access and (for private repos) credentials, which conflicts with the lab's zero-network,
+  zero-cost constraint (Constitution V); documented as an extension point instead (Problem 4).

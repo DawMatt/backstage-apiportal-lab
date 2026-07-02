@@ -8,16 +8,21 @@
 
 Lab 4 builds on the running Backstage 1.51.0 instance from Labs 1–3. It replaces the
 per-API hand-authored `catalog-info.yaml` pattern used in Labs 1–3 with a custom backend
-`EntityProvider` that scans the mono-repo for files matching `*-openapi.yaml` /
+`EntityProvider` that scans a mono-repo for files matching `*-openapi.yaml` /
 `*-asyncapi.yaml`, parses them, and emits/updates/retracts catalog `API` entities on a 30s
 poll schedule for the lab's small sample set — no catalog-info.yaml required per API
-(FR-001–FR-004). The same mechanism is designed to hold up at real-world mono-repo scale
-(1000+ spec files, 1GB+ repos): a persisted scan-state cache (`coreServices.database`) lets a
-restart skip re-parsing unchanged files, delta (not full) mutations are emitted after the
-first cycle, and an optional `chokidar` watch mode replaces repeated full-tree polling as the
-steady-state discovery signal — see research.md R6 for the full scaling rationale; only the
-config *values* differ between the lab demo and a production-scale deployment, not the
-architecture. Catalog owner/lifecycle metadata is sourced from a single vendor-namespaced
+(FR-001–FR-004). The same mechanism is designed to hold up at real-world scale in two
+independent dimensions: **repo size** (1000+ spec files, 1GB+, research.md R6 — a persisted
+scan-state cache lets a restart skip re-parsing unchanged files, delta-not-full mutations after
+the first cycle, and an optional `chokidar` watch mode replacing repeated full-tree polling as
+the steady-state discovery signal) and **repo count** (research.md R7 — config generalizes from
+one `rootPath` to a list of independently-configured `sources[]`, each its own `EntityProvider`
+instance with its own schedule, default owner, and `x-*` namespace, so a platform mono-repo and
+one or more separate team/pre-production repos can each be discovered with their own settings
+while collision and `catalog-info.yaml`-precedence checks stay global across all of them). Only
+the config *values and entry count* differ between the lab demo (one small source) and a
+production-scale, multi-repo deployment, not the architecture. Catalog owner/lifecycle metadata
+is sourced from a single vendor-namespaced
 `info.x-examplecorp` object (`owner`, `lifecycle`) — tool-agnostic field names, grouped under one
 namespace learners rename to their own company (FR-005–FR-006), with documented defaults when
 absent (FR-007). Metadata that already has a natural home in the spec — name (`info.title`),
@@ -100,7 +105,7 @@ APIs left untouched. Designed-for scale (config change only, no code change, per
 | V. Zero-Cost Operation | `fast-glob` and `js-yaml` are MIT-licensed OSS; Scalar Galaxy API is MIT-licensed; no cloud services, GitHub Apps, or webhooks required — mono-repo discovery runs entirely against the local filesystem | ✅ Pass |
 | VI. Progressive Lab Structure | Lab 4 requires Labs 1–3 completion; the new `EntityProvider` runs alongside (does not replace) the existing manual `type: url` catalog locations from Labs 2–3, so museum/streetlights/train-travel remain registered exactly as before; no prior lab file is modified | ✅ Pass |
 | VII. Modern & Purposeful API Examples | Scalar Galaxy API (MIT, self-contained, no external `$ref`s, realistic multi-resource domain) is new and distinct from Museum/Train Travel/Streetlights; the small precedence-demo API is a minimal-but-well-formed example used specifically to exercise precedence, not a primary teaching artifact | ✅ Pass |
-| VIII. Support Experimentation | README documents `autoApiRegistration.rootPath`, `.patterns`, and the `xNamespace` (`x-examplecorp` → the learner's own company) as adaptable conventions (FR-010); User Story 3 is dedicated to this; verification tests outcomes (entity appears/updates/is retracted), not exact file layout | ✅ Pass |
+| VIII. Support Experimentation | README documents `autoApiRegistration.rootPath`, `.patterns`, and the `xNamespace` (`x-examplecorp` → the learner's own company) as adaptable conventions (FR-010); User Story 3 is dedicated to this; the `sources[]` config shape (research.md R7) is documented as the path to onboarding additional team/pre-production repos with their own defaults, without code changes; verification tests outcomes (entity appears/updates/is retracted), not exact file layout | ✅ Pass |
 | IX. Pragmatic Security for Learning Environments | No new authentication or credential configuration is introduced in Lab 4; the existing guest-provider auth from Lab 2 is unchanged. No Security Note section is required (no insecure practice introduced) | ✅ Pass |
 
 No violations. Complexity Tracking section omitted.

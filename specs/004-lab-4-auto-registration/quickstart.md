@@ -57,3 +57,18 @@ The README includes a "Scaling to a real mono-repo" note pointing learners at:
 - That restart behavior at scale relies on the persisted cache, not a full re-scan — this is
   called out explicitly since it's the part most likely to surprise a learner who scales this
   lab up and then wonders why a restart is instant instead of taking minutes.
+
+A second "Scaling to multiple source repositories" note (research.md R7) covers:
+- The `autoApiRegistration.sources[]` config list — the lab's own `app-config.yaml` uses the flat
+  single-source shorthand, but the README shows the equivalent explicit `sources: [{ id: default,
+  ... }]` form alongside a second example entry, so learners can see exactly what changes to add a
+  team or pre-production repo (a different `rootPath`, `defaultOwner`, and `xNamespace`).
+- Why `defaultOwner` and `xNamespace` are per-source with no built-in global fallback (a repo
+  onboarding to auto-registration shouldn't have to adopt the platform mono-repo's team or vendor
+  namespace to participate).
+- Why collision detection and `catalog-info.yaml` precedence checks are explicitly called out as
+  *global* across sources, not per-source — two teams' repos producing the same entity name must
+  still surface a visible conflict, not silently coexist.
+- That onboarding a genuinely separate remote (not a local sibling checkout) requires a sync step
+  (e.g. scheduled shallow `git clone`/`pull`) ahead of the existing discovery pipeline, which the
+  lab does not build or require — `rootPath` always points at something already on local disk.
