@@ -40,10 +40,14 @@ path for `**/*-openapi.yaml` and `**/*-asyncapi.yaml`, on a scheduled interval v
 hammering the filesystem).
 
 **Root path**: configurable via `autoApiRegistration.rootPath` in `app-config.yaml`; documented
-as an adaptable convention (FR-010). Default value resolves from the backend process's working
-directory (`packages/backend` under `backstage-cli package start`) up to the repository root —
-exact relative segment count will be confirmed experimentally during implementation and recorded
-here as a Run update, consistent with how Lab 3's research.md captured verified findings.
+as an adaptable convention (FR-010). Default value resolves via `resolvePackagePath('backend')`
+(from `@backstage/backend-plugin-api`) rather than `process.cwd()` directly — `resolvePackagePath`
+locates the `packages/backend` directory via Node module resolution of its own `package.json`
+(`name: "backend"`), which is robust regardless of which working directory the backend process was
+actually launched from, unlike a `process.cwd()`-relative assumption. From there, 4 `..` segments
+(`packages/backend` → `packages` → `backstage` → `lab-01-base-backstage` → `labs`) reach `labs/`,
+then into `lab-04-auto-registration/apis` — confirmed experimentally during implementation
+(`packages/backend/src/extensions/autoApiRegistration.ts`'s `defaultRootPath()`).
 (This is the single-source shorthand; R7 generalizes `rootPath` into a per-entry field of an
 `autoApiRegistration.sources[]` list for organizations with more than one source repository.)
 
