@@ -134,28 +134,11 @@ value `'info'` places the card in the right-hand Info column (the same column as
 card). Without it, the card defaults to the main content area at the bottom of the page —
 far less visible.
 
-Create the file `packages/app/src/modules/apiGrade/index.ts`:
-
-```typescript
-import { createFrontendModule } from '@backstage/frontend-plugin-api';
-import { EntityCardBlueprint } from '@backstage/plugin-catalog-react/alpha';
-import React from 'react';
-import { ApiGradeCard } from '@dawmatt/backstage-plugin-api-grade';
-
-const apiGradeCard = EntityCardBlueprint.make({
-  name: 'api-grade',
-  params: {
-    filter: 'kind:API',
-    type: 'info',
-    loader: async () => React.createElement(ApiGradeCard),
-  },
-});
-
-export const apiGradeModule = createFrontendModule({
-  pluginId: 'catalog',
-  extensions: [apiGradeCard],
-});
-```
+Create the file `packages/app/src/modules/apiGrade/index.ts` — its full content is committed
+alongside this README at
+[`code/packages/app/src/modules/apiGrade/index.ts`](./code/packages/app/src/modules/apiGrade/index.ts);
+copy it in as-is. It wraps the plugin's `ApiGradeCard` in an `EntityCardBlueprint` extension and
+bundles it into a `createFrontendModule`, the same pattern as Lab 2's `apiVisibility` module.
 
 `filter: 'kind:API'` ensures the card only appears on API entity pages — not on Component,
 System, or other entity pages.
@@ -354,60 +337,17 @@ mode. Importing it directly sidesteps the incompatibility entirely instead of wo
 it.
 
 Because this subpath has no TypeScript declaration file, add a small ambient module
-declaration. Create `packages/app/src/modules/spectralLinter/spectral-linter-content.d.ts`:
+declaration. Create `packages/app/src/modules/spectralLinter/spectral-linter-content.d.ts` — its
+full content is committed alongside this README at
+[`code/packages/app/src/modules/spectralLinter/spectral-linter-content.d.ts`](./code/packages/app/src/modules/spectralLinter/spectral-linter-content.d.ts);
+copy it in as-is.
 
-```typescript
-declare module '@dweber019/backstage-plugin-api-docs-spectral-linter/dist/components/EntityApiDocsSpectralLinterContent/index.esm.js' {
-  import { ComponentType } from 'react';
-  export const EntityApiDocsSpectralLinterContent: ComponentType<{}>;
-}
-```
-
-Create the file `packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx`:
-
-```typescript
-import React, { useEffect, useState } from 'react';
-import { useApi, identityApiRef } from '@backstage/core-plugin-api';
-import { useEntity, useEntityOwnership } from '@backstage/plugin-catalog-react';
-import { EntityApiDocsSpectralLinterContent } from '@dweber019/backstage-plugin-api-docs-spectral-linter/dist/components/EntityApiDocsSpectralLinterContent/index.esm.js';
-import { InfoCard } from '@backstage/core-components';
-import { Typography } from '@material-ui/core';
-
-export function SpectralLinterContent() {
-  const { entity } = useEntity();
-  const identityApi = useApi(identityApiRef);
-  const { isOwnedEntity, loading: ownershipLoading } = useEntityOwnership();
-  const [isPlatformTeamMember, setIsPlatformTeamMember] = useState(false);
-  const [identityLoading, setIdentityLoading] = useState(true);
-
-  useEffect(() => {
-    identityApi.getBackstageIdentity().then(identity => {
-      setIsPlatformTeamMember(
-        identity.ownershipEntityRefs.includes('group:default/platform-team'),
-      );
-      setIdentityLoading(false);
-    });
-  }, [identityApi]);
-
-  if (ownershipLoading || identityLoading) return null;
-
-  // `isOwnedEntity` from useEntityOwnership() is a per-entity predicate
-  // FUNCTION, not a boolean — it must be called with the current entity.
-  if (!isOwnedEntity(entity) && !isPlatformTeamMember) {
-    return (
-      <InfoCard title="Spectral Linter">
-        <Typography variant="body2" color="textSecondary">
-          Detailed quality information is restricted to members of the API's owning team
-          and the platform team. Sign in as a member of the owning team or the platform
-          team to view linting results.
-        </Typography>
-      </InfoCard>
-    );
-  }
-
-  return <EntityApiDocsSpectralLinterContent />;
-}
-```
+Create the file `packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx` — its full
+content is committed at
+[`code/packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx`](./code/packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx);
+copy it in as-is. In short: it renders the plugin's inner `EntityApiDocsSpectralLinterContent`
+component, gated behind an ownership/platform-team check — the owning team or a platform-team
+member sees the lint results; everyone else sees an access-restricted message.
 
 **Why is `isOwnedEntity` called as a function?** `useEntityOwnership()` (from
 `@backstage/plugin-catalog-react`) returns `{ loading, isOwnedEntity }` where `isOwnedEntity`
@@ -428,39 +368,14 @@ permission policy.
 
 ## Step 9 — Create the spectralLinter Frontend Module
 
-Create the file `packages/app/src/modules/spectralLinter/index.ts`:
-
-```typescript
-import { createFrontendModule } from '@backstage/frontend-plugin-api';
-import { EntityContentBlueprint } from '@backstage/plugin-catalog-react/alpha';
-import { convertLegacyPlugin } from '@backstage/core-compat-api';
-import { apiDocsSpectralLinterPlugin } from '@dweber019/backstage-plugin-api-docs-spectral-linter';
-import React from 'react';
-import { SpectralLinterContent } from './SpectralLinterContent';
-
-const spectralLinterContent = EntityContentBlueprint.make({
-  name: 'spectral-linter',
-  params: {
-    defaultPath: '/spectral',
-    defaultTitle: 'Spectral',
-    filter: 'kind:API',
-    loader: async () => React.createElement(SpectralLinterContent),
-  },
-});
-
-export const spectralLinterModule = createFrontendModule({
-  pluginId: 'catalog',
-  extensions: [spectralLinterContent],
-});
-
-// Registers the plugin's linterApiRef (backed by its LinterClient) with the new frontend
-// system's API registry. `extensions: []` means we deliberately do NOT bring in the
-// plugin's own page/route extensions — we only need its API, since Step 8's unwrapped
-// component looks up `linterApiRef` via the ambient `useApi` context, not via a prop.
-export const spectralLinterApiPlugin = convertLegacyPlugin(apiDocsSpectralLinterPlugin, {
-  extensions: [],
-});
-```
+Create the file `packages/app/src/modules/spectralLinter/index.ts` — its full content is
+committed alongside this README at
+[`code/packages/app/src/modules/spectralLinter/index.ts`](./code/packages/app/src/modules/spectralLinter/index.ts);
+copy it in as-is. In short: it wraps `SpectralLinterContent` in an `EntityContentBlueprint`
+extension (the "Spectral" tab) and, separately, uses `convertLegacyPlugin` to register the
+plugin's `linterApiRef` (backed by its `LinterClient`) with the new frontend system's API
+registry, with `extensions: []` since only the API — not the plugin's own page/route
+extensions — is needed.
 
 `defaultPath: '/spectral'` and `defaultTitle: 'Spectral'` define the tab's URL path and
 display label. `filter: 'kind:API'` ensures the tab appears only on API entity pages.
