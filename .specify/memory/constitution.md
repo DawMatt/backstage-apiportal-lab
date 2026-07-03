@@ -1,9 +1,12 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.2.0 → 1.3.0
+Version change: 1.3.0 → 1.4.0
 Added sections:
-  - Principle IX. Pragmatic Security for Learning Environments
+  - Principle II. Process-Oriented Documentation — new rule: large/reusable file-creation steps
+    must commit the file under a lab-local `code/` subdirectory and link to it, not embed it
+    inline in a fenced code block
+  - Lab Structure Standards — new bullet cross-referencing the same rule
 Modified principles: None renamed
 Removed sections: None
 Templates reviewed:
@@ -11,8 +14,18 @@ Templates reviewed:
   ✅ .specify/templates/spec-template.md — No principle-specific references; no updates required
   ✅ .specify/templates/tasks-template.md — No principle-specific references; no updates required
 Instance files requiring updates (in-progress feature work):
+  ✅ labs/lab-02-users-roles/README.md — already compliant (ApiVisibilityCard.tsx, apiVisibility/
+    index.ts, permissionPolicy.ts extracted to code/ and linked, applied 2026-07-03)
+  ✅ labs/lab-03-api-quality/README.md — already compliant (apiGrade/index.ts, spectral-linter-
+    content.d.ts, SpectralLinterContent.tsx, spectralLinter/index.ts extracted to code/ and
+    linked, applied 2026-07-03)
+  ✅ labs/lab-04-auto-registration/README.md — already compliant (autoApiRegistration.ts and its
+    migration extracted to code/ and linked, applied 2026-07-03; this was the motivating case —
+    the 749-line embedded file was over half the page)
   ⚠ specs/001-lab-1-base-backstage/plan.md — Constitution Check table missing Principle IX
-  ⚠ specs/002-lab-2-users-roles/spec.md — Should note Principle IX applies to auth credential handling
+    (pre-existing gap, unrelated to this amendment)
+  ⚠ specs/002-lab-2-users-roles/spec.md — Should note Principle IX applies to auth credential
+    handling (pre-existing gap, unrelated to this amendment)
 Follow-up TODOs: None
 -->
 
@@ -35,8 +48,22 @@ Documentation MUST explain the *why* and *how* of each step, not just the *what*
 The journey of setting up Backstage is as important as the final running instance.
 Steps that are non-obvious, error-prone, or surprising MUST include explanatory context.
 
+When a lab step instructs the user to create a file, and that file's full content either
+(a) cannot reasonably fit on one screen (as a rough guide, more than ~40–50 lines) or
+(b) is a complete, reusable source file rather than a short edit/diff snippet — regardless of
+length — the file's full content MUST be committed to the repository under the lab's own
+directory (convention: a `code/` subdirectory mirroring the target relative path, e.g.
+`labs/lab-0N-*/code/packages/app/src/modules/foo/Bar.tsx`), and the README MUST link to that
+committed file instead of embedding the whole content inline in a fenced code block. Short
+edit-in-place snippets that show surrounding context for a targeted diff against a file created
+in an earlier step (not a full new file) are exempt and may remain inline.
+
 **Rationale**: A user who follows steps blindly cannot troubleshoot or adapt. Understanding
-the process produces durable knowledge; following a script does not.
+the process produces durable knowledge; following a script does not. Embedding entire source
+files inline inflates page length without adding explanatory value — the prose around the file
+(the *why*) is what teaches; the file content itself is better consulted, copied, or diffed as
+a real file. A committed, linked file is also directly reusable by a learner adapting the lab
+to their own repo, which an inline fence is not.
 
 ### III. Cross-Platform Compatibility
 
@@ -162,6 +189,10 @@ Labs that use simplified security practices (Principle IX) MUST also include:
 Labs MUST NOT require external network access beyond downloading freely available software
 and dependencies. All API samples and test data MUST be included in the repository.
 
+Labs that instruct the user to create a large or reusable source file MUST commit that file's
+content under a `code/` subdirectory within the lab's own directory and link to it from the
+README, per Principle II, rather than embedding it inline.
+
 ## Development Workflow
 
 - Each lab corresponds to one speckit feature branch following the `###-lab-name` convention.
@@ -193,4 +224,4 @@ All plan `Constitution Check` gates MUST reference the principles by Roman numer
 
 - `yarn dev` does not exist. Use `yarn start` instead. 
 
-**Version**: 1.3.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-08
+**Version**: 1.4.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-07-03
