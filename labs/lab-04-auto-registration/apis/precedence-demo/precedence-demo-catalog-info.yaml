@@ -1,0 +1,21 @@
+# Hand-authored entity for the precedence-demo API — deliberately NOT auto-discovered from
+# precedence-demo-openapi.yaml's own x-examplecorp values. This file demonstrates FR-011: a
+# hand-authored catalog-info.yaml takes precedence over auto-sourced metadata for the same API.
+# See labs/lab-04-auto-registration/README.md.
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: precedence-demo-api
+  title: Precedence Demo API
+  description: >
+    Hand-authored registration for the precedence-demo API — this entity, not the auto-sourced
+    candidate from precedence-demo-openapi.yaml's x-examplecorp object, is what appears in the
+    catalog (FR-011).
+  annotations:
+    example.com/visibility: private
+spec:
+  type: openapi
+  lifecycle: production
+  owner: group:default/museum-team
+  definition:
+    $text: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/004-lab-4-auto-registration/labs/lab-04-auto-registration/apis/precedence-demo/precedence-demo-openapi.yaml

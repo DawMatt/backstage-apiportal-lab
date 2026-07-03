@@ -1,0 +1,59 @@
+openapi: 3.1.0
+info:
+  title: Precedence Demo API
+  description: >
+    A minimal API used only to demonstrate FR-011: a hand-authored catalog-info.yaml
+    (precedence-demo-catalog-info.yaml, alongside this file) takes precedence over the metadata
+    auto-sourced from this file's own x-examplecorp object. See labs/lab-04-auto-registration/README.md.
+  version: 1.0.0
+  # Deliberately different from the hand-authored catalog-info.yaml's owner/visibility, so the
+  # precedence check has something real to demonstrate (FR-011).
+  x-examplecorp:
+    owner: group:default/platform-team
+    lifecycle: experimental
+    visibility: shared
+tags:
+  - name: Demo
+    description: Precedence demonstration endpoints
+paths:
+  /widgets:
+    get:
+      tags: [Demo]
+      summary: List widgets
+      operationId: listWidgets
+      responses:
+        '200':
+          description: A list of widgets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Widget'
+  /widgets/{widgetId}:
+    get:
+      tags: [Demo]
+      summary: Get a widget
+      operationId: getWidget
+      parameters:
+        - name: widgetId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A single widget
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Widget'
+components:
+  schemas:
+    Widget:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string

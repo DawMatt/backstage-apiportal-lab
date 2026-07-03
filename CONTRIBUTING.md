@@ -252,7 +252,11 @@ Step 7 is complete and the PR checklist below is satisfied.
 6. Confirm the lab starts from the state left by the previous lab and documents any
    dependencies on prior lab outputs.
 7. Validate manually (Step 7 above) on at least one platform.
-8. Open a PR and merge following Step 8 above.
+8. Update the root `README.md` — add the lab to the Lab Series table and to the Getting
+   Started / Repository Structure trees. Run `bash scripts/check-readme.sh` to confirm
+   nothing is missing; CI runs the same check on every push and PR and will fail the build
+   if the root README falls out of sync with `labs/` or `specs/`.
+9. Open a PR and merge following Step 8 above.
 
 ---
 
@@ -300,6 +304,9 @@ Before submitting a PR for a new or changed lab, confirm:
 - [ ] No Petstore or similarly dated API examples are used (Constitution Principle VII)
 - [ ] Pre-committed API spec files are self-contained (no external `$ref`s)
 - [ ] The lab builds correctly on top of the previous lab's end state
+- [ ] Root `README.md` Lab Series table and Repository Structure sections mention the new
+      `labs/` and `specs/` directories (run `bash scripts/check-readme.sh` to verify; this is
+      also enforced by CI on every push and PR)
 
 ---
 

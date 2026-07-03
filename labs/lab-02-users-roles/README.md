@@ -319,77 +319,19 @@ Run this command from inside your Backstage root directory
 
 #### Create `ApiVisibilityCard.tsx`
 
-Create `packages/app/src/modules/apiVisibility/ApiVisibilityCard.tsx` with the following
-content:
-
-```typescript
-import React from 'react';
-import { useEntity } from '@backstage/plugin-catalog-react';
-import { InfoCard } from '@backstage/core-components';
-import { Typography, Box, Chip } from '@material-ui/core';
-
-const VISIBILITY_ANNOTATION = 'example.com/visibility';
-
-export function ApiVisibilityCard() {
-  const { entity } = useEntity();
-  const visibility = entity.metadata.annotations?.[VISIBILITY_ANNOTATION];
-
-  if (!visibility) {
-    return (
-      <InfoCard title="API Visibility">
-        <Typography variant="body2" color="textSecondary">
-          No visibility designation set. Under the permission policy, this API is visible
-          only to members of the owning team (treated as private by default).
-        </Typography>
-      </InfoCard>
-    );
-  }
-
-  const isShared = visibility === 'shared';
-
-  return (
-    <InfoCard title="API Visibility">
-      <Box display="flex" alignItems="center" gap={1}>
-        <Chip
-          label={isShared ? 'Shared' : 'Private'}
-          color={isShared ? 'primary' : 'default'}
-          size="small"
-        />
-        <Typography variant="body2">
-          {isShared
-            ? 'Visible to all authenticated users regardless of team membership.'
-            : 'Visible only to members of the owning team.'}
-        </Typography>
-      </Box>
-    </InfoCard>
-  );
-}
-```
+Create `packages/app/src/modules/apiVisibility/ApiVisibilityCard.tsx` — its full content is
+committed alongside this README at
+[`code/packages/app/src/modules/apiVisibility/ApiVisibilityCard.tsx`](./code/packages/app/src/modules/apiVisibility/ApiVisibilityCard.tsx);
+copy it in as-is. It reads the `example.com/visibility` annotation off the entity and renders a
+"Shared"/"Private" chip, with a fallback message when the annotation is absent (treated as
+private by the permission policy).
 
 #### Create `index.ts`
 
-Create `packages/app/src/modules/apiVisibility/index.ts` with the following content:
-
-```typescript
-import { createFrontendModule } from '@backstage/frontend-plugin-api';
-import { EntityCardBlueprint } from '@backstage/plugin-catalog-react/alpha';
-import React from 'react';
-import { ApiVisibilityCard } from './ApiVisibilityCard';
-
-const apiVisibilityCard = EntityCardBlueprint.make({
-  name: 'api-visibility',
-  params: {
-    filter: 'kind:API',
-    type: 'info',
-    loader: async () => React.createElement(ApiVisibilityCard),
-  },
-});
-
-export const apiVisibilityModule = createFrontendModule({
-  pluginId: 'catalog',
-  extensions: [apiVisibilityCard],
-});
-```
+Create `packages/app/src/modules/apiVisibility/index.ts` — its full content is committed at
+[`code/packages/app/src/modules/apiVisibility/index.ts`](./code/packages/app/src/modules/apiVisibility/index.ts);
+copy it in as-is. It wraps `ApiVisibilityCard` in an `EntityCardBlueprint` extension and bundles
+it into a `createFrontendModule`.
 
 > **Note on Alpha imports**: `EntityCardBlueprint` is imported from
 > `@backstage/plugin-catalog-react/alpha`. This is the officially supported extension
@@ -599,76 +541,13 @@ For all non-catalog permissions (scaffolding, TechDocs, search, etc.), the polic
 
 Create the directory `packages/backend/src/extensions/` inside your Backstage root
 (`labs/lab-01-base-backstage/backstage/`), then create a new file called
-`permissionPolicy.ts` inside it with the following content:
-
-```typescript
-// packages/backend/src/extensions/permissionPolicy.ts
-import { createBackendModule } from '@backstage/backend-plugin-api';
-import {
-  PolicyDecision,
-  AuthorizeResult,
-  isResourcePermission,
-} from '@backstage/plugin-permission-common';
-import {
-  PermissionPolicy,
-  PolicyQuery,
-  PolicyQueryUser,
-} from '@backstage/plugin-permission-node';
-import { policyExtensionPoint } from '@backstage/plugin-permission-node/alpha';
-import {
-  catalogConditions,
-  createCatalogConditionalDecision,
-} from '@backstage/plugin-catalog-backend/alpha';
-
-class CatalogOwnershipPolicy implements PermissionPolicy {
-  async handle(
-    request: PolicyQuery,
-    user?: PolicyQueryUser,
-  ): Promise<PolicyDecision> {
-    if (isResourcePermission(request.permission, 'catalog-entity')) {
-      return createCatalogConditionalDecision(
-        request.permission,
-        {
-          anyOf: [
-            // Rule 1: Non-API entities (User, Group, etc.) are always visible to all users.
-            // This keeps the org chart and team pages open for everyone.
-            { not: catalogConditions.isEntityKind({ kinds: ['API'] }) },
-
-            // Rule 2: APIs annotated as shared are visible to all authenticated users,
-            // regardless of which team they belong to.
-            catalogConditions.hasAnnotation({
-              annotation: 'example.com/visibility',
-              value: 'shared',
-            }),
-
-            // Rule 3: Private APIs are visible only to members of the owning team.
-            // The user's ownershipEntityRefs contains their user ref plus all their
-            // group refs, resolved from the catalog User entity's memberOf list.
-            catalogConditions.isEntityOwner({
-              claims: user?.info.ownershipEntityRefs ?? [],
-            }),
-          ],
-        },
-      );
-    }
-    // All non-catalog permissions (scaffolding, TechDocs, search) are unconditionally allowed.
-    return { result: AuthorizeResult.ALLOW };
-  }
-}
-
-export default createBackendModule({
-  pluginId: 'permission',
-  moduleId: 'permission-policy',
-  register(reg) {
-    reg.registerInit({
-      deps: { policy: policyExtensionPoint },
-      async init({ policy }) {
-        policy.setPolicy(new CatalogOwnershipPolicy());
-      },
-    });
-  },
-});
-```
+`permissionPolicy.ts` inside it. Its full content is committed alongside this README at
+[`code/packages/backend/src/extensions/permissionPolicy.ts`](./code/packages/backend/src/extensions/permissionPolicy.ts);
+copy it in as-is. In short: it's a `CatalogOwnershipPolicy` that, for the `catalog-entity`
+resource permission, allows non-API entities unconditionally, allows APIs annotated
+`example.com/visibility: shared` for everyone, and otherwise falls back to an ownership check
+via `catalogConditions.isEntityOwner`; every other permission is unconditionally allowed. It's
+registered as a `permission-policy` backend module via `createBackendModule`.
 
 **Import sources** (all packages are already installed in Lab 1 — no `npm install` needed):
 

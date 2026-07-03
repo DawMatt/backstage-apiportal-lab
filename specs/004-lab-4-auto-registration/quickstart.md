@@ -1,0 +1,87 @@
+# Quickstart: Lab 4 — Auto Registration
+
+This is the design-time quickstart used to validate the plan; the learner-facing README (built in
+`/speckit-tasks` + `/speckit-implement`) will follow the same flow with full explanatory prose per
+Constitution Principle II.
+
+## Prerequisites
+
+- Labs 1–3 completed (running Backstage 1.51.0 instance, Lab 2 teams/users, Lab 3 quality tooling).
+- No new external accounts or services.
+
+## Steps
+
+1. **Install dependencies**: add `fast-glob` and `js-yaml` as direct dependencies of
+   `packages/backend`.
+2. **Add the auto-registration backend module**
+   (`packages/backend/src/extensions/autoApiRegistration.ts`): implements the `EntityProvider` +
+   companion `CatalogProcessor` described in research.md R1–R4. Registered in
+   `packages/backend/src/index.ts` via `backend.add(import('./extensions/autoApiRegistration'))`.
+3. **Configure discovery** in `app-config.yaml` under a new `autoApiRegistration` block (see
+   data-model.md for keys/defaults).
+4. **Add the two new sample files**:
+   - `labs/lab-04-auto-registration/apis/galaxy/galaxy-openapi.yaml` (vendored Scalar Galaxy API
+     with an `info.x-examplecorp` object added, `visibility: shared`) — no pre-existing
+     `catalog-info.yaml`.
+   - `labs/lab-04-auto-registration/apis/precedence-demo/precedence-demo-openapi.yaml` +
+     `precedence-demo-catalog-info.yaml` (hand-authored, `example.com/visibility: private`,
+     owner a non-platform team) — demonstrates FR-011 precedence and gives a real
+     private/shared contrast to check in step 5.
+5. **Start Backstage** (`yarn start` from the Lab 1 backstage workspace) and confirm:
+   - The Galaxy API appears in the catalog within one discovery cycle (~30s), with no manually
+     written catalog file (US1, SC-001).
+   - Its `spec.owner` and `spec.lifecycle` match the `info.x-examplecorp` values, and its tags
+     match the spec's native `tags` array — not duplicated into `x-examplecorp` (US2, SC-002).
+   - The Galaxy API (`visibility: shared`) is visible to any authenticated user, while the
+     precedence-demo API (`visibility: private`, hand-authored) is visible only to its owning
+     team and platform-team — logging in as a non-owning, non-platform user confirms the
+     difference (SC-006).
+   - The precedence-demo API's catalog entity reflects the hand-authored
+     `precedence-demo-catalog-info.yaml` throughout (owner, visibility), not the auto-sourced
+     values (FR-011).
+6. **Verify update-in-place**: edit `galaxy-openapi.yaml`'s `info.description`, wait one cycle,
+   confirm the existing entity updates rather than duplicating (FR-003).
+7. **Verify removal**: temporarily rename `galaxy-openapi.yaml` out of the discovery pattern, wait
+   one cycle, confirm the entity is no longer listed as active (FR-004, SC-005); rename it back.
+8. **Verify error handling**: temporarily break the YAML syntax in one file, confirm a log line
+   identifies the file; temporarily set `info.x-examplecorp.owner` to a nonexistent team, confirm a
+   catalog processing error is visible on that entity (FR-008, SC-003); temporarily set
+   `info.x-examplecorp.visibility` to an unrecognized value (e.g. `public`), confirm the same kind
+   of visible error rather than a silent default.
+
+## Out of scope for this quickstart
+
+- Full JSON-Schema validation of spec files (documented as a learner extension point, not built).
+- Exercising `watch` mode or the reconciliation safety net end-to-end (the lab's 2–3 sample files
+  don't demonstrate anything a poll cycle wouldn't; `mode: 'watch'` is documented, not walked
+  through step-by-step).
+
+## Scaling beyond the lab (documented, not walked through)
+
+The README includes a "Scaling to a real mono-repo" note pointing learners at:
+- Why the default is `mode: 'poll'` + `type: 'full'`-then-`delta'` mutations, and what changes
+  (`mode: 'watch'`, larger `reconciliation.frequencySeconds`, mandatory `ignore` patterns) at
+  1000+ files / 1GB+ (research.md R6).
+- Why scan state is persisted in the backend's own database rather than written back into the
+  mono-repo as generated catalog files (data-model.md, research.md R6 Problem 2).
+- That restart behavior at scale relies on the persisted cache, not a full re-scan — this is
+  called out explicitly since it's the part most likely to surprise a learner who scales this
+  lab up and then wonders why a restart is instant instead of taking minutes.
+
+A second "Scaling to multiple source repositories" note (research.md R7) covers:
+- The `autoApiRegistration.sources[]` config list — the lab's own `app-config.yaml` uses the flat
+  single-source shorthand, but the README shows the equivalent explicit `sources: [{ id: default,
+  ... }]` form alongside a second example entry, so learners can see exactly what changes to add a
+  team or pre-production repo (a different `rootPath`, `defaultOwner`, `defaultVisibility`, and
+  `xNamespace`).
+- Why `defaultOwner` and `xNamespace` are per-source with no built-in global fallback (a repo
+  onboarding to auto-registration shouldn't have to adopt the platform mono-repo's team or vendor
+  namespace to participate), while `defaultVisibility` is per-source but *does* have a built-in
+  global fallback (`private`) — visibility is the one setting where "unconfigured" must still be
+  safe by default, not just adaptable.
+- Why collision detection and `catalog-info.yaml` precedence checks are explicitly called out as
+  *global* across sources, not per-source — two teams' repos producing the same entity name must
+  still surface a visible conflict, not silently coexist.
+- That onboarding a genuinely separate remote (not a local sibling checkout) requires a sync step
+  (e.g. scheduled shallow `git clone`/`pull`) ahead of the existing discovery pipeline, which the
+  lab does not build or require — `rootPath` always points at something already on local disk.

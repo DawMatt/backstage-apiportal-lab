@@ -1,18 +1,31 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.2.0 → 1.3.0
+Version change: 1.4.0 → 1.5.0
 Added sections:
-  - Principle IX. Pragmatic Security for Learning Environments
+  - Lab Structure Standards — new requirement: a lab is not complete until the root README.md
+    (Lab Series table, Getting Started tree, Repository Structure tree) is updated to reference
+    its labs/ and specs/ directories; this must be planned/tasked, not left to post-hoc CI
 Modified principles: None renamed
 Removed sections: None
 Templates reviewed:
-  ✅ .specify/templates/plan-template.md — Constitution Check section is generic; no updates required
+  ✅ .specify/templates/plan-template.md — Constitution Check section is generic (gates are
+    derived from the constitution file at plan time, no fixed per-principle table); no edit
+    required, the new standard is picked up automatically
+  ✅ .specify/templates/tasks-template.md — Phase N (Polish & Cross-Cutting Concerns) generic
+    "Documentation updates in docs/" placeholder replaced with an explicit root README update
+    task referencing this standard
   ✅ .specify/templates/spec-template.md — No principle-specific references; no updates required
-  ✅ .specify/templates/tasks-template.md — No principle-specific references; no updates required
-Instance files requiring updates (in-progress feature work):
+Instance files requiring updates (in-progress/completed feature work):
+  ✅ README.md — updated for Lab 4 (2026-07-04): Lab Series table row linked (no longer "coming
+    soon"), Getting Started and Repository Structure trees include labs/lab-04-auto-registration/
+    and specs/004-lab-4-auto-registration/
+  ✅ scripts/check-readme.sh + .github/workflows/readme-sync.yml — added 2026-07-04 as a CI
+    safety net (not the primary mechanism — see rationale above)
   ⚠ specs/001-lab-1-base-backstage/plan.md — Constitution Check table missing Principle IX
-  ⚠ specs/002-lab-2-users-roles/spec.md — Should note Principle IX applies to auth credential handling
+    (pre-existing gap, unrelated to this amendment)
+  ⚠ specs/002-lab-2-users-roles/spec.md — Should note Principle IX applies to auth credential
+    handling (pre-existing gap, unrelated to this amendment)
 Follow-up TODOs: None
 -->
 
@@ -35,8 +48,22 @@ Documentation MUST explain the *why* and *how* of each step, not just the *what*
 The journey of setting up Backstage is as important as the final running instance.
 Steps that are non-obvious, error-prone, or surprising MUST include explanatory context.
 
+When a lab step instructs the user to create a file, and that file's full content either
+(a) cannot reasonably fit on one screen (as a rough guide, more than ~40–50 lines) or
+(b) is a complete, reusable source file rather than a short edit/diff snippet — regardless of
+length — the file's full content MUST be committed to the repository under the lab's own
+directory (convention: a `code/` subdirectory mirroring the target relative path, e.g.
+`labs/lab-0N-*/code/packages/app/src/modules/foo/Bar.tsx`), and the README MUST link to that
+committed file instead of embedding the whole content inline in a fenced code block. Short
+edit-in-place snippets that show surrounding context for a targeted diff against a file created
+in an earlier step (not a full new file) are exempt and may remain inline.
+
 **Rationale**: A user who follows steps blindly cannot troubleshoot or adapt. Understanding
-the process produces durable knowledge; following a script does not.
+the process produces durable knowledge; following a script does not. Embedding entire source
+files inline inflates page length without adding explanatory value — the prose around the file
+(the *why*) is what teaches; the file content itself is better consulted, copied, or diffed as
+a real file. A committed, linked file is also directly reusable by a learner adapting the lab
+to their own repo, which an inline fence is not.
 
 ### III. Cross-Platform Compatibility
 
@@ -162,6 +189,24 @@ Labs that use simplified security practices (Principle IX) MUST also include:
 Labs MUST NOT require external network access beyond downloading freely available software
 and dependencies. All API samples and test data MUST be included in the repository.
 
+Labs that instruct the user to create a large or reusable source file MUST commit that file's
+content under a `code/` subdirectory within the lab's own directory and link to it from the
+README, per Principle II, rather than embedding it inline.
+
+A lab is NOT complete until the root `README.md` is updated to reference it: a Lab Series
+table row (linked, no longer marked "coming soon"), and an entry in both the Getting Started
+tree and the Repository Structure tree for the new `labs/` and `specs/` directories. This is
+part of the lab's definition of done, not a follow-up chore — `/speckit-plan` and
+`/speckit-tasks` MUST account for it (an explicit task, not a generic "documentation updates"
+placeholder), so it is done during `/speckit-implement` rather than caught later at PR review
+or in CI.
+
+**Rationale**: The root README previously drifted out of date — Lab 4 shipped fully functional
+while the README still listed it as "coming soon" — because README maintenance wasn't part of
+any lab's definition of done. It was only caught after the fact, via an ad hoc CI check, which
+is too late: by then the fix is a follow-up interruption rather than something completed as
+part of the original work.
+
 ## Development Workflow
 
 - Each lab corresponds to one speckit feature branch following the `###-lab-name` convention.
@@ -193,4 +238,4 @@ All plan `Constitution Check` gates MUST reference the principles by Roman numer
 
 - `yarn dev` does not exist. Use `yarn start` instead. 
 
-**Version**: 1.3.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-06-08
+**Version**: 1.5.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-07-04
