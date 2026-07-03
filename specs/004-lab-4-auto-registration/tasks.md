@@ -131,6 +131,24 @@ This is a tutorial-lab project (not a generic web/mobile app). Two path roots ar
 
 ---
 
+## Phase 7: Bug Fixes (from checklists/issues.md — Run 1, 2026/07/03)
+
+**Purpose**: Fix the reported "No APIs were available in the catalog after starting backstage" issue. Root cause analysis of the pasted log:
+
+- The `group:default/platform-team` owner-resolution failure (T020's validator, `InputError` on `galaxy-openapi.yaml`) is a *symptom*: `teams.yaml` — which defines `platform-team` — never loads, because its catalog location URL is 404ing.
+- That 404, and the four other "Unable to read url" warnings (`teams.yaml`, `users.yaml`, `museum-api.yaml`, `streetlights-api.yaml`, `train-travel-api.yaml`... actually `platform-user.yaml` too), all point at `raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/003-api-quality/...` — a stale feature-branch name left over from when Lab 3's instructions were followed. That content has since been merged to `main` (verified: present at `main:labs/lab-02-users-roles/catalog/teams.yaml` and `main:labs/lab-03-api-quality/catalog/platform-user.yaml`), so the branch-pinned URLs should point at `main` instead.
+- With `teams.yaml` unreachable, `platform-team` never registers as a `Group`, so the Lab 4 owner validator (correctly) rejects `galaxy-openapi.yaml`'s `owner: group:default/platform-team` and emits a marker/error entity instead of a real one — leaving the catalog with no visible APIs.
+- The one remaining branch-pinned location (`precedence-demo-catalog-info.yaml`, pointing at `004-lab-4-auto-registration`) is *not* a bug — it is new-on-this-branch content that genuinely requires the branch to be pushed to GitHub first, exactly as documented in `labs/lab-04-auto-registration/README.md` (the "This only works once you've pushed your branch" note). No code or config change fixes that one; it's a sequencing step the learner has to perform.
+
+- [X] T038 Fix the five stale `003-api-quality`-branch catalog location URLs in `labs/lab-01-base-backstage/backstage/app-config.yaml` (lines ~130, 136, 142, 148, 154, 160, plus the two `spectralLinter` ruleset URLs at ~206–207) to point at `main` instead, since that content is already merged to `main`
+- [X] T039 [P] Add a troubleshooting entry to `labs/lab-04-auto-registration/README.md`'s Troubleshooting section explaining the observed failure chain (stale/unpushed branch in an org-data or API catalog location → that entity never registers → any auto-sourced API whose `x-examplecorp.owner` references a group defined only in that unreachable location fails owner validation → looks like "no APIs in the catalog" even though the real cause is upstream of Lab 4's own code) so learners can self-diagnose instead of assuming the `EntityProvider` is broken
+- [X] T040 Restart `labs/lab-01-base-backstage/backstage/` from a clean `yarn start` after T038 and confirm via backend logs and the catalog UI: `platform-team` resolves (no more `InputError` on `galaxy-openapi.yaml`), museum/streetlights/train-travel APIs and the `platform-team`/`platform-user` org entities all load without "Unable to read url" warnings, and the Galaxy API entity appears with `spec.owner: group:default/platform-team` (SC-001/SC-002); note that `precedence-demo-api` will still be absent unless the current branch has been pushed to GitHub, per T039's documented caveat
+- [X] T041 Update `specs/004-lab-4-auto-registration/checklists/issues.md`: mark the Run 1 item resolved with a one-line pointer to T038–T040 once T040's re-verification passes
+
+**Checkpoint**: Catalog populates on a clean start; the only remaining "gap" (precedence-demo-api before the branch is pushed) is expected and documented, not a bug.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -141,6 +159,7 @@ This is a tutorial-lab project (not a generic web/mobile app). Two path roots ar
 - **User Story 2 (Phase 4)**: Depends on Foundational completion; extends the same file US1 built (T012), so in practice follows US1 sequentially even though it introduces no new *architectural* dependency
 - **User Story 3 (Phase 5)**: Depends on US1 (T015) and US2 (T024) being implemented, since the README documents both the discovery mechanism and the metadata-sourcing/error behavior
 - **Polish (Phase 6)**: Depends on all user stories being complete
+- **Bug Fixes (Phase 7)**: Independent of Phases 3–6's code (config/docs-only fix) but logically follows Polish since it was found during Polish-phase (T036) cold-start validation
 
 ### User Story Dependencies
 

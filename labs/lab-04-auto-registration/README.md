@@ -400,6 +400,14 @@ checks — is reused unchanged; only how bytes arrive on local disk differs.
   exists.** Confirm that group is actually loaded in the catalog (check its entity page directly)
   — this error means the *catalog* doesn't know about the group yet, not that your YAML is wrong.
   A common cause locally is a `catalog.locations` URL that hasn't been pushed yet (see Step 5).
+  This can also show up as "no APIs appear in the catalog at all" rather than a single owner
+  error: if the `catalog.locations` entry for your org data (`teams.yaml`/`users.yaml`) points at
+  a branch name that's since been merged and deleted (a stale reference from an earlier lab,
+  rather than your current branch), that location 404s, the group it would have defined never
+  registers, and *every* auto-sourced API whose owner references that group fails validation —
+  which looks like the discovery mechanism itself is broken. Check the backend logs for "Unable
+  to read url, no matching files found" lines against your `catalog.locations` URLs first; if any
+  point at a branch other than `main` or your current branch, that's almost always the real cause.
 - **An entity you expect to see is silently missing, with no error logged.** Check the backend
   logs for a `Policy check failed for api:default/<name>` warning — this means the entity was
   built and emitted, but failed Backstage's own entity-schema validation (for example,
