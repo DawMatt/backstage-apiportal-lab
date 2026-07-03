@@ -1,0 +1,14 @@
+name: README sync check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify root README references every labs/ and specs/ directory
+        run: bash scripts/check-readme.sh
