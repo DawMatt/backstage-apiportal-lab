@@ -129,6 +129,25 @@ process built on Prism's programmatic library.
 
 ---
 
+## Phase 7: Bug Fix — Mock Requests 404/Fail End-to-End (issues.md Run 1 — 2026/07/04)
+
+**Purpose**: Fix the root cause behind `specs/005-lab-5-mocking-testing/checklists/issues.md`'s Step 7 report (`GET /api/proxy/mock/museum-api/museum-hours` returned a 404 HTML page with zero gateway log activity). Reproduced live against a clean `yarn start` of `labs/lab-01-base-backstage/backstage/`: this is **two** distinct, previously-undocumented bugs, not one — the frontend module's URL never reaches the gateway at all in local dev, and even a direct backend request is rejected before it gets there.
+
+**Root cause 1 — hardcoded relative proxy URL breaks across dev's two origins**: `apiMocking/index.tsx`'s `MockableOpenApiWidget` builds the mock server URL as the literal string `` `/api/proxy/mock/${entity.metadata.name}` `` (T011). In `yarn start`, the frontend (`http://localhost:3000`) and backend (`http://localhost:7007`) are different origins; a relative URL resolves against the *frontend's* origin, which has no route for it — Rspack's dev server serves its SPA fallback (or a bare 404, matching the exact behavior in issues.md) instead of ever reaching the backend's proxy plugin. Confirmed by curling `http://localhost:3000/api/proxy/mock/museum-api/museum-hours` (200, but it's `index.html`, not mock JSON) vs. the same path directly against `:7007` (reaches the real proxy plugin). This bug is latent in production too, where app and backend are typically same-origin behind a single server — which is why it wasn't caught by a static read of the code, only by running it.
+
+**Root cause 2 — the `/mock` proxy endpoint requires Backstage credentials by default**: even hitting `:7007` directly returns `401 { "error": { "name": "AuthenticationError", "message": "Missing credentials" } }`. `@backstage/plugin-proxy-backend`'s default `credentials` policy (`require`) demands a Backstage user/service token on every proxied request unless an endpoint explicitly opts out. Swagger UI's "Try it out" issues a plain `fetch()`/`XMLHttpRequest` with no Backstage token attached (it isn't a Backstage frontend calling through `fetchApiRef`), so every mock request — from a real learner in the browser, not just curl — would 401 even after Root cause 1 is fixed. `config.d.ts`'s own `credentials` union documents exactly this case: `'dangerously-allow-unauthenticated'`, "No Backstage credentials are required to access this proxy target."
+
+- [X] T030 Add `credentials: 'dangerously-allow-unauthenticated'` to the `/mock` proxy endpoint in `labs/lab-01-base-backstage/backstage/app-config.yaml` (same block T005 added), and update the matching YAML snippet under "Step 3 — Add Static Configuration" in `labs/lab-05-mocking-testing/README.md`; add one sentence there explaining why (the mock gateway has no real data/side effects behind it — same justification already used for the Security Note's shared default credential — and Swagger UI's plain `fetch()` never carries a Backstage token, so the default `require` policy would 401 every request regardless of Root cause 1)
+- [X] T031 [P] In `labs/lab-05-mocking-testing/code/packages/app/src/modules/apiMocking/index.tsx`, replace the hardcoded `` `/api/proxy/mock/${entity.metadata.name}` `` with a URL built from `discoveryApiRef`'s `getBaseUrl('proxy')` (import `discoveryApiRef`, `useApi` from `@backstage/core-plugin-api`): call `useApi(discoveryApiRef)` in `MockableOpenApiWidget`, resolve the proxy base URL in a `useEffect` into state (`useState<string>()`), and build `mockUrl` as `` `${proxyBaseUrl}/mock/${entity.metadata.name}` `` inside the existing `useMemo`, gated on `proxyBaseUrl` being resolved (render the unmodified `OpenApiDefinitionWidget` — same fallback path already used for an unparseable spec — until it is)
+- [X] T032 Copy the updated module from T031 into `labs/lab-01-base-backstage/backstage/packages/app/src/modules/apiMocking/index.tsx` (depends on T031, same copy relationship as T012/T018)
+- [X] T033 Manually re-verify against a clean `yarn start` of `labs/lab-01-base-backstage/backstage/`: repeat issues.md's exact repro (`curl 'http://localhost:3000/api/proxy/mock/museum-api/museum-hours?startDate=2024-02-01&page=1&limit=7'`) and confirm a real mock JSON response plus a matching `[mock-gateway] loading "museum-api" ...` log line; then repeat Step 7 through the browser UI (select **Local mock (Lab 5)**, Execute) to confirm the fix holds for Swagger UI's own request path, not just curl (depends on T030, T032)
+- [X] T034 [P] Add a research.md correction entry (following the existing "A correction worth knowing about" convention in the README, and R6's own style) documenting both root causes under research.md, so a future reader sees why `discoveryApiRef` and `dangerously-allow-unauthenticated` are load-bearing, not incidental choices (depends on T033)
+- [X] T035 Mark the Step 7 item in `specs/005-lab-5-mocking-testing/checklists/issues.md` resolved with a one-line pointer to T030–T032 (depends on T033)
+
+**Checkpoint**: `specs/005-lab-5-mocking-testing/checklists/issues.md`'s open item is closed, with both the symptom (curl repro) and the underlying mechanism (dev-mode cross-origin + proxy auth policy) fixed and documented.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -139,6 +158,7 @@ process built on Prism's programmatic library.
 - **User Story 2 (Phase 4)**: Depends on Foundational completion only (uses Galaxy's pre-existing native `servers`, no shared code with US1)
 - **User Story 3 (Phase 5)**: Depends on Foundational completion; extends the same file US1 built (T011), so in practice follows US1 sequentially even though it introduces no new *architectural* dependency
 - **Polish (Phase 6)**: Depends on all three user stories being complete
+- **Bug Fix (Phase 7)**: Depends on Phase 6 having been completed at least once (it corrects behavior T013/T029 already exercised); independent of any single user story's phase gate — it touches US1's mock-URL path but is tracked separately since it originates from a post-implementation field report (issues.md), not from spec.md
 
 ### User Story Dependencies
 
@@ -156,6 +176,7 @@ process built on Prism's programmatic library.
 - T015 (US2 edge case) in parallel with T014 (US2 primary verification) once both are ready to run
 - T023, T024 (Polish README sections) in parallel with each other
 - T027, T028 (Polish) in parallel
+- T030 (config fix) in parallel with T031 (module fix) — different files, no shared dependency until T032/T033
 
 ---
 

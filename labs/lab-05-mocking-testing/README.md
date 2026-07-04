@@ -136,6 +136,7 @@ proxy:
     '/mock':
       target: 'http://localhost:4010'
       changeOrigin: true
+      credentials: 'dangerously-allow-unauthenticated'
 
 mocking:
   gateway:
@@ -149,6 +150,14 @@ mocking:
 The proxy target and `mocking.gateway.port` are the same number, committed twice — Backstage's
 `app-config.yaml` has no config-to-config interpolation (only `${ENV_VAR}` substitution), so
 keeping them in sync is a one-line manual step, not a recurring one.
+
+`credentials: 'dangerously-allow-unauthenticated'` is required, not optional: Swagger UI's "Try it
+out" issues a plain browser `fetch()`, which never carries a Backstage user/service token. The
+proxy plugin's default policy (`require`) demands one on every request, so without this line every
+mock request — a learner's included, not just a raw `curl` — gets a `401 Missing credentials`
+before it ever reaches the gateway. This is safe specifically because the mock gateway has no real
+data or side effects behind it (same justification as the Security Note's shared default
+credential below) — do not reach for this setting for a proxy target that fronts anything real.
 
 ## Step 4 — Wire the Start Script
 

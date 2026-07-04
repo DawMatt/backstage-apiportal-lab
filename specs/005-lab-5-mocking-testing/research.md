@@ -168,6 +168,7 @@ proxy:
     /mock:
       target: 'http://localhost:4010'
       changeOrigin: true
+      credentials: 'dangerously-allow-unauthenticated'
 ```
 
 **Correction found during implementation**: Backstage's `app-config.yaml` has no config-to-config
@@ -175,8 +176,10 @@ interpolation syntax (`${...}` there only substitutes environment variables) —
 above describing this as "interpolated from `mocking.gateway.port`" was aspirational, not something
 that was ever actually implementable. Both values are committed as the same literal port number
 (`4010`), with an inline comment noting they must be kept in sync manually — a single-line, one-time
-cost, not a recurring maintenance burden. The frontend module computes each entity's mock URL as
-`/api/proxy/mock/<entityNameSlug>` — one static prefix plus the same slug used throughout. The Galaxy
+cost, not a recurring maintenance burden. The frontend module computes each entity's mock URL as an
+absolute URL resolved from `discoveryApiRef.getBaseUrl('proxy')`, not the originally-planned literal
+`/api/proxy/mock/<entityNameSlug>` string — see the field-report correction below (R8) for why a
+relative URL doesn't work. The Galaxy
 API's pre-existing native `servers` entries (`galaxy.scalar.com`, `void.scalar.com`) continue to be
 called directly by the browser, without a proxy hop — Scalar's public example services are designed
 for direct external/browser calls.
@@ -256,3 +259,58 @@ architecture change.
 This principle-mapping section exists specifically because the original (superseded) R2/R4/R5
 decisions were written and approved before Constitution Principle VIII's scale requirement was
 amended in, and did not actually satisfy it on review — this file's revision is that correction.
+
+## R8: Field-report correction — mock requests failed end-to-end (issues.md Run 1)
+
+**What was found**: A learner-run walkthrough of quickstart.md Step 7 reported
+`GET /api/proxy/mock/museum-api/museum-hours` returning a 404, with no corresponding log activity
+in the gateway — meaning the request never reached it at all. Reproducing this against a clean
+`yarn start` surfaced two independent, previously-undocumented bugs — not one:
+
+1. **The frontend module's mock URL was a hardcoded relative path** (`` `/api/proxy/mock/${entity.metadata.name}` ``,
+   R1/R5 as originally written). In `yarn start`, the frontend (`http://localhost:3000`) and
+   backend (`http://localhost:7007`) are different origins. A relative URL resolves against
+   whichever origin issues the request — the *frontend's* own dev server, which has no such route
+   and answers with its own 404/SPA-fallback before the backend's proxy plugin is ever involved.
+   Confirmed directly: curling the same path against `:3000` returns the dev server's `index.html`
+   (or a bare 404, matching the original report); the identical path against `:7007` reaches the
+   real proxy plugin. This is latent even in a packaged/production deployment where app and
+   backend are typically served from one origin — which is exactly why a static read of the code
+   didn't catch it; only running it did.
+2. **The `/mock` proxy endpoint rejected even a correctly-routed request.** Hitting `:7007`
+   directly returned `401 { "error": { "name": "AuthenticationError", "message": "Missing
+   credentials" } }`. `@backstage/plugin-proxy-backend`'s default `credentials` policy (`require`)
+   demands a Backstage user/service token on every proxied request unless an endpoint opts out.
+   Swagger UI's "Try it out" issues a plain `fetch()`/`XMLHttpRequest` — it is not a Backstage
+   frontend calling through `fetchApiRef`, so it never carries that token. This would have 401'd a
+   real learner's browser request just as it did curl, independent of bug 1.
+
+**Decision**: Fix both, and treat them as load-bearing, not incidental:
+
+- The frontend module resolves the mock URL from `discoveryApiRef.getBaseUrl('proxy')` (called via
+  `useApi(discoveryApiRef)` in `MockableOpenApiWidget`, resolved into state in a `useEffect`, and
+  used inside the existing `useMemo` once available) instead of a hardcoded relative string. This
+  is the same discovery mechanism every other Backstage frontend plugin uses to find the backend,
+  and it resolves correctly whether frontend/backend are same-origin (packaged) or split
+  (`yarn start`).
+- `proxy.endpoints['/mock']` sets `credentials: 'dangerously-allow-unauthenticated'` (documented
+  directly in `@backstage/plugin-proxy-backend`'s own config schema for exactly this case). This is
+  acceptable specifically because the mock gateway has no real data or side effects behind it — the
+  same justification the Security Note already uses for the shared default credential — and would
+  not be an appropriate default for a proxy target fronting anything real.
+
+**Alternatives considered**: Having the frontend module call the mock gateway directly (bypassing
+the Backstage proxy entirely) — rejected; it would reintroduce the CORS problem R5 exists to avoid,
+and lose the "one static, auditable proxy target" property FR-004 relies on. Leaving the proxy at
+its default `credentials: 'require'` and instead having the frontend module attach a Backstage
+token to Swagger UI's request — rejected; `swagger-ui-react` has no supported hook for injecting
+per-request auth headers into requests it issues internally (`onComplete`/`authActions.authorize`
+only manages the spec's own declared security schemes, not the transport layer to the proxy
+itself), and even if it did, it would conflate "credentials to reach the mock" with "credentials
+mocking.defaultCredential is documented as demonstrating" (R6) — the two are unrelated by design.
+
+**Rationale for surfacing this as its own research entry rather than silently editing R1/R5**:
+Constitution Principle VIII/IX-style review already found one correction worth being explicit about
+mid-plan (the per-process design in R2); this is the same pattern one layer later — found by
+running the implementation, not by reading it more carefully in advance, and worth keeping visible
+for the same reason.

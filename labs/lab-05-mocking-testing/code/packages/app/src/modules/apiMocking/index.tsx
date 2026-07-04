@@ -18,11 +18,11 @@
 // forwards all received props down to `swagger-ui-react`'s own `<SwaggerUI>`, whose `spec` prop
 // is spread in *after* its own internal `spec={definitionString}` — so our `spec` object wins
 // (confirmed by reading OpenApiDefinition.esm.js's source, not assumed).
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import * as yaml from 'js-yaml';
 import { createFrontendModule } from '@backstage/frontend-plugin-api';
 import { ApiBlueprint } from '@backstage/frontend-plugin-api';
-import { configApiRef } from '@backstage/core-plugin-api';
+import { configApiRef, discoveryApiRef, useApi } from '@backstage/core-plugin-api';
 import type { Entity } from '@backstage/catalog-model';
 import {
   apiDocsConfigRef,
@@ -67,7 +67,28 @@ function MockableOpenApiWidget({
   entity: Entity;
   credential: DefaultCredential | undefined;
 }) {
+  // The mock URL must be absolute, not a path relative to the page's own origin: in local dev
+  // the frontend (:3000) and backend (:7007) are different origins, so a relative
+  // `/api/proxy/mock/...` string resolves against the *frontend's* origin and never reaches the
+  // backend's proxy plugin at all (confirmed by reproducing issues.md's Step 7 404 — the
+  // frontend dev server's own 404/SPA-fallback answers before the backend ever sees the
+  // request). `discoveryApiRef.getBaseUrl('proxy')` resolves the backend's actual, correct
+  // origin for both dev and packaged/same-origin production deployments.
+  const discoveryApi = useApi(discoveryApiRef);
+  const [proxyBaseUrl, setProxyBaseUrl] = useState<string | undefined>();
+  useEffect(() => {
+    let cancelled = false;
+    discoveryApi.getBaseUrl('proxy').then(baseUrl => {
+      if (!cancelled) setProxyBaseUrl(baseUrl);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [discoveryApi]);
+
   const mergedSpec = useMemo(() => {
+    if (!proxyBaseUrl) return undefined;
+
     let parsed: any;
     try {
       parsed = yaml.load(definition);
@@ -76,16 +97,17 @@ function MockableOpenApiWidget({
     }
     if (!parsed || typeof parsed !== 'object') return undefined;
 
-    const mockUrl = `/api/proxy/mock/${entity.metadata.name}`;
+    const mockUrl = `${proxyBaseUrl}/mock/${entity.metadata.name}`;
     const nativeServers = Array.isArray(parsed.servers) ? parsed.servers : [];
     return {
       ...parsed,
       servers: [...nativeServers, { url: mockUrl, description: MOCK_SERVER_DESCRIPTION }],
     };
-  }, [definition, entity]);
+  }, [definition, entity, proxyBaseUrl]);
 
   if (!mergedSpec) {
-    // Not parseable as an OpenAPI document — fall back to the unmodified default rendering.
+    // Not yet parseable as an OpenAPI document, or the proxy base URL hasn't resolved yet —
+    // fall back to the unmodified default rendering (re-renders once it has).
     return <OpenApiDefinitionWidget definition={definition} />;
   }
 
