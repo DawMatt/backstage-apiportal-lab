@@ -1,31 +1,49 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.4.0 → 1.5.0
-Added sections:
-  - Lab Structure Standards — new requirement: a lab is not complete until the root README.md
-    (Lab Series table, Getting Started tree, Repository Structure tree) is updated to reference
-    its labs/ and specs/ directories; this must be planned/tasked, not left to post-hoc CI
-Modified principles: None renamed
+Version change: 1.5.0 → 1.6.0
+Modified principles:
+  - VIII. Support Experimentation → VIII. Support Experimentation & Scale — added a new
+    requirement: labs' technical choices MUST be able to scale to real-world implementation
+    sizes (reference point: 500+ APIs) via configuration/sizing changes rather than a
+    different architecture, even though the lab itself may only build/exercise a small demo;
+    lab-only simplifications that don't generalize to scale even in principle MUST be flagged
+    explicitly rather than left implicit
+Added sections: None
 Removed sections: None
 Templates reviewed:
   ✅ .specify/templates/plan-template.md — Constitution Check section is generic (gates are
     derived from the constitution file at plan time, no fixed per-principle table); no edit
-    required, the new standard is picked up automatically
-  ✅ .specify/templates/tasks-template.md — Phase N (Polish & Cross-Cutting Concerns) generic
-    "Documentation updates in docs/" placeholder replaced with an explicit root README update
-    task referencing this standard
+    required, the expanded principle is picked up automatically
+  ✅ .specify/templates/tasks-template.md — No principle-specific references to Principle VIII;
+    no edit required (scale-related tasks, where applicable, fall under each user story's own
+    phase or the existing Polish phase)
   ✅ .specify/templates/spec-template.md — No principle-specific references; no updates required
 Instance files requiring updates (in-progress/completed feature work):
-  ✅ README.md — updated for Lab 4 (2026-07-04): Lab Series table row linked (no longer "coming
-    soon"), Getting Started and Repository Structure trees include labs/lab-04-auto-registration/
-    and specs/004-lab-4-auto-registration/
-  ✅ scripts/check-readme.sh + .github/workflows/readme-sync.yml — added 2026-07-04 as a CI
-    safety net (not the primary mechanism — see rationale above)
+  ✅ specs/004-lab-4-auto-registration/plan.md — already compliant without changes: its
+    `autoApiRegistration` design (persisted scan-state cache, multi-source config) was already
+    documented as scaling to 1000+ files/1GB+ via config only, ahead of this amendment; this is
+    the precedent the new principle text codifies
+  ⚠→✅ specs/005-lab-5-mocking-testing/{research.md,data-model.md,plan.md,quickstart.md,tasks.md}
+    — CORRECTION (2026-07-04, post-amendment): this report originally claimed Lab 5 was "already
+    compliant without changes" at v1.6.0's adoption. That was wrong — its then-current design
+    spawned one `prism` CLI process per discovered API, which does not scale (500+ APIs → 500+
+    permanently-running processes/ports regardless of use; a real ceiling, not a config knob).
+    Caught on user review immediately after this amendment and reworked to a single in-process,
+    lazily-loading gateway (research.md R2/R7) before any implementation began. Left here as a
+    record that the "already compliant" pass at amendment time was not rigorous enough — it read
+    the existing scaling *prose* as sufficient without checking whether the underlying mechanism
+    actually had a scaling ceiling
   ⚠ specs/001-lab-1-base-backstage/plan.md — Constitution Check table missing Principle IX
-    (pre-existing gap, unrelated to this amendment)
+    (pre-existing gap, unrelated to this amendment) and does not yet address Principle VIII's
+    new scale requirement (new gap, low priority — Lab 1 is base setup, not a scaling-sensitive
+    mechanism)
   ⚠ specs/002-lab-2-users-roles/spec.md — Should note Principle IX applies to auth credential
     handling (pre-existing gap, unrelated to this amendment)
+  ⚠ specs/002-lab-2-users-roles/plan.md and specs/003-lab-3-api-quality/plan.md — neither
+    Constitution Check table currently addresses Principle VIII's new scale requirement
+    (new gap; not blocking since both labs already precede Lab 4's scale precedent, but worth a
+    pass if either plan is revisited)
 Follow-up TODOs: None
 -->
 
@@ -125,7 +143,7 @@ Every sample API MUST meet all of the following criteria:
 good API design. Learners leave with a correct Backstage setup but no intuition for what a
 well-designed API looks like. Using purposeful examples makes both lessons land simultaneously.
 
-### VIII. Support Experimentation
+### VIII. Support Experimentation & Scale
 
 Labs MUST be designed to support forking, adaptation, and deviation.
 Documentation MUST NOT assume users will follow every step exactly as written.
@@ -133,10 +151,27 @@ Where users may reasonably substitute tools, configurations, or approaches, the 
 acknowledge this and explain the trade-offs rather than presenting one path as the only path.
 Verification steps MUST test outcomes, not prescribed implementation details.
 
+Labs MUST also choose technical approaches that can scale to real-world implementation sizes
+(as a reference point, 500+ APIs) via configuration and resource-sizing changes rather than a
+different architecture. A lab MAY defer building or exercising the at-scale behavior itself —
+the lab demo may run against a handful of sample APIs — as long as: (a) the chosen mechanism has
+no fundamental scaling ceiling that would force a redesign, and (b) the lab's documentation
+identifies what changes (config, not code) between lab-demo scale and a large-scale deployment,
+and why. Design choices whose sole purpose is to simplify the lab, and which do not generalize to
+a larger scale even in principle, MUST be flagged explicitly as a known lab-only simplification
+rather than left implicit.
+
 **Rationale**: Users fork this repository to adapt it to their own needs, teams, and
-constraints. A lab that only works when followed to the letter fails the majority of its
-audience. Outcome-based verification and acknowledged variation points make labs resilient
-to the experimentation that real learning requires.
+constraints — including scale far beyond the lab's own small demo. A lab that only works when
+followed to the letter fails the majority of its audience; a lab whose only path to real-world
+scale is a rewrite fails learners evaluating whether the approach will actually hold up in their
+organization. Outcome-based verification and acknowledged variation points make labs resilient to
+experimentation; requiring the *mechanism* — not necessarily the lab's exercised scenario — to
+scale keeps labs honest about what's a genuine design decision versus a shortcut taken purely for
+tutorial simplicity. Lab 4's `autoApiRegistration` design (a persisted scan-state cache and
+multi-source config built for 1000+ files/1GB+ repos, though the lab itself exercises only two
+small sample files) already established this pattern; this principle codifies that precedent for
+all labs going forward.
 
 ### IX. Pragmatic Security for Learning Environments
 
@@ -238,4 +273,4 @@ All plan `Constitution Check` gates MUST reference the principles by Roman numer
 
 - `yarn dev` does not exist. Use `yarn start` instead. 
 
-**Version**: 1.5.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-07-04
+**Version**: 1.6.0 | **Ratified**: 2026-06-07 | **Last Amended**: 2026-07-04
