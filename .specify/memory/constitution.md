@@ -24,10 +24,16 @@ Instance files requiring updates (in-progress/completed feature work):
     `autoApiRegistration` design (persisted scan-state cache, multi-source config) was already
     documented as scaling to 1000+ files/1GB+ via config only, ahead of this amendment; this is
     the precedent the new principle text codifies
-  ✅ specs/005-lab-5-mocking-testing/{research.md,quickstart.md} — already compliant without
-    changes: research.md R4 and quickstart.md's "Scaling beyond the lab" section already flag
-    lab-scale port assignment as a documented simplification needing a persisted port map at
-    real scale, ahead of this amendment
+  ⚠→✅ specs/005-lab-5-mocking-testing/{research.md,data-model.md,plan.md,quickstart.md,tasks.md}
+    — CORRECTION (2026-07-04, post-amendment): this report originally claimed Lab 5 was "already
+    compliant without changes" at v1.6.0's adoption. That was wrong — its then-current design
+    spawned one `prism` CLI process per discovered API, which does not scale (500+ APIs → 500+
+    permanently-running processes/ports regardless of use; a real ceiling, not a config knob).
+    Caught on user review immediately after this amendment and reworked to a single in-process,
+    lazily-loading gateway (research.md R2/R7) before any implementation began. Left here as a
+    record that the "already compliant" pass at amendment time was not rigorous enough — it read
+    the existing scaling *prose* as sufficient without checking whether the underlying mechanism
+    actually had a scaling ceiling
   ⚠ specs/001-lab-1-base-backstage/plan.md — Constitution Check table missing Principle IX
     (pre-existing gap, unrelated to this amendment) and does not yet address Principle VIII's
     new scale requirement (new gap, low priority — Lab 1 is base setup, not a scaling-sensitive
