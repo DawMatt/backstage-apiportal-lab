@@ -54,11 +54,18 @@ Constitution Principle II.
    already offers `galaxy.scalar.com` / `void.scalar.com` with no additional Lab 5 configuration,
    select one, execute a request, and confirm the response comes from the real sandbox (US2,
    SC-002).
-9. **User Story 3 — credentials**: on an authenticated request (mock or sandbox), confirm the
-   "Authorize" dialog is already pre-filled with the `mocking.defaultCredential` value and the
-   request succeeds with zero setup (SC-003). Replace it with a different value in the same
-   dialog, confirm the replacement is what's actually sent (SC-004), and confirm no committed file
-   ever contains a personal credential.
+9. **User Story 3 — credentials**: Galaxy's `GET /me` declares six alternative security schemes
+   (`basicAuth`, three `oAuth2` flows, `bearerAuth`, `apiKeyHeader`, `apiKeyQuery`, and a combined
+   `apiKeyHeader`+`apiKeyQuery`), plus two more Swagger UI derives from Galaxy's OpenID Connect
+   discovery document — eleven sections total in the Authorize dialog, of which only `bearerAuth`
+   is pre-authorized with `mocking.defaultCredential`. Executing `GET /me` with no credential
+   entered succeeds against **both** the local mock (SC-003) and the real `galaxy.scalar.com`
+   sandbox — confirm via the browser's network tab that `Authorization: Bearer
+   lab-mock-token-do-not-use` was actually sent on the sandbox request even though nothing was
+   typed. Then call `POST /auth/token` against the sandbox, paste the returned `token` into the
+   `bearerAuth` field (replacing the pre-filled default), and confirm `GET /me` still succeeds with
+   the request's `Authorization` header now showing the pasted token instead (SC-004). Confirm no
+   committed file ever contains a personal credential.
 10. **Verify a second, unconfigured API gets a mock automatically**: temporarily add a third
     `*-openapi.yaml` file matching Lab 4's discovery pattern, restart `yarn start` (the gateway's
     discovery map is boot-time-only, so a restart is expected/documented — research.md R7), and

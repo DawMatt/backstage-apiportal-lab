@@ -148,6 +148,44 @@ process built on Prism's programmatic library.
 
 ---
 
+## Phase 8: Bug Fix — Credential Pre-fill Silently Never Applied to the Real Sandbox (issues.md Run 2 — 2026/07/04)
+
+**Purpose**: Fix the two Step 9 issues reported in `specs/005-lab-5-mocking-testing/checklists/issues.md`'s Run 2. Initial static reading of `apiMocking/index.tsx` and Galaxy's spec suggested both
+reports were documentation-only (many auth sections; sandbox "correctly" rejecting a fictional token) — but live Playwright instrumentation against a running `yarn start` (network capture + DOM
+inspection of the Authorize dialog) found a **real, previously-undiagnosed code defect**, not just a docs gap: `MockableOpenApiWidget`'s early-return fallback
+(`if (!mergedSpec) return <OpenApiDefinitionWidget definition={definition} />`) mounts `swagger-ui-react`'s `SwaggerUI` on the very first render — before `proxyBaseUrl` (and therefore `mergedSpec`
+and `onComplete`) have resolved via `useEffect` — with no `onComplete` prop at all. `swagger-ui-react` only ever wires up the `onComplete` callback it was given at that first mount; a later re-render
+that finally supplies `onComplete` does nothing, since the underlying system was already constructed without it. The result: `system.authActions.authorize(...)` was silently never called, and
+`GET /me` against the real `galaxy.scalar.com` sandbox carried no `Authorization` header at all — not a rejected fictional token, no token whatsoever, confirmed by capturing the actual outgoing
+request. The mock appeared to work only because Prism's `mock: { dynamic: false }` instance never validates (or requires) the bearer token's contents, masking the fact that authorization was never
+actually applied anywhere. Separately, and independent of the code fix, Galaxy's `GET /me` genuinely does render 11 distinct Authorize-dialog sections (6 from its own declared `security:` alternatives
+— `basicAuth`, three `oAuth2` flows, `bearerAuth`, `apiKeyHeader`, `apiKeyQuery`, a combined `apiKeyHeader`+`apiKeyQuery` — plus 2 more Swagger UI derives from Galaxy's OpenID Connect discovery
+document), of which only `bearerAuth` was ever meant to be pre-filled; Step 9 never told the learner which one to look for, or that an already-authorized scheme renders as a padlock/"logged in" state
+with no visible text box rather than a filled-in string.
+
+- [X] T036 In `labs/lab-05-mocking-testing/code/packages/app/src/modules/apiMocking/index.tsx`, change `MockableOpenApiWidget` to render `null` while `proxyBaseUrl` is still unresolved, instead of the
+  plain `OpenApiDefinitionWidget` fallback — ensuring `OpenApiDefinitionWidget`/`SwaggerUI` is mounted only once, already carrying its final `spec` and `onComplete` (research.md R9); keep the existing
+  `!mergedSpec` fallback (unparseable spec) as the only remaining case that renders the plain widget without `onComplete`
+- [X] T037 Copy the updated module from T036 into `labs/lab-01-base-backstage/backstage/packages/app/src/modules/apiMocking/index.tsx` (depends on T036, same copy relationship as T012/T018/T032)
+- [X] T038 Update README Step 9 (`labs/lab-05-mocking-testing/README.md`) and quickstart.md step 9 (`specs/005-lab-5-mocking-testing/quickstart.md`) to: (a) name all 11 Authorize-dialog sections for
+  Galaxy's `GET /me` and point the learner at `bearerAuth` specifically, noting it renders as an already-authorized padlock state with no input box rather than a filled-in string; (b) confirm
+  `GET /me` now succeeds with zero credential entered against **both** the local mock and the real `galaxy.scalar.com` sandbox (the original, correct claim, now actually true after T036/T037); (c)
+  retain the `POST /auth/token` → paste-into-`bearerAuth` walkthrough as the FR-007/SC-004 "supply your own credential" override demonstration, now framed as optional rather than a workaround
+  (depends on T037)
+- [X] T039 [P] Add a research.md R9 correction entry (`specs/005-lab-5-mocking-testing/research.md`, following R8's style) documenting the real root cause (premature mount before `onComplete` was
+  available), the fix (T036/T037), and the section-count clarification, including the alternatives considered and rejected (imperative re-authorize via a system ref; documenting the sandbox
+  rejection as "expected" without fixing it) (depends on T036)
+- [X] T040 Manually re-verify Step 9 end-to-end against a clean `yarn start` (Playwright-scripted, capturing the live `galaxy.scalar.com` network requests): the Authorize dialog shows 11 sections for
+  `GET /me`, with `bearerAuth` already authorized (no empty input) on page load; `GET /me` against the local mock succeeds with zero credential entered; `GET /me` against the real
+  `galaxy.scalar.com` sandbox also succeeds with zero credential entered, and the captured request shows `Authorization: Bearer lab-mock-token-do-not-use` was actually sent; `POST /auth/token`
+  against the sandbox, pasting its `token` into `bearerAuth`, still succeeds with the request now showing the pasted token instead (depends on T038)
+- [X] T041 Mark Run 2's items in `specs/005-lab-5-mocking-testing/checklists/issues.md` resolved with a one-line pointer to T036–T040 (depends on T040)
+
+**Checkpoint**: `specs/005-lab-5-mocking-testing/checklists/issues.md` Run 2 is closed — the credential pre-fill now genuinely applies before the widget's first paint, verified live against both the
+mock and the real sandbox, and Step 9's instructions correctly identify which of Galaxy's 11 Authorize-dialog sections matters.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -159,6 +197,8 @@ process built on Prism's programmatic library.
 - **User Story 3 (Phase 5)**: Depends on Foundational completion; extends the same file US1 built (T011), so in practice follows US1 sequentially even though it introduces no new *architectural* dependency
 - **Polish (Phase 6)**: Depends on all three user stories being complete
 - **Bug Fix (Phase 7)**: Depends on Phase 6 having been completed at least once (it corrects behavior T013/T029 already exercised); independent of any single user story's phase gate — it touches US1's mock-URL path but is tracked separately since it originates from a post-implementation field report (issues.md), not from spec.md
+- **Bug Fix (Phase 8)**: Depends on Phase 7 (it touches the same `apiMocking/index.tsx` file T031/T032 last edited, and corrects Step 9's text, which sits after Step 7 in the same README/quickstart);
+  a genuine code fix (the `onComplete`-never-fires mount-order bug), not a documentation-only phase as first suspected before live Playwright verification
 
 ### User Story Dependencies
 
@@ -177,6 +217,7 @@ process built on Prism's programmatic library.
 - T023, T024 (Polish README sections) in parallel with each other
 - T027, T028 (Polish) in parallel
 - T030 (config fix) in parallel with T031 (module fix) — different files, no shared dependency until T032/T033
+- T039 (research.md correction) can start as soon as T036 (the code fix) lands, in parallel with T037/T038
 
 ---
 
@@ -228,3 +269,8 @@ Task: "Add AsyncAPI-out-of-scope note"
 - This task list supersedes an earlier draft built around one `prism` CLI process per API; that
   design was reworked (research.md R2/R7) after review against Constitution Principle VIII's scale
   requirement, before any implementation tasks were executed — see the note under Path Conventions.
+- Phase 8 (issues.md Run 2) was initially suspected to be documentation-only (from a static read of
+  `apiMocking/index.tsx`'s scheme-matching logic and Galaxy's declared security schemes), but live
+  Playwright instrumentation against a running `yarn start` found a real code defect — the
+  credential pre-fill's `onComplete` callback never fired against the real sandbox at all — which a
+  docs-only fix would not have addressed; see research.md R9 for the full correction.

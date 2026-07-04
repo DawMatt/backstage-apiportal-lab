@@ -279,13 +279,34 @@ local mock.
 ## Step 9 — User Story 3: Credentials
 
 On Galaxy's page (Museum's spec declares no security scheme, so it isn't a useful demo for this
-step), open the lock icon / **Authorize** dialog. Execute an authenticated operation like
-`GET /me` against either the mock or a native sandbox server with no credential entered — it
-succeeds automatically, because the "Authorize" dialog was already pre-filled with
-`mocking.defaultCredential`'s value on page load. Replace the pre-filled value in that same dialog
-with something else, execute again, and confirm the replacement — not the default — is what's
-actually sent (inspect the request's `Authorization` header in your browser's network tab). Confirm
-no personal credential ever appears in `app-config.yaml` or any other committed file.
+step), open the lock icon / **Authorize** dialog for `GET /me`. Galaxy's spec declares six
+alternative ways to authenticate this one operation (`basicAuth`, three separate `oAuth2` flow
+blocks, `bearerAuth`, `apiKeyHeader`, `apiKeyQuery`, and a combined `apiKeyHeader`+`apiKeyQuery`
+row), and Swagger UI additionally fetches Galaxy's OpenID Connect discovery document and renders
+two more blocks from that — eleven sections in total. **Only the `bearerAuth` section matters for
+this lab**: it's the one this module pre-authorizes with `mocking.defaultCredential`'s value on
+page load. Look for it near the top of the dialog; the rest are additional options Galaxy's spec
+happens to declare, not something this lab wires up — ignore them. A pre-authorized scheme renders
+differently from an empty one: instead of an editable text box, `bearerAuth`'s section shows a
+"logged in"/padlock state with no input field, which is easy to miss if you're scanning for a
+filled-in string among ten other empty text boxes.
+
+Close the dialog (or leave it open — either way, `bearerAuth` is already authorized) and execute
+`GET /me` **against either the local mock or the real `galaxy.scalar.com` sandbox** with no
+credential entered yourself — both succeed on the first try (SC-003), because the pre-fill applies
+before you ever open the dialog. Inspect the request's `Authorization` header in your browser's
+network tab to confirm `lab-mock-token-do-not-use` was actually sent even though you never typed
+it. Unlike the local mock (which never validates the token's contents, only that one was sent),
+`galaxy.scalar.com` is Scalar's own real, live mock-server deployment and does check that a
+plausible bearer token is present — the pre-filled default satisfies that check on the real
+service too, not only on the local mock.
+
+To try your own credential instead: execute `POST /auth/token` against `galaxy.scalar.com` (any
+request body it accepts is fine — see its own docs on this page), copy the `token` value from the
+response, reopen the Authorize dialog, and paste that value into the `bearerAuth` field, replacing
+the pre-filled default. Execute `GET /me` again and confirm it still succeeds — the
+`Authorization` header now shows your pasted token, not the default (SC-004). Confirm no personal
+credential ever appears in `app-config.yaml` or any other committed file.
 
 ## Step 10 — Verify the "Generic by Default" Mechanism
 
@@ -372,8 +393,13 @@ extension, since OpenAPI's request/response model doesn't map onto AsyncAPI's ch
 - [ ] Stopping the gateway process alone (not all of `yarn start`) produces a clear `504`, not a
       silent failure, while Backstage itself keeps running
 - [ ] Galaxy's page offers its native sandbox servers with zero Lab 5 configuration (Step 8)
-- [ ] An authenticated request succeeds with no credential entered (Step 9)
-- [ ] Replacing the pre-filled credential changes what's actually sent (Step 9)
+- [ ] `GET /me` against the mock succeeds with no credential entered (Step 9)
+- [ ] `GET /me` against the real `galaxy.scalar.com` sandbox also succeeds with no credential
+      entered, and the request's `Authorization` header shows `lab-mock-token-do-not-use` was sent
+      even though it was never typed (Step 9)
+- [ ] Pasting a real token from `POST /auth/token` into `bearerAuth` makes `GET /me` against the
+      sandbox still succeed, and the request's `Authorization` header now shows that pasted token,
+      not the default (Step 9)
 - [ ] No personal credential appears in any committed file
 - [ ] A newly added `*-openapi.yaml` file gets a mock option after a restart, with zero
       Lab-5-specific configuration (Step 10)

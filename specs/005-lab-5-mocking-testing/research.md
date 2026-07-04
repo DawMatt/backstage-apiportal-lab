@@ -314,3 +314,73 @@ Constitution Principle VIII/IX-style review already found one correction worth b
 mid-plan (the per-process design in R2); this is the same pattern one layer later — found by
 running the implementation, not by reading it more carefully in advance, and worth keeping visible
 for the same reason.
+
+## R9: Field-report correction — the credential pre-fill silently never applied to the real sandbox (issues.md Run 2)
+
+**What was found**: A learner-run walkthrough of quickstart.md/README Step 9 reported two problems: (1) the
+instruction to "open the lock icon / Authorize dialog" gave no guidance once inside it — Galaxy's `GET /me`
+presents 11 distinct authorization sub-sections/buttons and none appeared to contain pre-filled data, so the
+learner could not tell what to do; (2) `GET /me` worked against the local mock with no credential entered, as
+documented, but returned `401` against the real `galaxy.scalar.com` sandbox — contradicting Step 9's claim that
+the pre-filled default "succeeds automatically... against either the mock or a native sandbox server."
+
+Investigating both against the running implementation (via a scripted Playwright session driving the real
+Galaxy page, not just re-reading the code) found **one real code defect** behind both symptoms, not a
+documentation-only issue as first suspected:
+
+1. **Section count is real and expected**: Galaxy's `GET /me`
+   (`labs/lab-04-auto-registration/apis/galaxy/galaxy-openapi.yaml`) declares `security: [basicAuth,
+   oAuth2(read:account), bearerAuth, apiKeyHeader, apiKeyQuery, apiKeyHeader+apiKeyQuery]` — six alternatives.
+   Swagger UI renders one block per scheme, one per `oAuth2` *flow* (three), plus two more it derives by fetching
+   Galaxy's own OpenID Connect discovery document at `/.well-known/openid-configuration` — 11 sections in total,
+   confirmed by counting `.auth-container` elements in a live-rendered page. Only `bearerAuth` was ever meant to
+   be pre-filled (R1/R6); this part is inherent to Galaxy's spec and not a bug, but Step 9 never told the learner
+   which section to look at.
+2. **The pre-fill itself was silently broken — the real bug**: instrumenting `MockableOpenApiWidget` and
+   capturing the network tab live showed `buildAuthorization()` correctly computed `{ bearerAuth: {...} }`, but
+   the `onComplete` callback that calls `system.authActions.authorize(...)` **never fired at all**, and the
+   outgoing `GET /me` request to `galaxy.scalar.com` carried no `Authorization` header whatsoever — not "a
+   fictional token that got rejected," but no token at all. Root cause: the component's early-return fallback
+   (`if (!mergedSpec) return <OpenApiDefinitionWidget definition={definition} />`) fires on the *first* render,
+   before `proxyBaseUrl` has resolved via its `useEffect` — with no `spec`/`onComplete` props at all. `swagger-ui-
+   react`'s internal system is constructed once, using whatever `onComplete` it was given at that first mount;
+   a later re-render that adds `onComplete` (once `proxyBaseUrl`/`mergedSpec` become available) does not requery
+   or reconstruct that system, so the callback that was supposed to call `authorize()` is permanently dropped for
+   that page view. This is exactly why the **mock** appeared to work "with the pre-fill" — Prism's
+   `mock: { dynamic: false }` instance never actually validates (or even requires) the bearer token's contents,
+   so an *unauthenticated* request against the mock still returns Museum/Galaxy's example response regardless;
+   the mock's apparent success masked the fact that authorization was never actually being sent anywhere.
+
+**Decision**: Fix the real defect in code, then correct the docs to match the now-true behavior:
+
+- `MockableOpenApiWidget` (`labs/lab-05-mocking-testing/code/packages/app/src/modules/apiMocking/index.tsx`,
+  copied into `labs/lab-01-base-backstage/backstage/packages/app/src/modules/apiMocking/index.tsx`) now renders
+  `null` while `proxyBaseUrl` is still resolving, instead of mounting the plain `OpenApiDefinitionWidget` with no
+  `onComplete`. `OpenApiDefinitionWidget`/`SwaggerUI` is now only ever mounted once, already carrying its final
+  `spec` and `onComplete`, since `proxyBaseUrl` resolution is a single near-instant local `discoveryApi` call and
+  the render gap is not learner-perceptible. Re-verified live via the same Playwright session: `bearerAuth`'s
+  authorized state is now set before the widget ever paints, the outgoing `GET /me` request to
+  `galaxy.scalar.com` now carries `Authorization: Bearer lab-mock-token-do-not-use`, and the real sandbox returns
+  `200` — Step 9's original claim ("succeeds automatically against either the mock or a native sandbox") is now
+  actually true, as originally intended, rather than needing to be walked back.
+- Step 9 (README and quickstart.md) is still updated to name the 11 sections and point at `bearerAuth`
+  specifically, and to note that an already-authorized scheme renders as a padlock/"logged in" state with no
+  visible text box (not a filled-in string), which is what made the one working section easy to miss among ten
+  empty ones — this part of the original report stands as a genuine, worthwhile documentation clarification even
+  though the underlying request now succeeds.
+- The `POST /auth/token` → paste-into-`bearerAuth` walkthrough is retained as the FR-007/SC-004 "supply your own
+  credential" demonstration — now correctly framed as an optional override of an already-working default, not as
+  a workaround for a failure.
+
+**Alternatives considered**: Leaving the early-return fallback in place and instead re-invoking `authorize()`
+imperatively after `mergedSpec` becomes available (e.g., via a `ref` to the mounted system) — rejected: would
+require capturing and holding a reference to `swagger-ui-react`'s internal system object across renders purely
+to work around a self-inflicted mount-order issue, when simply not mounting the widget prematurely removes the
+problem entirely and is a one-line change. Documenting the sandbox's `401` as expected behavior without fixing
+anything (this research entry's own first draft, written before live Playwright instrumentation) — rejected on
+further verification: the sandbox does not, in fact, reject the fictional default when the header is actually
+sent, so that framing was itself a misdiagnosis worth correcting rather than committing to the docs.
+
+**Rationale for surfacing this as its own research entry rather than folding it into R6/R8**: same pattern as
+R8's own rationale — found by running the implementation and having a learner exercise it, not by reading the
+docs more carefully in advance; worth keeping visible as its own dated field-report entry for the same reason.

@@ -33,10 +33,22 @@ Response
 
 ## Run 2 - 2026/07/04
 
-- [ ] Step 9 didn't work as expected for the instructions quoted below.
-    - [ ] You requested I open the lock / Authorize dialog. You didn't explain what you wanted me to do in that dialog, and there are 11 different authorization sub-sections and buttons to chose from. None of them seemed to contain any pre-filled data. The next instruction could not be completed without exiting the dialog first.
+- [x] Step 9 didn't work as expected for the instructions quoted below.
+    - [x] You requested I open the lock / Authorize dialog. You didn't explain what you wanted me to do in that dialog, and there are 11 different authorization sub-sections and buttons to chose from. None of them seemed to contain any pre-filled data. The next instruction could not be completed without exiting the dialog first.
     - GET /me did work with the local mock
-    - [ ] GET /me didn't work with the native sandbox server (galaxy.scalar.com), and returned a 401. I needed to use the POST /auth/token endpoint, then take `token` from that and put its contentså in the bearerAuth section of the Authorize dialog, before GET /me would work.
+    - [x] GET /me didn't work with the native sandbox server (galaxy.scalar.com), and returned a 401. I needed to use the POST /auth/token endpoint, then take `token` from that and put its contentså in the bearerAuth section of the Authorize dialog, before GET /me would work.
+
+  **Resolved** (tasks.md T036–T040, research.md R9): a real code defect, not just unclear docs —
+  `MockableOpenApiWidget` mounted `SwaggerUI` with no `onComplete` on its first render (before the
+  proxy base URL resolved), so the credential pre-fill's `authorize()` call was silently never
+  invoked and the real `galaxy.scalar.com` sandbox request carried no `Authorization` header at all
+  (the local mock only *appeared* to work because Prism never validates the token in the first
+  place). Fixed by rendering nothing until the widget's final props are ready, so `SwaggerUI` is
+  mounted once with `onComplete` already wired up. Re-verified live via a scripted Playwright
+  session: `bearerAuth` is now authorized before first paint, and `GET /me` succeeds with zero
+  credential entered against both the mock and the real sandbox, with the sandbox request now
+  genuinely carrying `Authorization: Bearer lab-mock-token-do-not-use`. README/quickstart Step 9
+  also now names all 11 Authorize-dialog sections and points at `bearerAuth` specifically.
 
 Step 9 instruction fragment
 ```

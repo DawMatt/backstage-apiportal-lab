@@ -105,9 +105,26 @@ function MockableOpenApiWidget({
     };
   }, [definition, entity, proxyBaseUrl]);
 
+  if (!proxyBaseUrl) {
+    // The proxy base URL hasn't resolved yet. Deliberately render nothing here rather than the
+    // unmodified default widget: `swagger-ui-react` only ever invokes the `onComplete` callback
+    // it was given at the moment its internal system finishes booting on *first* mount — a later
+    // prop update that adds `onComplete` after that point is silently ignored, since the system
+    // was already constructed without it. Mounting the plain widget here (as an earlier version
+    // of this component did) would boot `SwaggerUI` with no `onComplete` at all, permanently
+    // losing the credential pre-fill for that page view — confirmed live: `authorization`'s keys
+    // were computed correctly but `onComplete` never fired, so `authActions.authorize(...)` was
+    // never called, and the real Galaxy sandbox 401'd `GET /me` because no `Authorization` header
+    // was ever sent, not because the fictional default was rejected (issues.md Run 2, research.md
+    // R9). Resolving `proxyBaseUrl` is a single near-instant local `discoveryApi` call, so this
+    // window is not user-perceptible in practice.
+    return null;
+  }
+
   if (!mergedSpec) {
-    // Not yet parseable as an OpenAPI document, or the proxy base URL hasn't resolved yet —
-    // fall back to the unmodified default rendering (re-renders once it has).
+    // Proxy URL resolved, but the spec itself isn't parseable as an OpenAPI document — fall back
+    // to the unmodified default rendering. `onComplete` genuinely has nothing useful to authorize
+    // in this case (no security schemes to read), so mounting without it here is fine.
     return <OpenApiDefinitionWidget definition={definition} />;
   }
 
