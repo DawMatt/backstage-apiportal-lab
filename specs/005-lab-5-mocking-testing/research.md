@@ -38,11 +38,9 @@ API directly — not the `prism` CLI, and not one child process per API. On each
 1. Look up `entityNameSlug` in an in-memory `slug → specFilePath` map built once at gateway startup
    from Lab 4's existing `autoApiRegistration` discovery config (research.md R3) — cheap (a glob),
    not a parse, so this is fine to do eagerly even at 500+ files.
-2. If this slug's spec has not been loaded yet, read + `js-yaml`-parse the file and convert it to
-   Prism's operation format via `@stoplight/http-spec`'s `transformOas3Operations(document)`
-   (`@stoplight/http-spec@7.1.0`, subpath `@stoplight/http-spec/oas3`) — synchronous, in-memory,
-   requires no external `$ref` bundling step for this lab's self-contained specs (Constitution
-   Principle VII). Cache the resulting `IHttpOperation[]` in a bounded, LRU-evicted `Map`.
+2. If this slug's spec has not been loaded yet, convert it to Prism's operation format via
+   `@stoplight/prism-http`'s own `getHttpOperationsFromSpec(filePath)` helper. Cache the
+   resulting `IHttpOperation[]` in a bounded, LRU-evicted `Map`.
 3. Call `.request()` on a single, gateway-lifetime `Prism.createInstance({ mock: { dynamic: false } })`
    instance (`@stoplight/prism-http@5.15.11`) with the translated request and the (now-cached)
    operations array, translate the returned mock response back to a real HTTP response.
@@ -52,6 +50,25 @@ both packages (not guessed): `createInstance(...).request(requestDescriptor, ope
 mocked response without binding any HTTP server/port of its own — it's a plain function call. No
 `@stoplight/prism-cli` or `@stoplight/prism-http-server` dependency is needed; `@stoplight/prism-core`
 is pulled in automatically as a dependency of `prism-http`.
+
+**Correction found during implementation**: the original plan called for the gateway to call
+`@stoplight/http-spec`'s `transformOas3Operations(document)` directly on a plain `js-yaml`-parsed
+document. Tested live against Museum's real spec, this fails at mock-generation time with
+`Invalid reference token: components` the moment a response has no static example and Prism falls
+back to schema-driven generation — `transformOas3Operations` alone does not resolve the document's
+own internal `$ref`s (e.g. `#/components/schemas/Foo`), which essentially all non-trivial OpenAPI
+documents contain. Reading `@stoplight/prism-http`'s own source
+(`dist/utils/operations.js`) showed it wraps that exact same `transformOas3Operations` call with a
+`$RefParser().dereference()` + `bundleTarget()` step first, and exports the combined result as
+`getHttpOperationsFromSpec` — which also accepts a file path directly, so the gateway no longer
+reads/parses each spec file itself. `@stoplight/http-spec` remains an implicit dependency (pulled in
+by `prism-http`) but is no longer imported directly by the gateway script.
+The gateway also needed a small hand-rolled logger (not a `pino` dependency): Prism's core
+`factory()` and mocker call several pino-style methods on whatever logger `createInstance` is given
+— `child({ name })` on every request, plus assorted level methods including a non-standard
+`success` — discovered by hitting `TypeError: logger.success is not a function` at runtime. A
+`Proxy`-based logger answering any method name (silencing `debug`/`trace` to keep output readable)
+satisfies this without adding a new dependency.
 
 **Rationale**: The original per-file `prism mock <file> -p <port>` CLI-child-process design (superseded
 below) does not satisfy Constitution Principle VIII's amended scale requirement. At 500+ APIs it means
@@ -92,13 +109,29 @@ any registered OpenAPI API, not hardcoded to one example.
 **Alternatives considered**: A separate `mocking.include` glob — rejected as duplicate, driftable
 configuration for the same underlying file set.
 
+**Correction found during implementation**: Museum (Lab 1/2's own sample API, and this lab's
+primary walkthrough target — its native `servers` entry is fictitious/non-resolvable, which is
+exactly why it makes a good mocking demo) is **not** covered by the above. Its spec file is
+committed as a plain `labs/lab-01-base-backstage/apis/museum/openapi.yaml` — catalogued by hand
+via a committed `catalog-info.yaml`, not by Lab 4's `EntityProvider` — so it sits outside Lab 4's
+default `rootPath` *and* its filename can never match the `*-openapi.yaml` glob (no non-empty
+prefix before `-openapi.yaml`) regardless of `rootPath`. This was only discovered by actually
+building the discovery map and checking Museum's page against it, not by re-reading the plan.
+Resolution (confirmed with the user rather than assumed): the gateway scans Lab 4's discovery
+source **plus** one additional, explicitly-named source pointed at Lab 1's `apis/` directory with
+its own pattern (`**/openapi.yaml`), configurable via `mocking.gateway.additionalSources` (default
+covers exactly this case). This is a deliberate, documented divergence from "reuse Lab 4's config
+as the *only* source of truth" — Lab 4's own glob is left completely untouched; one more source is
+added alongside it rather than broadening it, so Lab 4's own scale/discovery story (R3 above,
+research.md's Lab 4 R6) is unaffected.
+
 ## R4: Running the gateway alongside `yarn start`
 
 **Decision (revised)**: Add `concurrently` as a root devDependency and run
 `scripts/mock-gateway.mjs` alongside `backstage-cli repo start`:
 
 ```json
-"start": "concurrently -k -n app,mocks \"backstage-cli repo start\" \"node scripts/mock-gateway.mjs\""
+"start": "concurrently -n app,mocks \"backstage-cli repo start\" \"node scripts/mock-gateway.mjs\""
 ```
 
 `wait-on` is **no longer needed** and has been dropped from the design. The original design used it
@@ -111,7 +144,13 @@ the time a learner actually clicks "Try it out," which is well after both proces
 **Rationale**: `backstage-cli repo start` already owns frontend/backend orchestration internally;
 `concurrently` is the smallest addition that achieves "mock starts automatically with `yarn start`."
 Removing `wait-on` and the generated-config race it existed to solve is a direct, welcome consequence
-of moving to a single static gateway rather than N generated proxy entries.
+of moving to a single static gateway rather than N generated proxy entries. `concurrently`'s
+`-k`/`--kill-others` flag is deliberately **not** used: quickstart.md's own verification steps
+(and Constitution Principle VIII's "errors surface clearly" expectation, FR-008) call for stopping
+*only* the gateway and confirming Backstage stays up and reports a clear connection error on the
+next mock request — `-k` would tear down the whole `yarn start` session the moment the gateway
+exits, which was only discovered by actually running that verification step, not reasoned about in
+advance.
 
 **Alternatives considered**: Implementing mocking as a Backstage backend plugin/module (the pattern
 Lab 4 used for catalog discovery) — rejected: heavier (new backend module + registration), and this
@@ -127,12 +166,16 @@ directly), which a backend-embedded route would not.
 proxy:
   endpoints:
     /mock:
-      target: 'http://localhost:${mocking.gateway.port}'
+      target: 'http://localhost:4010'
       changeOrigin: true
 ```
 
-(interpolated from the same `mocking.gateway.port` config key the gateway itself reads — single
-source of truth, no drift). The frontend module computes each entity's mock URL as
+**Correction found during implementation**: Backstage's `app-config.yaml` has no config-to-config
+interpolation syntax (`${...}` there only substitutes environment variables) — the original wording
+above describing this as "interpolated from `mocking.gateway.port`" was aspirational, not something
+that was ever actually implementable. Both values are committed as the same literal port number
+(`4010`), with an inline comment noting they must be kept in sync manually — a single-line, one-time
+cost, not a recurring maintenance burden. The frontend module computes each entity's mock URL as
 `/api/proxy/mock/<entityNameSlug>` — one static prefix plus the same slug used throughout. The Galaxy
 API's pre-existing native `servers` entries (`galaxy.scalar.com`, `void.scalar.com`) continue to be
 called directly by the browser, without a proxy hop — Scalar's public example services are designed
@@ -164,6 +207,27 @@ mechanism for free.
 **Alternatives considered**: Unconditional proxy-level header injection — rejected, breaks override.
 Requiring learners to always enter a credential manually — rejected, fails FR-006 ("succeeds by
 default without any learner setup").
+
+**Corrections found during implementation** (both confirmed live, in a browser, not assumed):
+- A new custom config key read via `configApiRef` is invisible to the frontend by default —
+  Backstage's config-schema/visibility system only exposes keys declared `@visibility frontend`
+  in a `config.d.ts` file, and only for packages that declare `"configSchema": "config.d.ts"` in
+  their own `package.json`. Without that declaration, `mocking.defaultCredential.*` silently came
+  back as `undefined` client-side (confirmed by inspecting the `<script type="backstage.io/config">`
+  payload the backend serves — the two keys appeared under `filteredKeys`, i.e. stripped). Fixed by
+  adding both `packages/app/config.d.ts` (declaring `mocking.defaultCredential.{scheme,value}` as
+  `@visibility frontend`) and `"configSchema": "config.d.ts"` to `packages/app/package.json`.
+- `getApiDefinitionWidget(apiEntity)`'s returned widget's `component: (definition: string) => ...`
+  only ever receives the raw definition *string* (confirmed by `ApiDefinitionWidget`'s type
+  signature) — the full `apiEntity` is available in the *outer* `getApiDefinitionWidget` closure,
+  not inside `component`, which is what this lab's widget factory relies on to compute the mock URL
+  and merged servers list per entity. Separately, `OpenApiDefinitionWidget` (and the
+  `OpenApiDefinition` it lazily renders) spread all received props onto `swagger-ui-react`'s own
+  `<SwaggerUI>` *after* its own internal `spec={definitionState}`, so passing an extra `spec` prop
+  through the widget (a full parsed-and-merged document object, not the original string) overrides
+  the internally-rendered one — confirmed by reading `OpenApiDefinition.esm.js`'s source, and this
+  is exactly the mechanism this lab's widget uses to inject the "Local mock (Lab 5)" server entry
+  without needing any support from `@backstage/plugin-api-docs` itself.
 
 ## R7: Constitution Principle VIII — why this mechanism actually scales
 

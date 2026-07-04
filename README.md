@@ -17,7 +17,7 @@ Each lab is self-contained, cross-platform (Windows and macOS), and costs nothin
 | [Lab 2](labs/lab-02-users-roles/) | Users, Roles & API Visibility | Add users, teams, and a custom permission policy; private APIs are visible only to their owning team, shared APIs are visible to everyone |
 | [Lab 3](labs/lab-03-api-quality/) | API Quality | Add a shared Spectral ruleset, the api-grade quality plugin, and the Spectral linter plugin; API owners and a platform team see detailed quality/lint results, everyone else sees a summary grade |
 | [Lab 4](labs/lab-04-auto-registration/) | Auto Registration | Auto-discover and register APIs from a Git mono-repo via a custom `EntityProvider`; source owner, lifecycle, and visibility metadata from `x-*` fields in the spec itself |
-| Lab 5 *(coming soon)* | Mocking & Testing | Dynamically mock or exercise a test implementation of any registered API, with support for user-supplied non-production credentials |
+| [Lab 5](labs/lab-05-mocking-testing/) | Mocking & Testing | Dynamically mock any registered OpenAPI API via a single lazy-loading gateway process, or exercise a real sandbox; pre-filled, overridable non-production credentials |
 | Lab 6 *(coming soon)* | API Lifecycle Management | Register multiple major versions of an API in parallel; track lifecycle state (development/test/production) and deprecation/retirement per version |
 | Lab 7 *(coming soon)* | Other Documentation | Add the Thoughtworks Tech Radar plugin; register blips to plot your API landscape |
 
@@ -70,10 +70,15 @@ labs/
 │   ├── README.md                  ← continue here after Lab 2
 │   ├── .spectral.yaml             ← shared Spectral ruleset used by both quality plugins
 │   └── catalog/                   ← platform team member (eve) added in this lab
-└── lab-04-auto-registration/
-    ├── README.md                  ← continue here after Lab 3
-    ├── autoApiRegistration.ts     ← backend EntityProvider that scans and registers APIs
-    └── apis/                      ← auto-discovered specs, incl. the Scalar Galaxy vendor copy
+├── lab-04-auto-registration/
+│   ├── README.md                  ← continue here after Lab 3
+│   ├── autoApiRegistration.ts     ← backend EntityProvider that scans and registers APIs
+│   └── apis/                      ← auto-discovered specs, incl. the Scalar Galaxy vendor copy
+└── lab-05-mocking-testing/
+    ├── README.md                  ← continue here after Lab 4
+    └── code/
+        ├── scripts/mock-gateway.mjs           ← single lazy-loading Prism mock gateway
+        └── packages/app/src/modules/apiMocking/  ← apiDocsConfigRef override (mock + credentials)
 ```
 
 ---
@@ -86,12 +91,14 @@ backstage-apiportal-lab/
 │   ├── lab-01-base-backstage/
 │   ├── lab-02-users-roles/
 │   ├── lab-03-api-quality/
-│   └── lab-04-auto-registration/
+│   ├── lab-04-auto-registration/
+│   └── lab-05-mocking-testing/
 ├── specs/                         ← SDD artifacts (spec, plan, tasks per lab)
 │   ├── 001-lab-1-base-backstage/
 │   ├── 002-lab-2-users-roles/
 │   ├── 003-lab-3-api-quality/
-│   └── 004-lab-4-auto-registration/
+│   ├── 004-lab-4-auto-registration/
+│   └── 005-lab-5-mocking-testing/
 ├── .specify/                      ← Speckit configuration and templates
 ├── GOAL.md                        ← high-level goals for the full lab series
 ├── CONTRIBUTING.md                ← how to contribute new labs

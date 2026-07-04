@@ -6,10 +6,15 @@ runtime shapes introduced by the single mock gateway process and the frontend mo
 ## Discovery Map (in-memory, built once at gateway startup)
 
 Computed once when `scripts/mock-gateway.mjs` starts, from the OpenAPI files matched by Lab 4's
-`autoApiRegistration` `rootPath`/`patterns` config (research.md R3). A cheap glob, not a parse —
-safe to build eagerly even at 500+ files. Not refreshed while the process is running (a newly added
-file requires a gateway restart to become mockable — research.md R7, documented as an intentional,
-Lab-4-style poll/watch-mode tradeoff, not silently unsupported).
+`autoApiRegistration` `rootPath`/`patterns` config (research.md R3), **plus** one additional,
+explicitly-named source (`mocking.gateway.additionalSources`, default: Lab 1's `apis/` directory,
+pattern `**/openapi.yaml`) that exists solely to cover Museum's own spec file, which predates Lab
+4's naming convention and is catalogued by hand rather than auto-discovered (research.md R3
+correction). A cheap directory walk plus a lightweight `info.title` read (not the expensive
+OAS-to-Prism-operations conversion) — safe to do eagerly even at 500+ files. Not refreshed while
+the process is running (a newly added file requires a gateway restart to become mockable —
+research.md R7, documented as an intentional, Lab-4-style poll/watch-mode tradeoff, not silently
+unsupported).
 
 | Field | Type | Description |
 |---|---|---|
@@ -51,10 +56,15 @@ proxy:
 ```
 
 Read by two consumers:
-- `scripts/mock-gateway.mjs` reads `mocking.gateway.*` to know which port to bind and how large a
-  cache to keep.
+- `scripts/mock-gateway.mjs` reads `mocking.gateway.*` to know which port to bind, how large a
+  cache to keep, and (via `mocking.gateway.additionalSources`) which extra spec directories to
+  scan alongside Lab 4's own.
 - The `apiMocking` frontend module reads `mocking.defaultCredential` client-side via `configApiRef`
   (research.md R6) — not a secret, deliberately fictional and safe to ship in the frontend bundle.
+  **This requires `packages/app/config.d.ts`** declaring `mocking.defaultCredential.{scheme,value}`
+  with `@visibility frontend`, and `"configSchema": "config.d.ts"` in `packages/app/package.json` —
+  without both, Backstage's config-visibility filter silently strips the key before it ever reaches
+  the browser (research.md R6 correction; confirmed live, not assumed).
 
 No generated/uncommitted config file is produced by this lab (unlike the superseded per-API-process
 design, which generated `app-config.mocks.yaml` at every startup — removed, research.md R4/R5).

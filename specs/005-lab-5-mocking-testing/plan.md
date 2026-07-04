@@ -48,9 +48,13 @@ learner encounters the default credential.
 - `@stoplight/http-spec@7.1.0` (Apache-2.0) — new root devDependency; `transformOas3Operations()`
   (subpath `@stoplight/http-spec/oas3`) converts a parsed OpenAPI document into the operations shape
   `prism-http` consumes (research.md R2).
-- `js-yaml` (new root devDependency) — parses each spec file's YAML before conversion (same package
-  Lab 4 already uses in `packages/backend`, added here as a separate root devDependency since this
-  script runs outside that package).
+- `js-yaml` (new root devDependency, **and** a new `packages/app` dependency) — the gateway uses it
+  to read `app-config.yaml` and lightweight `info.title` discovery reads; the frontend module also
+  needs its own copy to parse `entity.spec.definition` (always delivered as a raw string) into an
+  object it can merge a mock server entry into before handing it to Swagger UI. Not shared via
+  hoisting alone — `packages/app` declares it explicitly so the frontend bundler includes it
+  (implementation correction: the original plan assumed this script-only usage would be the only
+  place `js-yaml` was needed; building the frontend module showed otherwise).
 - `concurrently` (new root devDependency) — runs the mock gateway alongside `backstage-cli repo
   start` (research.md R4); not previously present anywhere in the workspace. `wait-on` is
   deliberately **not** added — the revised design has no generated config file to wait for
