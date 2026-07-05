@@ -1,6 +1,9 @@
 # Backstage apps created by students during labs (gitignored — large, student-generated)
 labs/*/backstage/
 
+# Local Files
+**/.local/*
+
 # Node.js
 node_modules/
 npm-debug.log*

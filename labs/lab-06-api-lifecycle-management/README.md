@@ -120,8 +120,26 @@ export default createApp({
 });
 ```
 
-The module adds one `EntityCardBlueprint` info card (`ApiVersionsCard.tsx`) to every `kind:API`
-entity's page — no new backend module, no new dependency.
+The module adds two `EntityCardBlueprint` cards to every `kind:API` entity's page — no new backend
+module, no new dependency:
+
+- **`ApiVersionsCard.tsx`** — an `info` card (sidebar) listing sibling versions.
+- **`ApiLifecycleBanner.tsx`** — a `content` card (main column) that renders nothing unless
+  `spec.lifecycle` is `deprecated` or `retired`, in which case it shows a loud warning naming the
+  latest version to use instead. The Versions card alone is easy to miss; this puts the same
+  "don't use this" signal where you're already looking.
+
+Card order in the main content column otherwise follows plugin/module discovery order, not
+anything declared in `apiVersions/index.ts` — the auto-discovered `api-docs` Definition card would
+render above the banner by default. Add one entry to `app-config.yaml`'s `app.extensions` list to
+pin the banner first (Backstage has treated app-config extension order as authoritative since
+v1.27 — see [the frontend-system override docs](https://github.com/backstage/backstage/blob/master/docs/frontend-system/architecture/25-extension-overrides.md)):
+
+```yaml
+app:
+  extensions:
+    - entity-card:catalog/api-lifecycle-banner
+```
 
 ## Step 4 — Start Backstage and Confirm Both Versions Are Registered
 
@@ -145,19 +163,29 @@ differ.
 
 ## Step 6 — Advance v2's Lifecycle
 
+> **WARNING**
+>
+> **Every edit in Steps 6–8 must be committed and pushed to your fork before Backstage will see
+> it.** Step 2's catalog locations are `type: url` entries pointing at
+> `raw.githubusercontent.com/<your-fork>/...` — Backstage fetches the file from GitHub, not from
+> your local working copy. Editing the YAML locally and refreshing the page does nothing on its
+> own; commit, push to the branch your location URLs point at (`main`, unless you changed it), then
+> wait for the catalog's normal refresh interval (or trigger one immediately via `POST
+> /api/catalog/refresh`).
+
 Edit `museum-api-v2.yaml`'s `spec.lifecycle`: change it from `development` to `testing`, then from
-`testing` to `production`. After each edit, refresh either version's page — the Versions card and
-v2's own About card should reflect the new value within Backstage's normal catalog refresh
-interval, while `museum-api-v1` stays unaffected throughout.
+`testing` to `production`. After each edit, **commit and push**, then refresh either version's
+page — the Versions card and v2's own About card should reflect the new value within Backstage's
+normal catalog refresh interval, while `museum-api-v1` stays unaffected throughout.
 
 ## Step 7 — Deprecate v1
 
-Edit `museum-api-v1.yaml`'s `spec.lifecycle` to `deprecated`. Confirm the Deprecated label appears
-on v1's own page **and** in the Versions card on both v1 and v2's pages.
+Edit `museum-api-v1.yaml`'s `spec.lifecycle` to `deprecated`, then **commit and push**. Confirm the
+Deprecated label appears on v1's own page **and** in the Versions card on both v1 and v2's pages.
 
 ## Step 8 — Retire v1
 
-Edit `museum-api-v1.yaml`'s `spec.lifecycle` to `retired`. Confirm:
+Edit `museum-api-v1.yaml`'s `spec.lifecycle` to `retired`, then **commit and push**. Confirm:
 
 - v1 disappears from the Versions card's default (expanded) list on both pages.
 - A "Show retired versions (1)" button appears; clicking it reveals v1, clearly labeled Retired.
@@ -250,9 +278,12 @@ Fixed — this is the mechanism itself, not a convention:
   to remove Lab 2's original catalog location entry from `app-config.yaml` in Step 2 — the old and
   new entities can coexist harmlessly, but that defeats the "supersede, don't duplicate" point of
   this lab.
-- **Lifecycle edit doesn't show up immediately**: catalog processing runs on its normal refresh
-  interval; give it a few seconds and refresh the page, or trigger an immediate refresh via
-  Backstage's `POST /api/catalog/refresh` endpoint with the entity's ref.
+- **Lifecycle edit doesn't show up at all, no matter how long you wait**: you edited the local
+  file but didn't commit and push. These catalog locations are `type: url`, so Backstage reads
+  from your fork's GitHub remote, never your local disk — see the note above Step 6.
+- **Lifecycle edit doesn't show up immediately after pushing**: catalog processing runs on its
+  normal refresh interval; give it a few seconds and refresh the page, or trigger an immediate
+  refresh via Backstage's `POST /api/catalog/refresh` endpoint with the entity's ref.
 - **v2's spec fails to resolve (`$text` 404)**: if you're working from a fork, update the
   `$text` URL in `museum-api-v2.yaml` to point at your fork's raw URL, not this repository's.
 
