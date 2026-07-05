@@ -25,7 +25,7 @@ metadata:
     apiportal.io/version: "1.0"
 spec:
   type: openapi
-  lifecycle: deprecated
+  lifecycle: retired
   owner: group:default/museum-team
   system: museum-api
   definition:
