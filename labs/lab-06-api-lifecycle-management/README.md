@@ -94,10 +94,22 @@ info:
 `apiBasename` is new in this lab — see "Why apiBasename Drives System Assignment" below for why
 it exists and how the provider turns it into a `System` entity with no catalog YAML of its own.
 
-## Step 2 — Register a Second `autoApiRegistration` Source
+## Step 2 — Update the Shared Auto-Registration Module, Then Register a Second Source
 
-`app-config.yaml`'s `autoApiRegistration` config is already in place, converted from Lab 4's
-single-source shorthand to the explicit multi-source form (see
+This lab's `apiBasename` → `System` behavior is an additive change to Lab 4's own
+`autoApiRegistration.ts`, not new code of its own. Copy the updated
+[`labs/lab-04-auto-registration/code/packages/backend/src/extensions/autoApiRegistration.ts`](../lab-04-auto-registration/code/packages/backend/src/extensions/autoApiRegistration.ts)
+over your Lab 4 copy at
+`packages/backend/src/extensions/autoApiRegistration.ts`, and add the new migration file
+[`002_add_system_slug.ts`](../lab-04-auto-registration/code/packages/backend/src/extensions/autoApiRegistrationMigrations/002_add_system_slug.ts)
+alongside Lab 4's existing `001_scan_state_cache.ts` in
+`packages/backend/src/extensions/autoApiRegistrationMigrations/` — copy both in as-is, same as
+Lab 4's own Step 2. Skipping this step is the single most common way to stall on Step 4 below: the
+frontend module renders, but every API's "API Versions" card reports "not part of a System,"
+because `spec.system` and the synthesized `System` entity only exist once this file is updated.
+
+Then convert `app-config.yaml`'s `autoApiRegistration` config from Lab 4's single-source shorthand
+to the explicit multi-source form (see
 [`labs/lab-04-auto-registration/README.md`'s "Scaling to Multiple Source Repositories"](../lab-04-auto-registration/README.md#scaling-to-multiple-source-repositories)):
 
 ```yaml
@@ -361,6 +373,12 @@ Fixed — this is the mechanism itself, not a convention:
 - **"Owner ... does not resolve to a known User or Group entity"**: confirm `group:default/
   museum-team` is registered (Lab 2's `teams.yaml`) — the same check Lab 4 already performs for
   every auto-registered API applies here too.
+- **The `museum-api` System appears right after a restart, then disappears a cycle or two
+  later**: you're running an older copy of `autoApiRegistration.ts` whose `buildSystemEntity()`
+  doesn't set location annotations on the synthesized `System` — Backstage's own catalog
+  processing treats a location-less entity as an orphan and removes it. Re-copy the file per
+  Step 2 above; the current version sets a synthetic `backstage.io/managed-by-location` on every
+  `System` it builds specifically to avoid this.
 
 ---
 

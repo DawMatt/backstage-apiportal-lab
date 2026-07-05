@@ -1,6 +1,6 @@
 ## Run 1 - 2026/07/05
 
-- [ ] Step 4 verification failed at the following steps:
+- [x] Step 4 verification failed at the following steps:
 
 ```markdown
 - A `museum-api` `System` entity exists, listing both as "Has part" APIs, even though no
@@ -10,3 +10,46 @@
   working links between them, and `museum-api-v2` flagged **Latest** (computed from each spec's
   `info.version`, `1.0.0` vs. `2.0.0`).
 ```
+
+  **Resolved.** Two root causes, both fixed:
+  1. `buildSystemEntity()` in `autoApiRegistration.ts` didn't set
+     `backstage.io/managed-by-location` / `backstage.io/managed-by-origin-location` on the
+     synthesized `System` entity, so Backstage's own catalog processing treated it as a
+     location-less orphan and removed it a cycle or two after every restart — it would appear
+     right after startup, then vanish. Fixed with a synthetic `synthetic:<providerName>` location
+     value (research.md R1a "Gotcha", tasks.md T006a).
+  2. The README's Step 2 never instructed copying the updated `autoApiRegistration.ts` (or the
+     new `002_add_system_slug.ts` migration) into the backend, and wrongly described
+     `app-config.yaml`'s multi-source config as "already in place" — a learner following the
+     README as written would never get `spec.system`/the `System` entity at all. Fixed by making
+     Step 2 explicitly instruct both copies before the config change (tasks.md T032a).
+  3. (Incidental, caught while fixing the above) a TypeScript type error in `ScanStateCache.create()`'s
+     `migrations` record — typed as `Record<string, typeof scanStateCacheMigration>`, which
+     doesn't structurally match `002_add_system_slug.ts` (no `TABLE_NAME` export) — fixed by
+     typing the record as a minimal `{ up, down }` migration-module interface instead.
+
+  Verified end-to-end against a live `yarn start` instance: `museum-api-v1`/`museum-api-v2` both
+  register with no catalog-info.yaml, `museum-api` `System` persists across multiple poll/orphan-
+  cleanup cycles with `hasPart` relations to both versions, and each version's own `info.version`
+  (`1.0.0` vs `2.0.0`) is read correctly for the Latest flag.
+
+## Run 2 - 2026/07/05
+
+- [x] This message is appearing when I try to access backstage now:
+
+```
+Compiled with problems:
+×
+WARNING in ./src/modules/apiVersions/versionUtils.ts 17:21-29
+  ⚠ ESModulesLinkingWarning: export 'default' (imported as 'yaml') was not found in 'js-yaml' (possible exports: CHOMPING_CLIP, CHOMPING_KEEP, CHOMPING_STRIP, COLLECTION_STYLE_BLOCK, COLLECTION_STYLE_FLOW, CORE_SCHEMA, EVENT_ALIAS, EVENT_DOCUMENT, EVENT_MAPPING, EVENT_POP, EVENT_SCALAR, EVENT_SEQUENCE, FAILSAFE_SCHEMA, JSON_SCHEMA, MERGE_KEY, NOT_RESOLVED, SCALAR_STYLE_DOUBLE_QUOTED, SCALAR_STYLE_FOLDED_BLOCK, SCALAR_STYLE_LITERAL_BLOCK, SCALAR_STYLE_PLAIN, SCALAR_STYLE_SINGLE_QUOTED, Schema, Style, VISIT_BREAK, VISIT_SKIP, YAML11_SCHEMA, YAMLException, binaryTag, boolCoreTag, boolJsonTag, boolYaml11Tag, constructFromEvents, defineMappingTag, defineScalarTag, defineSequenceTag, dump, eventsToAst, floatCoreTag, floatJsonTag, floatYaml11Tag, getScalarValue, intCoreTag, intJsonTag, intYaml11Tag, jsToAst, legacyMapTag, load, loadAll, mapTag, mergeTag, nullCoreTag, nullJsonTag, nullYaml11Tag, omapTag, pairsTag, parseEvents, present, realMapTag, seqTag, setTag, strTag, timestampTag, visit)
+```
+
+  **Resolved.** `versionUtils.ts` used `import yaml from 'js-yaml'` (a default import), but
+  `js-yaml@^5` (already the pinned version, per `packages/app/package.json`) is ESM-only with no
+  default export — only named exports (`load`, `dump`, etc.). The `apiMocking` module (Lab 5)
+  already uses the correct pattern for this same dependency:
+  `import * as yaml from 'js-yaml'`. Applied that fix to `versionUtils.ts` (tasks.md T015a);
+  confirmed the frontend now reports "Rspack compiled successfully" with no warnings, and
+  re-verified the full catalog state (both Museum API versions, the `museum-api` System with
+  `hasPart` relations, independent lifecycles, `info.version`-based Latest) is still correct
+  after the fix.

@@ -295,12 +295,18 @@ function buildEntity(opts: {
 // synthesized purely from spec files, never hand-authored (see runCycle()'s per-cycle
 // resynchronization).
 function buildSystemEntity(providerName: string, slug: string, owner: string): Entity {
+  // Needs the same location annotations the API entities get: without one, the catalog's
+  // orphan-cleanup task treats a location-less entity as unowned and deletes it on its own
+  // schedule, regardless of the EntityProvider re-asserting it every cycle.
+  const location = `synthetic:${providerName}`;
   return {
     apiVersion: 'backstage.io/v1alpha1',
     kind: 'System',
     metadata: {
       name: slug,
       annotations: {
+        [ANNOTATION_LOCATION]: location,
+        [ANNOTATION_ORIGIN_LOCATION]: location,
         [MANAGED_BY_ANNOTATION]: providerName,
       },
     },
@@ -441,7 +447,11 @@ class ScanStateCache {
     // `knex_migrations` table here would validate our one-migration `migrationSource` against the
     // real catalog plugin's own (much longer) applied-migrations history and fail with
     // "migration directory is corrupt".
-    const migrations: Record<string, typeof scanStateCacheMigration> = {
+    interface MigrationModule {
+      up(knex: Knex): Promise<void>;
+      down(knex: Knex): Promise<void>;
+    }
+    const migrations: Record<string, MigrationModule> = {
       '001_scan_state_cache': scanStateCacheMigration,
       '002_add_system_slug': systemSlugMigration,
     };

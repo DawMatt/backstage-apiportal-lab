@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApi } from '@backstage/core-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { Entity } from '@backstage/catalog-model';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 
 export const RETIRED = 'retired';
 export const DEPRECATED = 'deprecated';

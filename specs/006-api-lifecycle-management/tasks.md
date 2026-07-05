@@ -75,6 +75,12 @@ without both API versions existing and being groupable.
       files that changed this cycle) and include one synthesized `System` `DeferredEntity` per
       distinct slug in both the first-run `full` mutation and any triggered `delta` mutation
       (research.md R1a, depends on T005)
+- [X] T006a Fix `buildSystemEntity()` in `autoApiRegistration.ts` to set
+      `backstage.io/managed-by-location` / `backstage.io/managed-by-origin-location` annotations
+      (a synthetic `synthetic:<providerName>` value) on every synthesized `System` entity — without
+      them, catalog processing treats the entity as a location-less orphan and deletes it a cycle
+      or two after each restart (found during Step 4 verification; research.md R1a "Gotcha";
+      resolves checklists/issues.md Run 1, depends on T006)
 - [X] T007 [P] Fix `normalizeConfig()`'s `rootPath` resolution in `autoApiRegistration.ts` so a
       user-supplied relative `rootPath` resolves against `packages/backend`'s own directory (the
       same anchor `defaultRootPath()` already uses), not the process's `cwd` — required for a
@@ -150,6 +156,11 @@ other.
 - [X] T015 [US2] Implement `getVersionString()`/`getVersion()`/`compareVersions()`/`findLatest()`
       in `versionUtils.ts`: parse `info.version` out of `spec.definition` (already a
       placeholder-resolved plain string) via `js-yaml`, never a catalog annotation (research.md R2)
+- [X] T015a Fix `versionUtils.ts`'s `js-yaml` import: `import yaml from 'js-yaml'` (a default
+      import) fails to resolve at runtime against `js-yaml@^5` (ESM-only, no default export —
+      `import * as yaml from 'js-yaml'` is the pattern the `apiMocking` module (Lab 5) already
+      uses correctly), producing an `ESModulesLinkingWarning` and breaking the frontend compile
+      (found during Step 4 verification, Run 2; resolves checklists/issues.md; depends on T015)
 - [X] T016 [US2] Render each sibling's `v{version}` label and a "Latest" `Chip` in
       `ApiVersionsCard.tsx`'s `VersionRow`, computed via `findLatest()` (depends on T015)
 - [X] T017 [US2] Verify (quickstart.md step 6): confirm `museum-api-v2` is flagged Latest, computed
@@ -253,6 +264,12 @@ reachable and never deleted.
 - [X] T031 [P] Update `labs/lab-04-auto-registration/README.md`'s "Adaptable Conventions" `rootPath`
       bullet to document the `packages/backend`-relative resolution fix (T007), pointing at Lab 6's
       second source as a worked example
+- [X] T032a Fix `labs/lab-06-api-lifecycle-management/README.md`'s Step 2: it previously described
+      `app-config.yaml`'s multi-source config as "already in place" and never instructed copying
+      the updated `autoApiRegistration.ts` (+ new `002_add_system_slug.ts` migration) into the
+      backend — the missing instruction a learner would need before Step 4 can pass at all;
+      add the corresponding Troubleshooting entry for the location-annotation orphan symptom
+      (resolves checklists/issues.md Run 1, pairs with T006a)
 - [X] T032 Confirm `labs/lab-06-api-lifecycle-management/README.md` is linked from the root
       `README.md`'s Lab Series table, Getting Started tree, and Repository Structure tree, per the
       Constitution's Lab Structure Standards (already satisfied — no edit required)

@@ -47,6 +47,15 @@ auto-registered lab. A dedicated "system discovery" backend module, separate fro
 `autoApiRegistration.ts` — rejected as unnecessary duplication; the file-glob/x-* extraction
 mechanism is identical, only the target entity kind differs.
 
+**Gotcha (found during Step 4 verification)**: a synthesized `System` entity needs the same
+`backstage.io/managed-by-location` / `backstage.io/managed-by-origin-location` annotations the
+generated `API` entities get, even though it has no real spec file behind it. Without them,
+Backstage's own catalog processing treats it as a location-less orphan and silently drops it a
+cycle or two later — the `System` would appear right after a restart, then vanish, with no error
+surfaced anywhere the learner would think to look. `buildSystemEntity()` sets both annotations to a
+synthetic `synthetic:<providerName>` value (never resolved as a real location, just present so
+processing doesn't reject the entity).
+
 ## R2: Identifying and displaying the "latest" version
 
 **Decision**: Read each version's `info.version` (a field every OpenAPI/AsyncAPI spec already has)
