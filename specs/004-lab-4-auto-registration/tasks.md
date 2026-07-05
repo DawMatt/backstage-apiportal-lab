@@ -70,7 +70,7 @@ This is a tutorial-lab project (not a generic web/mobile app). Two path roots ar
 - [X] T012 [US1] Implement candidate entity mapping using only natively-homed fields — `info.title` slugified → `metadata.name`, verbatim `info.title` → `metadata.title`, `info.description` → `metadata.description`, native `tags[].name` → `metadata.tags` (default `[]`), `openapi`/`asyncapi` presence → `spec.type`, `spec.definition.$text` → source file path/URL, `backstage.io/managed-by-location` annotation → source file path — with `spec.owner`/`spec.lifecycle` set to the per-source `defaultOwner` constant and the fixed `experimental` default (no `x-*` reading yet) in `labs/lab-01-base-backstage/backstage/packages/backend/src/extensions/autoApiRegistration.ts` (data-model.md Catalog API Entity table, depends on T008)
 - [X] T013 [US1] Implement the first-run full mutation: glob scan → parse + shape-check → map candidates (T012) → build scan-state cache rows → emit one `type: 'full'` `EntityProvider` mutation in `labs/lab-01-base-backstage/backstage/packages/backend/src/extensions/autoApiRegistration.ts` (research.md R1/R6, depends on T009, T012)
 - [X] T014 [US1] Implement subsequent-cycle delta mutations: diff current scan against scan-state cache rows, emit `type: 'delta'` (`added`/`removed`) mutations for changed/new/removed files only, update cache rows in `labs/lab-01-base-backstage/backstage/packages/backend/src/extensions/autoApiRegistration.ts` (FR-002/003/004, research.md R6 Problem 1, depends on T013)
-- [X] T015 [US1] Wire the `coreServices.scheduler` poll loop (`schedule.frequencySeconds`, default 30s) to run the discovery cycle (T013 first run, then T014) per configured source in `labs/lab-01-base-backstage/backstage/packages/backend/src/extensions/autoApiRegistration.ts` (research.md R2, depends on T014)
+- [X] T015 [US1] Wire the `coreServices.scheduler` poll loop (`schedule.frequencySeconds`, default 30s) to run the discovery cycle (T013 first run, then T014) per configured source in `labs/lab-01-base-backstage/backstage/packages/backend/src/extensions/autoApiRegistration.ts` (research.md R2, depends on T014); follow every `scheduler.scheduleTask(...)` call (poll task and watch-mode reconciliation task) with `await scheduler.triggerTask(taskId)` so the first cycle runs immediately on backend startup rather than waiting out the scheduler's own persisted `next_run_start_at` from a prior process (research.md R6 Corollary)
 - [X] T016 [US1] Vendor the Scalar Galaxy API to `labs/lab-04-auto-registration/apis/galaxy/galaxy-openapi.yaml` (trimmed copy of the MIT-licensed `https://cdn.jsdelivr.net/npm/@scalar/galaxy/dist/3.1.yaml`, no `x-examplecorp` object yet, no pre-existing `catalog-info.yaml`) — used to manually verify create/update/remove for this story (research.md R5)
 - [X] T017 [US1] Manually verify against `labs/lab-01-base-backstage/backstage/` (quickstart.md steps 5–7): Galaxy API appears within one poll cycle with no hand-authored catalog file (SC-001); editing `info.description` updates the entity in place, not a duplicate (FR-003); renaming the file out of the discovery pattern retracts the entity as active (FR-004/SC-005)
 
@@ -146,6 +146,52 @@ This is a tutorial-lab project (not a generic web/mobile app). Two path roots ar
 - [X] T041 Update `specs/004-lab-4-auto-registration/checklists/issues.md`: mark the Run 1 item resolved with a one-line pointer to T038–T040 once T040's re-verification passes
 
 **Checkpoint**: Catalog populates on a clean start; the only remaining "gap" (precedence-demo-api before the branch is pushed) is expected and documented, not a bug.
+
+---
+
+## Phase 8: Bug Fixes (from checklists/issues.md — Run 2, 2026/07/06)
+
+**Purpose**: Fix a regression introduced by the T015 cold-start fix (research.md R6 Corollary): "The cold start fix has broken all API catalog item loading." Root cause analysis:
+
+- T015 added `await scheduler.triggerTask(taskId)` immediately after every `scheduler.scheduleTask(...)` call, to force the first discovery cycle to run at boot instead of waiting out a persisted `next_run_start_at` from a prior process.
+- `triggerTask` (`@backstage/backend-defaults` `TaskWorker.trigger`) does `UPDATE ... WHERE id = taskId AND current_run_ticket IS NULL`, and throws a `ConflictError` if zero rows update — i.e. if the task is already running.
+- On a brand-new task (fresh database, never scheduled before), `persistTask()` sets `next_run_start_at` to "now" already (no `initialDelay` is configured), so the scheduler's own background worker loop can win the race and start executing the task before the module's explicit `triggerTask` call reaches the database — the two calls are not sequenced against each other.
+- That unguarded `throw` happens inside the `auto-api-registration` backend module's `init()`, which runs as part of the `catalog` plugin's init chain in the new backend system (`catalogProcessingExtensionPoint`). An uncaught rejection there fails that plugin's initialization outright, which is why *all* API catalog items stopped loading (not just the auto-registered ones) — not a defect in discovery/mapping logic itself.
+
+- [X] T042 Guard both `scheduler.triggerTask(taskId)` calls (poll-mode task and watch-mode reconciliation task) in `labs/lab-01-base-backstage/backstage/packages/backend/src/extensions/autoApiRegistration.ts` (and the mirrored reference copy in `labs/lab-04-auto-registration/code/packages/backend/src/extensions/autoApiRegistration.ts`) with a try/catch that swallows `ConflictError` from `@backstage/errors` (it means the task already started on its own — the desired outcome) while letting any other error propagate, so a lost race can no longer crash catalog plugin init (research.md R6 Corollary, depends on T015)
+- [X] T043 [P] Add a troubleshooting entry to `labs/lab-04-auto-registration/README.md`'s Troubleshooting section covering this failure mode (all catalog entities missing, not just auto-registered ones, immediately after adding/changing the cold-start `triggerTask` call) and how to recognize it in backend logs (a `ConflictError`/"is currently running" error thrown during backend module init, not an `AutoApiRegistrationErrorProcessor` warning) (depends on T042)
+- [X] T044 Restart `labs/lab-01-base-backstage/backstage/` from a clean `yarn start` (fresh database) after T042 and confirm via backend logs and the catalog UI: no `ConflictError` is thrown during startup, all previously-registered entities (museum/streetlights/train-travel/scalar-galaxy/precedence-demo-api plus org entities) load normally, and the auto-registered APIs are visible immediately rather than ~30s after the app-config locations (depends on T042)
+- [X] T045 Update `specs/004-lab-4-auto-registration/checklists/issues.md`: add a Run 2 entry documenting this regression, resolved with a one-line pointer to T042–T044
+
+**Checkpoint**: Cold start shows every entity (auto-registered and hand-authored) immediately, with no catalog plugin init failure — the T015 fix's original goal is preserved without the regression.
+
+---
+
+## Phase 9: Tighten Up Cold-Start Timing (research.md R6 Follow-up 2)
+
+**Purpose**: T042 stopped the `triggerTask` race from crashing catalog init, but didn't close a remaining timing gap: if the triggered run executes *before* the catalog engine calls this provider's `connect(...)`, `runCycle()`'s existing `!this.connection` guard skips it (logged as "skipped a cycle — provider not yet connected"), and without a further fix, the only remaining path to run again is the next naturally scheduled cycle. At the lab's 30s default that's a minor annoyance; at a scaled deployment's much longer cadence (R6 — e.g. hourly), that's a genuinely noticeable wait for entities that could have been ready in under a second.
+
+- [X] T046 Change `AutoApiRegistrationEntityProvider.connect()` in `labs/lab-01-base-backstage/backstage/packages/backend/src/extensions/autoApiRegistration.ts` (and the mirrored reference copy in `labs/lab-04-auto-registration/code/packages/backend/src/extensions/autoApiRegistration.ts`) to kick off `runCycle()` itself when `!this.hasRunOnce`, so the first cycle is driven by the provider's own authoritative "I am now connected" signal rather than relying on winning a timing race with the scheduler's `triggerTask` call (research.md R6 Follow-up 2, depends on T042)
+- [X] T047 Add an `inFlightCycle` dedup guard to `runCycle()` (rename the existing body to a private `doRunCycle()`, make `runCycle()` a thin wrapper that returns the shared in-flight promise) in the same two files, since T046 means the scheduler-triggered path and the connect()-triggered path can now legitimately race to call `runCycle()` around the same moment and must not both run a full scan concurrently (depends on T046)
+- [X] T048 Restart `labs/lab-01-base-backstage/backstage/` from a clean `yarn start` (fresh database) after T046/T047 and confirm via backend logs: the "skipped a cycle — provider not yet connected" line (if it still occurs) is followed by a successful cycle within about a second (via `connect()`), not 30+ seconds later; no duplicate full-mutation logs; no `ConflictError` (depends on T047)
+
+**Checkpoint**: The first discovery cycle runs as soon as the provider is structurally able to, independent of the scheduler's own cadence — closing the gap that would otherwise scale badly on a real deployment's much longer `scheduleFrequencySeconds`/`reconciliation.frequencySeconds`.
+
+---
+
+## Phase 10: Bug Fixes (from checklists/issues.md — Run 3, 2026/07/06)
+
+**Purpose**: Fix "waited 2 scheduled poll cycles and the auto-registered APIs still hadn't loaded," a direct consequence of T046 (research.md R6 Follow-up 3). Root cause analysis:
+
+- T046 made the first discovery cycle run as early as possible via `connect()`, which makes it *more* likely to race ahead of org-data loading (`teams.yaml`, fetched from a remote URL) than the old "wait for the next scheduled tick" behavior did.
+- When that race is lost, an auto-registered file's owner doesn't resolve yet, and it's correctly registered as an error entity (R4) — a transient condition caused by catalog state, not a defect in the file itself.
+- The existing `changedPaths` change-detection logic (T009, research.md R6 Problem 2) only re-examines a file when its `mtimeMs`/content hash changes — an unchanged file that previously errored was therefore silently excluded from all future cycles, so the transient error became permanently stuck even after the org data it depended on had loaded.
+
+- [X] T049 Change the `changedPaths` filter in `labs/lab-01-base-backstage/backstage/packages/backend/src/extensions/autoApiRegistration.ts` (and the mirrored reference copy in `labs/lab-04-auto-registration/code/packages/backend/src/extensions/autoApiRegistration.ts`) to always include a cached row with `last_error` set, regardless of `mtimeMs`, and skip the "content hash unchanged, no re-validation needed" short-circuit inside the mapping loop for such rows, so a previously-errored file is fully re-validated every cycle until it resolves or the file itself changes (research.md R6 Follow-up 3, depends on T046)
+- [X] T050 Restart `labs/lab-01-base-backstage/backstage/` from a clean `yarn start` (fresh database) and confirm via backend logs and the catalog API: cycle 1 may still show the transient "Owner ... does not resolve" error (expected, since org-data loading isn't synchronized with this module), but by the next scheduled cycle both `scalar-galaxy` and `precedence-demo-api` are present with `spec.owner: group:default/platform-team` and no registration-error annotation (depends on T049)
+- [X] T051 Update `specs/004-lab-4-auto-registration/checklists/issues.md`: add a Run 3 entry documenting this regression, resolved with a one-line pointer to T049–T050
+
+**Checkpoint**: A registration error caused by transient catalog state (not the file's own content) self-heals on the next cycle instead of requiring the file to be touched or the cache to be wiped — true both at cold start and any time org data changes later.
 
 ---
 

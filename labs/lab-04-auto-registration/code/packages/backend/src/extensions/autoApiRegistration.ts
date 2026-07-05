@@ -33,6 +33,7 @@ import type {
   DatabaseService,
   LoggerService,
   RootConfigService,
+  SchedulerService,
 } from '@backstage/backend-plugin-api';
 import {
   ANNOTATION_LOCATION,
@@ -41,7 +42,7 @@ import {
   stringifyEntityRef,
 } from '@backstage/catalog-model';
 import type { Entity } from '@backstage/catalog-model';
-import { InputError } from '@backstage/errors';
+import { ConflictError, InputError } from '@backstage/errors';
 import type { Knex } from 'knex';
 import * as scanStateCacheMigration from './autoApiRegistrationMigrations/001_scan_state_cache';
 import * as systemSlugMigration from './autoApiRegistrationMigrations/002_add_system_slug';
@@ -523,6 +524,13 @@ async function mapLimit<T, R>(
 class AutoApiRegistrationEntityProvider implements EntityProvider {
   private connection?: EntityProviderConnection;
   private hasRunOnce = false;
+  // Dedups concurrent callers of runCycle() into a single in-flight execution. Two independent
+  // triggers can legitimately race to run the *first* cycle — the scheduler's startup
+  // `triggerTask` call (research.md R6 Corollary) and connect() below (fired the moment the
+  // catalog engine actually wires this provider up, in case connect() happens after that trigger
+  // already found `this.connection` unset and skipped) — without this, both could kick off a
+  // full scan/mutation at once.
+  private inFlightCycle?: Promise<void>;
 
   constructor(
     private readonly source: SourceConfig,
@@ -538,9 +546,29 @@ class AutoApiRegistrationEntityProvider implements EntityProvider {
 
   async connect(connection: EntityProviderConnection): Promise<void> {
     this.connection = connection;
+    if (!this.hasRunOnce) {
+      // The scheduler's own startup trigger may have already fired and found no connection yet
+      // (logged as "skipped a cycle"); rather than let that mean waiting for the next scheduled
+      // cadence — a real problem once a scaled-up deployment schedules this hourly rather than
+      // every 30s (research.md R6) — run the first cycle as soon as the provider is actually
+      // able to, driven by this authoritative connect() signal instead of a timing race.
+      this.runCycle().catch(error =>
+        this.logger.error(`auto-api-registration:${this.source.id}: initial cycle failed`, error as Error),
+      );
+    }
   }
 
   async runCycle(): Promise<void> {
+    if (this.inFlightCycle) {
+      return this.inFlightCycle;
+    }
+    this.inFlightCycle = this.doRunCycle().finally(() => {
+      this.inFlightCycle = undefined;
+    });
+    return this.inFlightCycle;
+  }
+
+  private async doRunCycle(): Promise<void> {
     if (!this.connection) {
       this.logger.warn(
         `auto-api-registration:${this.source.id}: skipped a cycle — provider not yet connected`,
@@ -561,6 +589,14 @@ class AutoApiRegistrationEntityProvider implements EntityProvider {
     const changedPaths = [...currentPaths].filter(filePath => {
       const cached = existingByPath.get(filePath);
       if (!cached) return true;
+      // A previous registration error (e.g. an owner that didn't resolve to a known User/Group
+      // yet) can be caused by catalog state that has nothing to do with this file's own content —
+      // most commonly, this cycle running before the org-data location (teams.yaml/users.yaml)
+      // has finished loading, which the R6 cold-start fixes make more likely, not less. Without
+      // this, an errored file's unchanged mtime/hash would make it permanently invisible to
+      // `changedPaths`, so it would never get re-validated once the catalog state that caused the
+      // error resolves itself — the error becomes sticky until the file itself is touched.
+      if (cached.last_error) return true;
       const stat = fs.statSync(filePath);
       return stat.mtimeMs !== cached.mtime_ms;
     });
@@ -576,8 +612,10 @@ class AutoApiRegistrationEntityProvider implements EntityProvider {
       const contents = fs.readFileSync(filePath, 'utf8');
       const hash = sha1(contents);
 
-      if (cached && cached.content_hash === hash) {
-        // mtime touched, content unchanged — refresh mtime only, no mutation needed.
+      if (cached && cached.content_hash === hash && !cached.last_error) {
+        // mtime touched, content unchanged, and this file registered cleanly last time —
+        // refresh mtime only, no mutation needed. A previously-errored row falls through to full
+        // re-validation below even with an unchanged hash (see the `changedPaths` filter above).
         upserts.push({ ...cached, mtime_ms: stat.mtimeMs });
         return;
       }
@@ -733,6 +771,27 @@ class AutoApiRegistrationErrorProcessor implements CatalogProcessor {
   }
 }
 
+// Forces a just-registered task's first run to happen immediately instead of waiting out a
+// `next_run_start_at` persisted from a previous process (research.md R6 Corollary). On a
+// brand-new task, the scheduler's own worker loop may already have claimed the run before this
+// call reaches the database — that's a benign lost race (the run we wanted is already happening),
+// surfaced as `ConflictError`, and must not be allowed to fail backend module init.
+async function triggerTaskIgnoringConflict(
+  scheduler: SchedulerService,
+  taskId: string,
+  logger: LoggerService,
+): Promise<void> {
+  try {
+    await scheduler.triggerTask(taskId);
+  } catch (error) {
+    if (error instanceof ConflictError) {
+      logger.debug(`auto-api-registration: ${taskId} was already running when triggered at startup`);
+      return;
+    }
+    throw error;
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Backend module registration (following packages/backend/src/extensions/permissionPolicy.ts)
 // ---------------------------------------------------------------------------------------------
@@ -772,8 +831,9 @@ export default createBackendModule({
           const provider = providers[index];
 
           if (source.mode === 'poll') {
+            const taskId = `auto-api-registration:${source.id}:poll`;
             await scheduler.scheduleTask({
-              id: `auto-api-registration:${source.id}:poll`,
+              id: taskId,
               frequency: { seconds: source.scheduleFrequencySeconds },
               timeout: { seconds: Math.max(source.scheduleFrequencySeconds * 2, 30) },
               fn: async () => {
@@ -784,13 +844,22 @@ export default createBackendModule({
                 }
               },
             });
+            // The scheduler persists `next_run_start_at` across restarts, so a backend restart
+            // within one `scheduleFrequencySeconds` window of the last run would otherwise wait
+            // out the remainder of that persisted timer before the first cycle fires. Force an
+            // immediate run so entities are visible right after cold start. On a brand-new task,
+            // `triggerTask` can lose a race against the scheduler's own worker loop (which already
+            // scheduled the first run for "now") and throw `ConflictError` — that just means the
+            // run we wanted already started, so it's swallowed rather than failing catalog init.
+            await triggerTaskIgnoringConflict(scheduler, taskId, logger);
           } else {
             // Steady-state discovery signal at real-world scale: a watcher triggers a rescan of
             // just this source on add/change/unlink, coalesced by chokidar's own event batching.
             // `schedule.frequencySeconds` is ignored in watch mode in favor of the much longer
             // `reconciliation.frequencySeconds` safety-net sweep below.
+            const taskId = `auto-api-registration:${source.id}:reconciliation`;
             await scheduler.scheduleTask({
-              id: `auto-api-registration:${source.id}:reconciliation`,
+              id: taskId,
               frequency: { seconds: source.reconciliationFrequencySeconds },
               timeout: { seconds: Math.max(source.reconciliationFrequencySeconds / 2, 60) },
               fn: async () => {
@@ -801,6 +870,9 @@ export default createBackendModule({
                 }
               },
             });
+            // Same cold-start rationale as the poll-mode task above: don't wait out a persisted
+            // reconciliation timer before the first sweep runs.
+            await triggerTaskIgnoringConflict(scheduler, taskId, logger);
 
             const watcher = chokidar.watch(source.patterns, {
               cwd: source.rootPath,

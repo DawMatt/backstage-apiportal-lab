@@ -266,6 +266,83 @@ reintroduce the hand-maintained-duplicate-file problem Lab 4 exists to eliminate
 the discovery tool to have write access to a repo it should only need to read — a materially
 larger and riskier permission footprint at real-world scale.
 
+**Corollary — the scan-state cache alone does not make a cold restart show entities quickly; the
+scheduler's own persisted timer must also be accounted for.** The scan-state cache (above) removes
+re-parse cost from a restart, but the discovery *cycle* is still driven by a `scheduler.scheduleTask`
+registration (`autoApiRegistration.ts`), and Backstage's `SchedulerService` persists each task's
+`next_run_start_at` in its own database table — separate from, and orthogonal to, this module's
+scan-state cache. That persisted timestamp **survives a backend restart**: on re-registration, the
+scheduler's `TaskWorker.persistTask()` upserts `next_run_start_at` to `min(now + frequency,
+<the previously persisted value>)`. If the restart happens within one `scheduleFrequencySeconds`
+window of the last run before shutdown (the common case for a dev stop/rebuild/restart cycle, and
+easy to trigger in the lab's default 30s-poll config), the previously persisted timestamp is still
+in the future and wins the `min()`, so the first discovery cycle does not fire until that original
+schedule elapses — up to a full `scheduleFrequencySeconds`/`reconciliation.frequencySeconds` after
+the backend comes back up, regardless of how fast the cache-validated scan itself would have been.
+This is what actually causes the "no APIs, then app-config locations, then everything else ~30s
+later" cold-start sequence, not a lack of scan-state persistence.
+
+**Decision**: immediately after each `scheduler.scheduleTask(...)` call, call
+`await scheduler.triggerTask(taskId)` to force that task's first run right away, independent of
+whatever `next_run_start_at` was persisted from a previous process. This is done for both the
+poll-mode task and the watch-mode reconciliation task. The scan-state cache then does its job on
+that immediate first run — unchanged files are skipped cheaply — so the net effect is that
+auto-registered entities become visible essentially as soon as the backend finishes booting, not
+up to one scheduling interval later.
+
+**Follow-up 1 — `triggerTask` can lose a race against the scheduler's own worker loop.** On a
+brand-new task (no persisted row yet), `persistTask()` already sets `next_run_start_at` to "now",
+so the scheduler's background worker can claim and start that first run before the module's own
+`triggerTask` call reaches the database. `triggerTask` then throws `ConflictError` ("Task ... is
+currently running"). Left unguarded, that throw happens inside the backend module's `init()` —
+part of the `catalog` plugin's own init chain in the new backend system — and an uncaught error
+there fails catalog plugin initialization *entirely*, not just this module (see checklists/issues.md
+Run 2). **Decision**: wrap every `triggerTask` call in a `triggerTaskIgnoringConflict` helper that
+swallows `ConflictError` specifically (it means the run we wanted is already happening) and
+re-throws anything else.
+
+**Follow-up 2 — `triggerTask` can also fire before the `EntityProvider` has connected, wasting the
+whole point of triggering it.** The scheduler registering a task and the catalog engine calling
+this provider's `connect(...)` are two independent, unordered startup sequences. If the triggered
+run executes first, `runCycle()`'s existing `!this.connection` guard logs "skipped a cycle —
+provider not yet connected" and returns without discovering anything — and without the
+`triggerTask` fix, the *only* remaining path to run again is the next natural scheduled cycle. That
+was tolerable when a lab default polls every 30s, but is a real, user-visible problem once a scaled
+deployment schedules this hourly or longer (R6 above) — "wait for the next scheduled check" would
+mean genuinely waiting up to an hour for entities that could have been ready in under a second.
+**Decision**: make `connect()` itself kick off the first cycle (`if (!this.hasRunOnce) { this.runCycle()... }`)
+rather than relying on winning a timing race with the scheduler's trigger. `connect()` is the
+authoritative, non-racy signal that the provider is actually able to run — driving the first cycle
+from it, in addition to the scheduler-side `triggerTask`, means whichever of the two events happens
+second is the one that actually does the work, regardless of which one that is or how long the
+configured cadence is. Because both paths can now legitimately call `runCycle()` around the same
+time, `runCycle()` was changed to dedup concurrent invocations into one shared in-flight promise
+(`inFlightCycle`) rather than allowing two overlapping full scans.
+
+**Follow-up 3 — running the first cycle as early as possible (Follow-up 2) races the discovery
+cycle against org-data loading, and a resulting owner-validation failure was permanently sticky.**
+Making the first cycle run at the earliest possible moment (Follow-up 2) makes it *more* likely,
+not less, that it runs before an org-data location (e.g. `teams.yaml`, itself fetched from a remote
+URL) has finished loading `Group`/`User` entities into the catalog. When that happens, `mapCandidate`
+correctly rejects the owner reference (R4) and the file is registered as an error entity — but the
+existing change-detection logic (`changedPaths`, above) only re-examines a file when its `mtimeMs`
+differs from the cached row, or (a second check) when its content hash differs. A file whose content
+never changes was therefore excluded from `changedPaths` on every subsequent cycle even after the
+org data it depends on had loaded moments later — the registration error became permanently stuck
+until the file itself was touched or the scan-state cache was wiped. Confirmed experimentally: a
+clean restart reliably produced the error on cycle 1 (before `platform-team` had loaded) and never
+self-corrected on cycle 2 even though `platform-team` was resolvable within ~3 seconds of the
+failed attempt.
+
+**Decision**: a cached row with `last_error` set is now *always* included in `changedPaths`
+regardless of mtime, and the mtime-unchanged/hash-unchanged short-circuit inside the mapping loop
+is skipped for such rows too — so a previously-errored file is fully re-validated (owner,
+visibility, precedence, collision) on every subsequent cycle until it either succeeds or the file
+itself is fixed. This is a strict correctness improvement independent of cold-start timing: an
+owner/visibility validation failure can be caused by catalog state that changes for reasons having
+nothing to do with a restart at all (a team added, renamed, or fixed after the fact), and it
+shouldn't require touching the spec file to pick that up.
+
 **Problem 3 — polling a 1GB tree every 30s doesn't scale as the primary discovery loop.** Even
 with ignore patterns (R2) and streaming (R2), a full `fast-glob` walk of a very large tree still
 costs real I/O, and running that walk every 30s regardless of whether anything changed is wasted
