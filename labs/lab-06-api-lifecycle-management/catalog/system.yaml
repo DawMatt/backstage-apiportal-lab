@@ -1,0 +1,18 @@
+# Lab 6 — Logical grouping for all major versions of the Museum API.
+#
+# A System entity is the native Backstage relation used to say "these API entities are all
+# versions of the same logical API" (see labs/lab-06-api-lifecycle-management/README.md for why).
+# Non-API entity kinds (including System) remain visible to all authenticated users regardless of
+# an API's own visibility annotation — see the permission policy's Rule 1 from Lab 2.
+
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: museum-api
+  description: >
+    Logical grouping of all major versions of the Museum API. Each major version is
+    registered as its own API entity (museum-api-v1, museum-api-v2, ...) and linked here
+    via spec.system, so they can coexist in the catalog while still being presented as
+    versions of one logical API.
+spec:
+  owner: group:default/museum-team
