@@ -263,7 +263,10 @@ Three failure modes, each temporary — revert after checking:
 
 **Adaptable — change these to fit your own repo layout:**
 
-- `rootPath` — where the scan starts. Point it at your own mono-repo root.
+- `rootPath` — where the scan starts. Point it at your own mono-repo root. A relative path is
+  resolved against `packages/backend`'s own directory (the same anchor the module's built-in
+  default uses), not wherever `yarn start` happens to be invoked from — see Lab 6's second
+  `autoApiRegistration` source for a worked example.
 - `patterns` — the filename glob(s) that identify an API definition file. The default
   (`**/*-openapi.yaml`, `**/*-asyncapi.yaml`) is this lab's convention, not Backstage's; use
   whatever your team already follows.

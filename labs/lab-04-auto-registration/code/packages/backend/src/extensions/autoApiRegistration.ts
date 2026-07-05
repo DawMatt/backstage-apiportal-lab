@@ -44,6 +44,7 @@ import type { Entity } from '@backstage/catalog-model';
 import { InputError } from '@backstage/errors';
 import type { Knex } from 'knex';
 import * as scanStateCacheMigration from './autoApiRegistrationMigrations/001_scan_state_cache';
+import * as systemSlugMigration from './autoApiRegistrationMigrations/002_add_system_slug';
 
 // ---------------------------------------------------------------------------------------------
 // Config
@@ -118,9 +119,16 @@ export function normalizeConfig(rootConfig: RootConfigService): SourceConfig[] {
       );
     }
 
+    const rawRootPath = entry.getOptionalString('rootPath');
     return {
       id,
-      rootPath: entry.getOptionalString('rootPath') ?? defaultRootPath(),
+      // A relative rootPath is resolved against this backend package's own directory, not the
+      // process's cwd (which varies by how `yarn start` was invoked) — same anchor
+      // defaultRootPath() itself uses, so every source's `rootPath` behaves consistently
+      // regardless of where the dev server happens to be launched from.
+      rootPath: rawRootPath
+        ? path.resolve(resolvePackagePath('backend'), rawRootPath)
+        : defaultRootPath(),
       patterns: entry.getOptionalStringArray('patterns') ?? DEFAULT_PATTERNS,
       ignore: entry.getOptionalStringArray('ignore') ?? DEFAULT_IGNORE,
       mode: (entry.getOptionalString('mode') as 'poll' | 'watch') ?? 'poll',
@@ -217,6 +225,9 @@ export function slugify(title: string): string {
 interface MappingResult {
   entity: Entity;
   entityName: string;
+  // Lab 6: set only on a successful (non-error) mapping that declares an apiBasename — error/
+  // marker entities never contribute a System, since they aren't real registrations.
+  systemSlug?: string;
   error?: string;
 }
 
@@ -243,6 +254,7 @@ function buildEntity(opts: {
   owner: string;
   lifecycle: string;
   visibility: string;
+  system?: string;
   registrationError?: string;
 }): Entity {
   const annotations: Record<string, string> = {
@@ -273,7 +285,27 @@ function buildEntity(opts: {
       type: opts.parsed.kind,
       lifecycle: opts.lifecycle,
       owner: opts.owner,
+      ...(opts.system ? { system: opts.system } : {}),
       definition: opts.contents,
+    },
+  };
+}
+
+// Lab 6: builds the System entity representing an apiBasename — one instance per distinct slug,
+// synthesized purely from spec files, never hand-authored (see runCycle()'s per-cycle
+// resynchronization).
+function buildSystemEntity(providerName: string, slug: string, owner: string): Entity {
+  return {
+    apiVersion: 'backstage.io/v1alpha1',
+    kind: 'System',
+    metadata: {
+      name: slug,
+      annotations: {
+        [MANAGED_BY_ANNOTATION]: providerName,
+      },
+    },
+    spec: {
+      owner,
     },
   };
 }
@@ -300,6 +332,10 @@ function mapCandidate(opts: {
   const lifecycle = xField(parsed.raw, source.xNamespace, 'lifecycle') ?? 'experimental';
   const rawVisibility = xField(parsed.raw, source.xNamespace, 'visibility');
   const visibility = rawVisibility ?? source.defaultVisibility;
+  // Lab 6: x-<namespace>.apiBasename groups every major version of the same logical API under one
+  // System, slugified the same way entity names are so it's a valid catalog entity name.
+  const rawApiBasename = xField(parsed.raw, source.xNamespace, 'apiBasename');
+  const systemSlug = rawApiBasename ? slugify(rawApiBasename) : undefined;
 
   // Rule: an unrecognized-but-present visibility value is a marker/error entity, never silently
   // defaulted.
@@ -364,6 +400,7 @@ function mapCandidate(opts: {
 
   return {
     entityName: baseSlug,
+    systemSlug,
     entity: buildEntity({
       providerName,
       filePath,
@@ -373,6 +410,7 @@ function mapCandidate(opts: {
       owner,
       lifecycle,
       visibility,
+      system: systemSlug,
     }),
   };
 }
@@ -388,6 +426,9 @@ interface CacheRow {
   content_hash: string;
   entity_name: string;
   last_error: string | null;
+  // Lab 6: the slugified info.x-<namespace>.apiBasename this file last resolved to, or null if
+  // the file doesn't declare one. Drives System entity synthesis in runCycle().
+  system_slug: string | null;
 }
 
 class ScanStateCache {
@@ -400,17 +441,21 @@ class ScanStateCache {
     // `knex_migrations` table here would validate our one-migration `migrationSource` against the
     // real catalog plugin's own (much longer) applied-migrations history and fail with
     // "migration directory is corrupt".
+    const migrations: Record<string, typeof scanStateCacheMigration> = {
+      '001_scan_state_cache': scanStateCacheMigration,
+      '002_add_system_slug': systemSlugMigration,
+    };
     await knex.migrate.latest({
       tableName: 'auto_api_registration_migrations',
       migrationSource: {
         async getMigrations() {
-          return ['001_scan_state_cache'];
+          return Object.keys(migrations);
         },
         getMigrationName(migration: string) {
           return migration;
         },
-        async getMigration() {
-          return scanStateCacheMigration;
+        async getMigration(migration: string) {
+          return migrations[migration];
         },
       },
     });
@@ -584,6 +629,7 @@ class AutoApiRegistrationEntityProvider implements EntityProvider {
         content_hash: hash,
         entity_name: mapped.entityName,
         last_error: mapped.error ?? null,
+        system_slug: mapped.systemSlug ?? null,
       });
     });
 
@@ -594,14 +640,36 @@ class AutoApiRegistrationEntityProvider implements EntityProvider {
       }
     }
 
+    // Lab 6: recompute the full set of System entities this source currently implies, from every
+    // file's last-known system_slug (not just the ones that changed this cycle) — cheap (in-memory
+    // over the cache rows already loaded) and re-declaring an unchanged System is a harmless
+    // upsert, so this stays correct even across a backend restart's first cycle.
+    const deletedPaths = new Set(deletes);
+    const finalRows: CacheRow[] = [...upserts];
+    for (const [filePath, row] of existingByPath) {
+      if (currentPaths.has(filePath) && !changedPaths.includes(filePath) && !deletedPaths.has(filePath)) {
+        finalRows.push(row);
+      }
+    }
+    const systemSlugs = new Set(
+      finalRows.map(row => row.system_slug).filter((slug): slug is string => !!slug),
+    );
+    const systemEntities: DeferredEntity[] = [...systemSlugs].map(slug => ({
+      entity: buildSystemEntity(
+        this.getProviderName(),
+        slug,
+        resolveOwnerRef(undefined, this.source.defaultOwner),
+      ),
+    }));
+
     if (!this.hasRunOnce) {
       // First run: establish the baseline with one `full` mutation.
-      await this.connection.applyMutation({ type: 'full', entities: added });
+      await this.connection.applyMutation({ type: 'full', entities: [...added, ...systemEntities] });
       this.hasRunOnce = true;
     } else if (added.length > 0 || removedRefs.length > 0) {
       await this.connection.applyMutation({
         type: 'delta',
-        added,
+        added: [...added, ...systemEntities],
         removed: removedRefs.map(entityRef => ({ entityRef })),
       });
     }

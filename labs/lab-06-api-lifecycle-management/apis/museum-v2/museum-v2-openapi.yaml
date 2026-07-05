@@ -1,6 +1,12 @@
+# Lab 6 — Museum API, version 2. A new major version, registered alongside (not replacing) v1 —
+# see labs/lab-06-api-lifecycle-management/README.md. Discovered by Lab 4's file-glob
+# autoApiRegistration provider like v1; no hand-authored catalog-info.yaml.
 openapi: 3.1.0
 info:
-  title: Museum API
+  # Titled "Museum API v2", not just "Museum API" — see museum-v1-openapi.yaml's info.title
+  # comment for why (entity names are slugified from info.title, so sibling versions need
+  # distinguishable titles; `apiBasename` below is what actually says "same logical API").
+  title: Museum API v2
   description: >
     An API for getting information about the museum, its special events, and purchasing
     tickets. This is a sample API used in the Backstage API Portal Lab to demonstrate
@@ -18,6 +24,13 @@ info:
   contact:
     name: Museum Support
     email: support@example.museum
+  # Lab 6: read by autoApiRegistration.ts's x-<namespace> extraction (source config sets
+  # xNamespace: examplecorp). Same apiBasename as v1 groups both under one auto-synthesized System.
+  x-examplecorp:
+    owner: group:default/museum-team
+    visibility: private
+    lifecycle: development
+    apiBasename: museum-api
 
 servers:
   - url: https://api.example.museum/v2

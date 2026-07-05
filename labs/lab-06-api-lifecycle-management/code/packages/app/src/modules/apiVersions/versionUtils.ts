@@ -2,15 +2,33 @@ import { useEffect, useState } from 'react';
 import { useApi } from '@backstage/core-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { Entity } from '@backstage/catalog-model';
+import yaml from 'js-yaml';
 
-export const VERSION_ANNOTATION = 'apiportal.io/version';
 export const RETIRED = 'retired';
 export const DEPRECATED = 'deprecated';
 
-export function getVersion(entity: Entity): [number, number] {
-  const raw = entity.metadata.annotations?.[VERSION_ANNOTATION];
-  const [major, minor] = (raw ?? '0.0').split('.').map(Number);
-  return [major || 0, minor || 0];
+// Version comes straight from the spec's own info.version — never a hand-authored annotation
+// duplicating it. By the time the catalog serves an entity, spec.definition's `$text` (if any)
+// has already been resolved to a plain string by Backstage's own placeholder processor, so this
+// works identically whether the entity was auto-registered (Lab 4) or points at a remote spec.
+export function getVersionString(entity: Entity): string | undefined {
+  const definition = entity.spec?.definition;
+  if (typeof definition !== 'string') {
+    return undefined;
+  }
+  try {
+    const doc = yaml.load(definition) as { info?: { version?: unknown } } | undefined;
+    const version = doc?.info?.version;
+    return typeof version === 'string' ? version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function getVersion(entity: Entity): [number, number, number] {
+  const raw = getVersionString(entity) ?? '0.0.0';
+  const [major, minor, patch] = raw.split('.').map(Number);
+  return [major || 0, minor || 0, patch || 0];
 }
 
 export function isRetired(entity: Entity): boolean {
@@ -22,15 +40,15 @@ export function getLifecycle(entity: Entity): string | undefined {
 }
 
 export function compareVersions(a: Entity, b: Entity): number {
-  const [aMajor, aMinor] = getVersion(a);
-  const [bMajor, bMinor] = getVersion(b);
-  return aMajor !== bMajor ? aMajor - bMajor : aMinor - bMinor;
+  const [aMajor, aMinor, aPatch] = getVersion(a);
+  const [bMajor, bMinor, bPatch] = getVersion(b);
+  return aMajor !== bMajor ? aMajor - bMajor : aMinor !== bMinor ? aMinor - bMinor : aPatch - bPatch;
 }
 
-// "Latest" is computed from every sibling's version annotation, not manually flagged, to
-// avoid two versions ever claiming "latest" at once (research.md R2). Prefer the highest
-// non-retired version; if every sibling is retired, fall back to the highest overall
-// (spec.md edge case: no current version at all).
+// "Latest" is computed from every sibling's info.version, not manually flagged, to avoid two
+// versions ever claiming "latest" at once (research.md R2). Prefer the highest non-retired
+// version; if every sibling is retired, fall back to the highest overall (spec.md edge case: no
+// current version at all).
 export function findLatest(siblings: Entity[]): Entity | undefined {
   const active = siblings.filter(s => !isRetired(s));
   const pool = active.length > 0 ? active : siblings;

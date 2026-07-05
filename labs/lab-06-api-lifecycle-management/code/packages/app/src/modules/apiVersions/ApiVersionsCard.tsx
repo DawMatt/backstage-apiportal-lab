@@ -15,7 +15,7 @@ import {
   compareVersions,
   findLatest,
   getLifecycle,
-  getVersion,
+  getVersionString,
   isRetired,
   useApiSiblings,
 } from './versionUtils';
@@ -29,7 +29,7 @@ function VersionRow({
   isCurrent: boolean;
   isLatest: boolean;
 }) {
-  const [major, minor] = getVersion(sibling);
+  const version = getVersionString(sibling) ?? 'unknown';
   const lifecycle = getLifecycle(sibling);
   return (
     <ListItem key={sibling.metadata.name} disableGutters>
@@ -42,11 +42,11 @@ function VersionRow({
           >
             {isCurrent ? (
               <strong>
-                {sibling.metadata.name} — v{major}.{minor} (this page)
+                {sibling.metadata.name} — v{version} (this page)
               </strong>
             ) : (
               <EntityRefLink entityRef={sibling}>
-                {sibling.metadata.name} — v{major}.{minor}
+                {sibling.metadata.name} — v{version}
               </EntityRefLink>
             )}
             {isLatest && <Chip label="Latest" color="primary" size="small" />}

@@ -10,97 +10,125 @@ alongside the original, and demonstrates how Backstage represents "these are ver
 logical API," which version is prominent by default, and how a version is deprecated and
 eventually retired without ever deleting its history.
 
+Lab 4 already built a mechanism for exactly this kind of problem: a file-glob `EntityProvider`
+that reads OpenAPI/AsyncAPI specs directly and extracts owner/lifecycle/visibility from an
+`info.x-<namespace>` extension block, so no hand-authored `catalog-info.yaml` is ever needed. This
+lab **extends that same provider** (one additive change to
+`labs/lab-04-auto-registration/code/packages/backend/src/extensions/autoApiRegistration.ts`, still
+backward-compatible with every existing Lab 4 spec) rather than reinventing catalog descriptors:
+zero hand-authored catalog YAML is added by this lab, for either the two API versions or the
+System that groups them.
+
 By the end of this lab you will have:
 
-- Two Museum API versions — `museum-api-v1` (Lab 1's original, unmodified) and `museum-api-v2` (a
-  new spec with deliberate breaking changes) — registered in the catalog **at the same time**,
-  grouped under one new `System` entity (`museum-api`) via Backstage's native `spec.system`
+- Two Museum API versions — `museum-api-v1` and `museum-api-v2` (a new spec with deliberate
+  breaking changes) — both **auto-registered** from local OpenAPI files (no catalog-info.yaml),
+  grouped under one **auto-synthesized** `System` entity via Backstage's native `spec.system`
   relation.
 - A new frontend module (`packages/app/src/modules/apiVersions/`) that adds an "API Versions"
-  card to every API's page, listing its sibling versions, computing and flagging the latest one,
-  showing each version's own lifecycle chip, and collapsing retired versions behind a "Show
-  retired versions" toggle.
+  card to every API's page, listing its sibling versions, computing and flagging the latest one
+  (read straight from each spec's own `info.version` — never a duplicated annotation), showing
+  each version's own lifecycle chip, and collapsing retired versions behind a "Show retired
+  versions" toggle.
 - A worked walkthrough of the full lifecycle: v2 starting in `development` and advancing through
   `testing` to `production`, while v1 is marked `deprecated` and then `retired` — with v1's entity
-  never deleted at any point.
+  never deleted at any point. Every transition is a one-line edit to the spec file's own
+  `x-examplecorp.lifecycle` field — no catalog YAML to touch, no git push required.
 
 **What you will learn:**
 
 - Why a `System` entity — not a bespoke annotation — is the right native mechanism for "these
-  entities are versions of one logical API" (see "Why a System entity" below)
-- Why "latest version" is computed from a version annotation rather than a manually-maintained
-  flag, and what goes wrong with the manual-flag approach
+  entities are versions of one logical API," and why that `System` is worth auto-synthesizing
+  from a spec-level field rather than hand-authoring (see "Why a System Entity" below)
+- Why "latest version" is read directly from `info.version` (data the spec already has) rather
+  than a parallel `apiportal.io/version` annotation, and what goes wrong with a duplicated copy
+- Why lifecycle state belongs in the spec's own `x-<namespace>` extension block, picked up by the
+  same mechanism Lab 4 already built for owner/visibility, instead of a hand-authored
+  `spec.lifecycle` override that fights the source of truth
 - Why this lab deliberately leaves Backstage's built-in search and catalog table unmodified,
   and where the "default" browsing experience actually lives instead
-- Why `spec.lifecycle` — a field every API entity has already had since Lab 1 — is enough to
-  represent five lifecycle states, including one (`retired`) Backstage doesn't define itself
 
 ---
 
 ## Prerequisites
 
 - **Labs 1–5 completed** — Backstage running locally with Museum, Streetlights, Train Travel,
-  Galaxy, and the precedence-demo API all registered, plus Lab 5's mocking/testing setup
+  Galaxy, and the precedence-demo API all registered, plus Lab 4's auto-registration module and
+  Lab 5's mocking/testing setup
 - **Node.js 20+ (or 22/24) and Yarn** — same toolchain as Labs 1–5
-- No new external accounts, services, or OS-level prerequisites, and no new dependencies to
-  install — this lab only adds catalog YAML, one new OpenAPI spec, and one small frontend module
+- No new external accounts, services, or OS-level prerequisites, and no new dependency to
+  install — `js-yaml` (used to read `info.version` client-side) is already a `packages/app`
+  dependency as of Lab 5's mocking module
 
 ---
 
-## Step 1 — Add the System and Both API Versions to the Catalog
+## Step 1 — Add the Two Museum API Spec Files
 
-Copy this lab's catalog files into your Backstage workspace's catalog location list. If you're
-working directly in this repository (not a separate clone), the files are already at
-[`catalog/system.yaml`](catalog/system.yaml), [`catalog/apis/museum-api-v1.yaml`](catalog/apis/museum-api-v1.yaml),
-[`catalog/apis/museum-api-v2.yaml`](catalog/apis/museum-api-v2.yaml), and
-[`catalog/apis/museum-v2/openapi.yaml`](catalog/apis/museum-v2/openapi.yaml).
+Unlike Labs 2–5's catalog-info.yaml-based registrations, there is no catalog YAML to author here
+at all. This lab adds two local OpenAPI files, already in place at
+[`apis/museum-v1/museum-v1-openapi.yaml`](apis/museum-v1/museum-v1-openapi.yaml) and
+[`apis/museum-v2/museum-v2-openapi.yaml`](apis/museum-v2/museum-v2-openapi.yaml):
 
-- **`system.yaml`** registers `system:default/museum-api` — the logical grouping every version
-  will point at via `spec.system`.
-- **`museum-api-v1.yaml`** registers a *new* entity name, `museum-api-v1`, pointing its
-  `spec.definition.$text` at the exact same, unmodified OpenAPI file Lab 1 already registered
-  (`labs/lab-01-base-backstage/apis/museum/openapi.yaml`). It supersedes Lab 2's single
-  `museum-api` entity — see "Why supersede, not edit" below.
-- **`museum-api-v2.yaml`** registers `museum-api-v2`, pointing at a **new** spec file
-  ([`catalog/apis/museum-v2/openapi.yaml`](catalog/apis/museum-v2/openapi.yaml)) with two
-  deliberate breaking changes: the `/special-events/{eventId}` path parameter is renamed to
-  `{id}`, and `GET /tickets/{ticketId}/qr` is renamed to `GET /tickets/{ticketId}/qr-code`. Both
-  changes are called out in the spec's own `info.description`.
+- **`museum-v1-openapi.yaml`** is a content-identical copy of Lab 1's `museum/openapi.yaml`
+  (Lab 1's own committed file is never edited — see "Why Supersede Lab 2's Entry, Not Edit It"
+  below for why a local copy, not a `$text` reference, is required here). Titled
+  **"Museum API v1"**, not just "Museum API" — see the file's own `info.title` comment for why.
+- **`museum-v2-openapi.yaml`** is a new spec, titled **"Museum API v2"**, with two deliberate
+  breaking changes vs. v1: the `/special-events/{eventId}` path parameter is renamed to `{id}`,
+  and `GET /tickets/{ticketId}/qr` is renamed to `GET /tickets/{ticketId}/qr-code`. Both changes
+  are called out in the spec's own `info.description`.
 
-Both version entities carry:
-
-- `annotations['apiportal.io/version']` — a `"major.minor"` string (`"1.0"`, `"2.0"`) used to sort
-  versions and compute the latest one.
-- `spec.system: museum-api` — the relation that groups them.
-- `spec.lifecycle` — v1 starts at `production`, v2 starts at `development`.
-
-## Step 2 — Update `app-config.yaml`'s Catalog Locations
-
-In `app-config.yaml`'s `catalog.locations`, **remove** Lab 2's single "Museum REST API" location
-entry and **add** three new entries — one for the System, one for each version:
+Both specs carry an `info.x-examplecorp` block — the same `x-<namespace>` extension mechanism Lab 4
+already introduced for owner/lifecycle/visibility:
 
 ```yaml
-    # --- Lab 6: Museum API System (groups museum-api-v1/v2 as versions of one logical API) ---
-    - type: url
-      target: https://raw.githubusercontent.com/<your-fork>/backstage-apiportal-lab/main/labs/lab-06-api-lifecycle-management/catalog/system.yaml
-      rules:
-        - allow: [System]
-
-    # --- Lab 6: Museum API v1 ---
-    - type: url
-      target: https://raw.githubusercontent.com/<your-fork>/backstage-apiportal-lab/main/labs/lab-06-api-lifecycle-management/catalog/apis/museum-api-v1.yaml
-      rules:
-        - allow: [API]
-
-    # --- Lab 6: Museum API v2 (deliberate breaking changes vs. v1) ---
-    - type: url
-      target: https://raw.githubusercontent.com/<your-fork>/backstage-apiportal-lab/main/labs/lab-06-api-lifecycle-management/catalog/apis/museum-api-v2.yaml
-      rules:
-        - allow: [API]
+info:
+  version: 1.0.0 # read directly for "latest version" — see "Why Version Comes From info.version"
+  x-examplecorp:
+    owner: group:default/museum-team
+    visibility: private
+    lifecycle: production # v2 starts at `development` — this is the field Steps 6-8 edit
+    apiBasename: museum-api # groups every version of this API under one auto-synthesized System
 ```
 
-Replace `<your-fork>` with your own GitHub username/organization, matching the pattern already
-used by every earlier lab's entries in this same file.
+`apiBasename` is new in this lab — see "Why apiBasename Drives System Assignment" below for why
+it exists and how the provider turns it into a `System` entity with no catalog YAML of its own.
+
+## Step 2 — Register a Second `autoApiRegistration` Source
+
+`app-config.yaml`'s `autoApiRegistration` config is already in place, converted from Lab 4's
+single-source shorthand to the explicit multi-source form (see
+[`labs/lab-04-auto-registration/README.md`'s "Scaling to Multiple Source Repositories"](../lab-04-auto-registration/README.md#scaling-to-multiple-source-repositories)):
+
+```yaml
+autoApiRegistration:
+  sources:
+    - id: default
+      defaultOwner: group:default/platform-team
+      defaultVisibility: private
+      xNamespace: examplecorp
+
+    # --- Lab 6: Museum API (all major versions + their System, all auto-registered) ---
+    - id: lab6-museum-api
+      rootPath: ../../../../lab-06-api-lifecycle-management/apis
+      defaultOwner: group:default/museum-team
+      defaultVisibility: private
+      xNamespace: examplecorp
+```
+
+This is its own source (own `id`, own `rootPath`, own `defaultOwner`) rather than a change to
+Lab 4's `default` source, exactly as the museum team's own repo would be onboarded independently
+at real scale (Lab 4 README's "no built-in global fallback" rationale for `defaultOwner`). It
+shares `xNamespace: examplecorp` with the `default` source deliberately: `x-examplecorp` is
+`examplecorp`-the-company's vendor extension namespace for *any* API metadata a producer wants to
+declare about their spec — owner, lifecycle, visibility, now `apiBasename` — not something scoped
+to Backstage or "the API Portal" specifically. Every team at `examplecorp` uses the same namespace
+regardless of which repo or catalog source picks their specs up; introducing a per-tool namespace
+(e.g. `x-apiportal`) would wrongly imply the metadata exists *for* Backstage, when other systems
+(a CLI linter, an internal API gateway, a docs generator) are equally valid consumers of the same
+`x-examplecorp` block. Lab 2's original single "Museum REST API" `catalog.locations` entry has
+also been **removed** — this lab's two auto-registered versions supersede it (see "Why Supersede
+Lab 2's Entry, Not Edit It" below).
 
 ## Step 3 — Add the API Versions Frontend Module
 
@@ -121,7 +149,8 @@ export default createApp({
 ```
 
 The module adds two `EntityCardBlueprint` cards to every `kind:API` entity's page — no new backend
-module, no new dependency:
+module, no new dependency (`js-yaml`, used to read `info.version` from `spec.definition`, is
+already present as of Lab 5):
 
 - **`ApiVersionsCard.tsx`** — an `info` card (sidebar) listing sibling versions.
 - **`ApiLifecycleBanner.tsx`** — a `content` card (main column) that renders nothing unless
@@ -148,44 +177,42 @@ cd labs/lab-01-base-backstage/backstage
 yarn start
 ```
 
-Open the catalog and confirm:
+Within one `autoApiRegistration` poll cycle, open the catalog and confirm:
 
-- `museum-api-v1` and `museum-api-v2` both appear as separate entities.
-- The `museum-api` System's page lists both as "Has part" APIs.
+- `museum-api-v1` and `museum-api-v2` both appear as separate entities — with no
+  `catalog-info.yaml` for either.
+- A `museum-api` `System` entity exists, listing both as "Has part" APIs, even though no
+  `system.yaml` was ever authored — it was synthesized from both specs' matching
+  `x-examplecorp.apiBasename: museum-api`.
 - Opening either version's page shows the new "API Versions" card, listing both versions with
-  working links between them, and `museum-api-v2` flagged **Latest**.
+  working links between them, and `museum-api-v2` flagged **Latest** (computed from each spec's
+  `info.version`, `1.0.0` vs. `2.0.0`).
 
 ## Step 5 — Confirm Independent Lifecycle State
 
-`museum-api-v1` starts at `production`, `museum-api-v2` starts at `development`. Confirm each
-version's own "About" card and its row in the Versions card show its own state, and that the two
-differ.
+`museum-api-v1` starts at `production`, `museum-api-v2` starts at `development` (each spec's own
+`x-examplecorp.lifecycle`). Confirm each version's own "About" card and its row in the Versions card
+show its own state, and that the two differ.
 
 ## Step 6 — Advance v2's Lifecycle
 
-> **WARNING**
->
-> **Every edit in Steps 6–8 must be committed and pushed to your fork before Backstage will see
-> it.** Step 2's catalog locations are `type: url` entries pointing at
-> `raw.githubusercontent.com/<your-fork>/...` — Backstage fetches the file from GitHub, not from
-> your local working copy. Editing the YAML locally and refreshing the page does nothing on its
-> own; commit, push to the branch your location URLs point at (`main`, unless you changed it), then
-> wait for the catalog's normal refresh interval (or trigger one immediately via `POST
-> /api/catalog/refresh`).
-
-Edit `museum-api-v2.yaml`'s `spec.lifecycle`: change it from `development` to `testing`, then from
-`testing` to `production`. After each edit, **commit and push**, then refresh either version's
-page — the Versions card and v2's own About card should reflect the new value within Backstage's
-normal catalog refresh interval, while `museum-api-v1` stays unaffected throughout.
+Edit `apis/museum-v2/museum-v2-openapi.yaml`'s `info.x-examplecorp.lifecycle`: change it from
+`development` to `testing`, then from `testing` to `production`. Unlike Labs 2–5's `type: url`
+catalog locations, `autoApiRegistration` reads these files directly off **local disk** — there is
+nothing to commit or push. Save the file, wait for the next poll cycle (30 seconds by default),
+and refresh either version's page: the Versions card and v2's own About card should reflect the
+new value, while `museum-api-v1` stays unaffected throughout.
 
 ## Step 7 — Deprecate v1
 
-Edit `museum-api-v1.yaml`'s `spec.lifecycle` to `deprecated`, then **commit and push**. Confirm the
-Deprecated label appears on v1's own page **and** in the Versions card on both v1 and v2's pages.
+Edit `apis/museum-v1/museum-v1-openapi.yaml`'s `info.x-examplecorp.lifecycle` to `deprecated`, save,
+and wait for the next poll cycle. Confirm the Deprecated label appears on v1's own page **and** in
+the Versions card on both v1 and v2's pages.
 
 ## Step 8 — Retire v1
 
-Edit `museum-api-v1.yaml`'s `spec.lifecycle` to `retired`, then **commit and push**. Confirm:
+Edit `apis/museum-v1/museum-v1-openapi.yaml`'s `info.x-examplecorp.lifecycle` to `retired`, save, and
+wait for the next poll cycle. Confirm:
 
 - v1 disappears from the Versions card's default (expanded) list on both pages.
 - A "Show retired versions (1)" button appears; clicking it reveals v1, clearly labeled Retired.
@@ -204,18 +231,53 @@ decision, not a data deletion.
 
 Backstage already has a native entity kind for "these things belong to one logical group":
 `System`. Setting `spec.system: museum-api` on every version gets you a real, already-indexed
-relation — plus a free "Has part" list on the System's own page — with zero new backend code. A
-bespoke annotation queried directly would still need a custom card to show anything, and would
-forfeit that free System page for no benefit. See `research.md` R1 for the full comparison.
+relation — plus a free "Has part" list on the System's own page — with zero new backend code
+beyond what Lab 4 already built. A bespoke annotation queried directly would still need a custom
+card to show anything, and would forfeit that free System page for no benefit. See `research.md`
+R1 for the full comparison.
+
+Authoring `system.yaml` by hand would have worked too, but it would be one more hand-maintained
+file per logical API, at odds with the whole reason Lab 4 exists. Instead, `autoApiRegistration.ts`
+now synthesizes one `System` entity per distinct `x-examplecorp.apiBasename` value it discovers
+across every spec in a source, the same way it already synthesizes `API` entities from spec
+files — see `research.md` R1a.
+
+## Why Version Comes From `info.version`, Not an Annotation
+
+Every OpenAPI/AsyncAPI spec already has `info.version`. An earlier draft of this lab added a
+parallel `apiportal.io/version` annotation to each catalog entity — but that's the same fact,
+typed twice, with no mechanism keeping the two in sync if someone bumps one and not the other.
+The Versions card instead parses `info.version` directly out of `spec.definition` (already a
+plain, fully-resolved string by the time the catalog serves it, whether the entity came from
+Lab 4's file-glob provider or a remote `$text` reference) — there's no copy to drift, because
+there's no copy. See `research.md` R2.
+
+## Why Lifecycle Reuses the x-* Extension Field, Not a Catalog Override
+
+Lab 4's `autoApiRegistration.ts` already reads `info.x-<namespace>.lifecycle` and puts it straight
+into `spec.lifecycle` on the generated entity. An earlier draft of this lab instead hand-authored
+`spec.lifecycle` directly in a catalog-info.yaml, silently overriding whatever the spec itself
+declared — two sources of truth for the same fact, with the hand-authored one always winning
+invisibly. This lab removes that override entirely: `x-examplecorp.lifecycle` in the spec file is
+now the *only* place lifecycle state lives, and Steps 6–8 edit it there. See `research.md` R3.
+
+## Why apiBasename Drives System Assignment
+
+`apiBasename` is a new `x-examplecorp` field, read the same way `owner`/`lifecycle`/`visibility`
+already are. It exists because "which logical API is this a version of" is metadata the API
+producer should declare once, at the source, the same way they'd declare their own team as owner
+— not something a catalog maintainer re-derives and hand-wires into a separate `System` file per
+API family. `autoApiRegistration.ts` slugifies the value (`museum-api`) and uses it both as
+`spec.system` on every matching `API` entity and as the `metadata.name` of a synthesized `System`
+entity, deduplicated across every spec that shares it. See `research.md` R1a.
 
 ## Why Latest Is Computed, Not Hand-Flagged
 
 It would be simpler to add an `apiportal.io/latest: "true"` annotation to whichever version is
 newest. It would also be wrong the moment someone forgets to flip it when adding a third version —
-two versions could both claim "latest," or none could. Instead, every version just carries its own
-`apiportal.io/version` number, and the Versions card computes which one is highest (excluding
-retired versions) every time it renders. There's no flag to get out of sync, because there's no
-flag.
+two versions could both claim "latest," or none could. Instead, every version's spec just carries
+its own `info.version`, and the Versions card computes which one is highest (excluding retired
+versions) every time it renders. There's no flag to get out of sync, because there's no flag.
 
 ## Why Backstage's Native Search Is Left Unmodified
 
@@ -229,14 +291,20 @@ benefits from a curated view that only shows what's current. See `research.md` R
 
 ## Why Supersede Lab 2's Entry, Not Edit It
 
-Lab 2 registered a single `museum-api` entity. Introducing "multiple major versions of the same
-API" properly requires versioned names (`museum-api-v1`, `museum-api-v2`) — there's no way to keep
-one entity unversioned while its sibling is `-v2` and still teach "these are equally-versioned
-parallel entities." This lab's `app-config.yaml` change therefore removes Lab 2's original catalog
-location and replaces it with three new ones. This is an explicitly-permitted "breaking change to
-the environment" under this repository's constitution (Development Workflow section) — if you're
-adapting this pattern to your own APIs, plan for the same kind of one-time migration the first time
-you introduce explicit versioning to an API that previously had none.
+Lab 2 registered a single `museum-api` entity via a hand-authored catalog-info.yaml. Introducing
+"multiple major versions of the same API" properly requires versioned, auto-registered entities
+(`museum-api-v1`, `museum-api-v2`) — there's no way to keep one entity unversioned while its
+sibling is `-v2` and still teach "these are equally-versioned parallel entities." This lab
+therefore removes Lab 2's original catalog location and, separately, adds a second
+`autoApiRegistration` source pointing at this lab's own `apis/` directory. This is an
+explicitly-permitted "breaking change to the environment" under this repository's constitution
+(Development Workflow section) — if you're adapting this pattern to your own APIs, plan for the
+same kind of one-time migration the first time you introduce explicit versioning to an API that
+previously had none.
+
+`museum-v1-openapi.yaml` is a **local copy** of Lab 1's spec, not a `$text` reference to it,
+specifically so Lab 4's file-glob provider (which only reads local files) can discover it without
+requiring an edit to Lab 1's already-committed file — see the copy's own header comment.
 
 ---
 
@@ -244,48 +312,55 @@ you introduce explicit versioning to an API that previously had none.
 
 Adaptable — change these freely for your own APIs:
 
-- The `apiportal.io/version` annotation format (`"major.minor"`) — substitute full semver, a date,
-  or whatever versioning scheme your organization already uses.
+- The `x-examplecorp` namespace name (rename to your own company/vendor identifier, same as Lab
+  4's `xNamespace` — one namespace per organization, shared by every team and repo, not one per
+  tool that happens to read it) and its `owner`/`visibility`/`lifecycle`/`apiBasename` fields.
 - The five-value lifecycle convention (`development`/`testing`/`production`/`deprecated`/
   `retired`) — `spec.lifecycle` accepts any string; use whatever states match your own process.
-- "One `System` per logical API" — this is the pattern to replicate, not a fixed name; a real
-  catalog would have one `System` per API family, not just Museum's.
+- "One `apiBasename` per logical API" — this is the pattern to replicate, not a fixed name; a real
+  catalog would have one `apiBasename` per API family, not just Museum's.
 
 Fixed — this is the mechanism itself, not a convention:
 
-- The `System`/`spec.system` relation as the grouping mechanism.
+- The `System`/`spec.system` relation as the grouping mechanism, and `autoApiRegistration.ts`'s
+  synthesis of one `System` per distinct `apiBasename`.
 - The `EntityCardBlueprint` pattern used to build the Versions card.
+- Reading `info.version` directly rather than a parallel annotation.
 
 ---
 
 ## Verification
 
-1. Both `museum-api-v1` and `museum-api-v2` appear in the catalog at the same time (Step 4).
-2. The Versions card on either page lists both versions and flags v2 Latest (Step 4).
-3. v1 and v2 show independent lifecycle chips that update independently as you edit them
-   (Steps 5–6).
-4. Marking v1 deprecated shows the label everywhere v1 appears; marking it retired collapses it
+1. Both `museum-api-v1` and `museum-api-v2` appear in the catalog at the same time, with no
+   hand-authored catalog-info.yaml for either (Step 4).
+2. A `museum-api` System exists with no `system.yaml` ever authored (Step 4).
+3. The Versions card on either page lists both versions and flags v2 Latest, computed from
+   `info.version` (Step 4).
+4. v1 and v2 show independent lifecycle chips that update independently as you edit each spec's
+   `x-examplecorp.lifecycle` field, with no commit/push required (Steps 5–6).
+5. Marking v1 deprecated shows the label everywhere v1 appears; marking it retired collapses it
    behind "Show retired versions" while it remains reachable via direct link (Steps 7–8).
-5. `museum-api-v1`'s entity is never deleted — confirm it's still present at the end (Step 9).
+6. `museum-api-v1`'s entity is never deleted — confirm it's still present at the end (Step 9).
 
 ## Troubleshooting
 
-- **Versions card renders but shows only one version**: confirm both `museum-api-v1.yaml` and
-  `museum-api-v2.yaml` set `spec.system: museum-api` (not `museum-api-v1`/`v2` — that's a typo that
-  silently produces an empty sibling list, since the card queries by the exact `spec.system`
-  string).
+- **Versions card renders but shows only one version**: confirm both spec files set the exact same
+  `x-examplecorp.apiBasename` value (`museum-api`) — a typo produces two different System slugs and
+  an empty sibling list on each side.
+- **Neither museum API version appears at all**: check the backend logs for
+  `auto-api-registration:lab6-museum-api:` lines. A wrong `rootPath` in `app-config.yaml`'s
+  second `autoApiRegistration` source is the most common cause — it must resolve (relative to
+  `packages/backend`) to this lab's `apis/` directory.
 - **Old `museum-api` entity still shows up alongside the new versioned ones**: you likely forgot
   to remove Lab 2's original catalog location entry from `app-config.yaml` in Step 2 — the old and
   new entities can coexist harmlessly, but that defeats the "supersede, don't duplicate" point of
   this lab.
-- **Lifecycle edit doesn't show up at all, no matter how long you wait**: you edited the local
-  file but didn't commit and push. These catalog locations are `type: url`, so Backstage reads
-  from your fork's GitHub remote, never your local disk — see the note above Step 6.
-- **Lifecycle edit doesn't show up immediately after pushing**: catalog processing runs on its
-  normal refresh interval; give it a few seconds and refresh the page, or trigger an immediate
-  refresh via Backstage's `POST /api/catalog/refresh` endpoint with the entity's ref.
-- **v2's spec fails to resolve (`$text` 404)**: if you're working from a fork, update the
-  `$text` URL in `museum-api-v2.yaml` to point at your fork's raw URL, not this repository's.
+- **Lifecycle edit doesn't show up immediately**: `autoApiRegistration` polls on its configured
+  interval (30 seconds by default, see Lab 4's `schedule.frequencySeconds`) — give it a few
+  seconds and refresh the page. Unlike Labs 2–5, there is no git push step here.
+- **"Owner ... does not resolve to a known User or Group entity"**: confirm `group:default/
+  museum-team` is registered (Lab 2's `teams.yaml`) — the same check Lab 4 already performs for
+  every auto-registered API applies here too.
 
 ---
 
@@ -295,3 +370,5 @@ Fixed — this is the mechanism itself, not a convention:
   decisions and alternatives considered for this lab.
 - [`data-model.md`](../../specs/006-api-lifecycle-management/data-model.md) — the exact entity
   shapes and the lifecycle state-transition diagram.
+- [`labs/lab-04-auto-registration/README.md`](../lab-04-auto-registration/README.md) — the
+  auto-registration mechanism this lab extends.
