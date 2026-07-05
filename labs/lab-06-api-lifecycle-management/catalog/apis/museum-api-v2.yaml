@@ -22,7 +22,7 @@ metadata:
     apiportal.io/version: "2.0"
 spec:
   type: openapi
-  lifecycle: development
+  lifecycle: testing
   owner: group:default/museum-team
   system: museum-api
   definition:
