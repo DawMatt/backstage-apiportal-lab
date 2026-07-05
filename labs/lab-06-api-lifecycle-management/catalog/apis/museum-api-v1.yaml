@@ -13,7 +13,7 @@ metadata:
   description: >
     A sample REST API for a fictional museum, demonstrating modern OpenAPI 3.1 design
     practices. Covers special events, museum hours, and ticket purchasing. Version 1 —
-    see museum-api-v2 for the next major version and its breaking changes.
+    see museum-api-v2 for the next major version and its breaking changes
   tags:
     - rest
     - openapi
