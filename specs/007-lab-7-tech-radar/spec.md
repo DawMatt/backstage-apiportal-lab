@@ -8,6 +8,13 @@
 
 **Input**: User description: "Create new feature and specification to implement lab 7 in GOAL.md"
 
+## Clarifications
+
+### Session 2026-07-06
+
+- Q: What quadrant taxonomy should the sample Tech Radar use? → A: Classic Thoughtworks 4 (Techniques, Tools, Platforms, Languages & Frameworks)
+- Q: Should the lab also demonstrate retiring/removing a blip (not just adding or moving one)? → A: Yes, add a retire scenario
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Publish an organization Tech Radar (Priority: P1)
@@ -28,7 +35,7 @@ As a learner running the Backstage instance built in prior labs, I want a Though
 
 ### User Story 2 - Register a new blip (Priority: P2)
 
-As a team member documenting a technology decision, I want to add a new blip to the radar (or move an existing one to a different ring), so that the radar stays current as adoption guidance changes.
+As a team member documenting a technology decision, I want to add a new blip to the radar, move an existing one to a different ring, or retire a blip that is no longer relevant, so that the radar stays current as adoption guidance changes.
 
 **Why this priority**: This is the main hands-on exercise of the lab — it teaches the mechanics of maintaining the radar over time, which is the point of the exercise once the radar is visible.
 
@@ -39,6 +46,7 @@ As a team member documenting a technology decision, I want to add a new blip to 
 1. **Given** the radar data source used by the plugin, **When** a learner adds a new blip entry with a name, quadrant, ring and description, **Then** the new blip is visible on the radar after reload.
 2. **Given** an existing blip, **When** a learner changes its ring (e.g. from "Assess" to "Trial"), **Then** the radar reflects the new ring and indicates that the blip has moved.
 3. **Given** a learner provides an invalid quadrant or ring name, **When** Backstage loads the radar data, **Then** the lab documentation explains the resulting error and how to fix it.
+4. **Given** a blip that is no longer relevant, **When** a learner removes it from the radar data source following the lab's documented retirement steps, **Then** the blip no longer appears on the radar after reload.
 
 ---
 
@@ -68,12 +76,12 @@ As a learner new to Tech Radar concepts, I want the lab documentation to explain
 ### Functional Requirements
 
 - **FR-001**: The Backstage instance MUST display a Tech Radar page reachable from the main navigation, following the same access approach (visible to all authenticated users) as other non-API catalog entry types established in prior labs.
-- **FR-002**: The radar MUST define a fixed set of quadrants and a fixed set of rings representing adoption/lifecycle stages (e.g. Adopt, Trial, Assess, Hold), consistent with the standard Thoughtworks Radar model.
+- **FR-002**: The radar MUST use the classic Thoughtworks quadrant set — Techniques, Tools, Platforms, and Languages & Frameworks — and a fixed set of rings representing adoption/lifecycle stages (Adopt, Trial, Assess, Hold), consistent with the standard Thoughtworks Radar model.
 - **FR-003**: The radar's data (quadrants, rings, and blips) MUST be sourced from a file within the repository that learners can edit directly, without requiring any external service or paid API.
 - **FR-004**: Each blip MUST include, at minimum: a name, its quadrant, its ring, and a short description explaining the recommendation or rationale.
 - **FR-005**: The system MUST support indicating that a blip has moved between rings since a previous state (e.g. via a "moved" flag or equivalent mechanism supported by the plugin).
 - **FR-006**: The lab documentation MUST provide step-by-step instructions for installing and configuring the Tech Radar plugin into the Backstage instance produced by prior labs.
-- **FR-007**: The lab documentation MUST provide step-by-step instructions for registering a new blip and for moving an existing blip to a different ring.
+- **FR-007**: The lab documentation MUST provide step-by-step instructions for registering a new blip, for moving an existing blip to a different ring, and for retiring (removing) a blip that is no longer relevant.
 - **FR-008**: The lab documentation MUST explain the meaning of each ring and quadrant used in the sample data, so learners can apply the model to their own technologies.
 - **FR-009**: The sample radar data MUST include enough blips to populate every quadrant and every ring at least once, so the full visual model is demonstrated out of the box.
 - **FR-010**: The lab MUST identify any prerequisites (packages, versions) needed for the Tech Radar plugin and how to source them, consistent with the repository's constitution.
@@ -82,7 +90,7 @@ As a learner new to Tech Radar concepts, I want the lab documentation to explain
 ### Key Entities
 
 - **Radar Blip**: A single technology, tool, technique, or platform being tracked; has a name, description, an assigned quadrant, an assigned ring, and an optional "moved" indicator relative to its prior ring.
-- **Quadrant**: A named category grouping related blips (e.g. Techniques, Tools, Platforms, Languages & Frameworks — or a set adapted to this repository's API-focused context).
+- **Quadrant**: A named category grouping related blips. The lab uses the classic Thoughtworks quadrant set: Techniques, Tools, Platforms, and Languages & Frameworks.
 - **Ring**: A named adoption/lifecycle stage shared across all quadrants (e.g. Adopt, Trial, Assess, Hold), representing how strongly the blip is recommended.
 - **Radar Dataset**: The overall collection of quadrants, rings, and blips that together render as one Tech Radar page.
 
@@ -94,6 +102,7 @@ As a learner new to Tech Radar concepts, I want the lab documentation to explain
 - **SC-002**: 100% of the sample dataset's quadrants and rings have at least one visible blip after setup, with no configuration errors.
 - **SC-003**: A learner can successfully add a new blip and see it appear on the radar on their first attempt, following only the lab's written instructions.
 - **SC-004**: A learner can successfully move an existing blip to a different ring and observe the "moved" indicator on their first attempt, following only the lab's written instructions.
+- **SC-006**: A learner can successfully retire an existing blip and confirm it no longer appears on the radar on their first attempt, following only the lab's written instructions.
 - **SC-005**: A learner unfamiliar with the Tech Radar concept can, after reading the documentation, correctly describe the purpose of each ring without additional external research.
 
 ## Assumptions
@@ -101,5 +110,5 @@ As a learner new to Tech Radar concepts, I want the lab documentation to explain
 - "Other documentation" in the GOAL.md lab list refers to using the Thoughtworks Tech Radar as a documentation/communication artifact within Backstage, distinct from the API-specific documentation (OpenAPI/AsyncAPI docs, quality, mocking) covered in earlier labs.
 - The radar dataset is maintained as a static file (e.g. JSON or equivalent) committed to the repository and read directly by the plugin; no external Tech Radar backend service or hosted API is required, consistent with the $0-cost constraint.
 - The radar is visible to all authenticated users regardless of team, matching the existing "allow all" visibility approach used for non-API catalog entry types in Lab 2 — the radar is organizational documentation, not team-owned API metadata.
-- Sample blips will be chosen to relate to the API development practices this lab series already teaches (e.g. API design techniques, the OpenAPI/AsyncAPI tooling, mocking approaches from Lab 5), so the radar reinforces rather than distracts from the series' teaching goals.
-- No historical time-series of radar snapshots is required beyond a single "moved" indicator per blip; multi-generation radar history is out of scope for this lab.
+- Sample blips will be chosen to relate to the API development practices this lab series already teaches (e.g. API design techniques, the OpenAPI/AsyncAPI tooling, mocking approaches from Lab 5), distributed across the four classic quadrants, so the radar reinforces rather than distracts from the series' teaching goals.
+- No historical time-series of radar snapshots is required beyond a single "moved" indicator per blip; multi-generation radar history is out of scope for this lab. Retiring a blip means removing its entry from the dataset, not archiving prior radar editions.
