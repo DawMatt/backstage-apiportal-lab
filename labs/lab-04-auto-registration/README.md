@@ -263,7 +263,10 @@ Three failure modes, each temporary — revert after checking:
 
 **Adaptable — change these to fit your own repo layout:**
 
-- `rootPath` — where the scan starts. Point it at your own mono-repo root.
+- `rootPath` — where the scan starts. Point it at your own mono-repo root. A relative path is
+  resolved against `packages/backend`'s own directory (the same anchor the module's built-in
+  default uses), not wherever `yarn start` happens to be invoked from — see Lab 6's second
+  `autoApiRegistration` source for a worked example.
 - `patterns` — the filename glob(s) that identify an API definition file. The default
   (`**/*-openapi.yaml`, `**/*-asyncapi.yaml`) is this lab's convention, not Backstage's; use
   whatever your team already follows.
@@ -314,9 +317,34 @@ config values need to change:
 - `parseConcurrency` bounds how many files are parsed at once, so a large batch of simultaneous
   changes (e.g. checking out a branch that touches hundreds of files) doesn't spike memory or
   block the event loop.
+- **The scan-state cache alone doesn't make a restart *visibly* fast — the scheduler's own
+  persisted timer has to be handled too.** The discovery cycle runs inside a
+  `scheduler.scheduleTask(...)` registration, and Backstage's `SchedulerService` persists each
+  task's `next_run_start_at` in its own database table across restarts. If you restart within one
+  scheduling interval of the last run (a normal dev stop/rebuild/restart), that old persisted
+  timestamp is still in the future and wins, so the first cycle wouldn't fire until it elapses —
+  even though the cache-validated scan behind it is instant. This module follows every
+  `scheduleTask` call with `await scheduler.triggerTask(taskId)` specifically to force that first
+  cycle to run immediately on boot, regardless of what was persisted from a previous process (with
+  a `ConflictError` guard — see Troubleshooting below — since that trigger can legitimately lose a
+  race against the scheduler's own worker loop on a brand-new task).
+- **The triggered run can itself fire before the provider has connected — this matters more as the
+  schedule gets longer.** `scheduler.scheduleTask` and the catalog engine calling this provider's
+  `connect(...)` are two independent, unordered startup sequences. If the triggered run happens
+  first, `runCycle()`'s own guard skips it ("provider not yet connected") rather than erroring. At
+  the lab's 30s default, the very next scheduled cycle covers for this almost immediately. At a
+  scaled deployment's much longer cadence (an hour or more is realistic once you're not polling a
+  handful of files every 30s), waiting for "the next scheduled cycle" is a real, user-visible delay
+  — not a rounding error. `connect()` itself also kicks off the first cycle when it fires, so
+  whichever of the two events (scheduler trigger vs. provider connect) happens second is the one
+  that actually runs it — independent of how long the configured cadence is. Because both paths can
+  legitimately call `runCycle()` around the same moment, it dedups concurrent calls into a single
+  in-flight execution rather than running two overlapping full scans.
 
-If you scale this lab up, expect restarts to be fast (cache-driven, not a full re-scan) — that's
-the part most likely to surprise you the first time.
+If you scale this lab up, expect restarts to be fast (cache-driven, not a full re-scan; triggered
+immediately rather than waiting on a stale scheduler timestamp; and not dependent on winning a race
+against the provider's own connection lifecycle) — that's the part most likely to surprise you the
+first time.
 
 ---
 
@@ -394,8 +422,13 @@ checks — is reused unchanged; only how bytes arrive on local disk differs.
 
 - **Nothing appears after 30+ seconds.** Check the backend logs for
   `auto-api-registration:default:` lines. A "skipped a cycle — provider not yet connected"
-  warning on the very first tick is normal (the scheduler's first run can fire slightly before
-  the catalog engine finishes wiring up the provider); it should not repeat.
+  warning on the very first tick is normal (the scheduler's startup trigger can fire slightly
+  before the catalog engine finishes wiring up the provider) and should be followed, within about
+  a second, by a real cycle triggered by the provider's own `connect()` callback — it should not
+  repeat, and it should not take until the next 30s tick. If entities genuinely don't appear until
+  the next full scheduling interval, that's a sign the `connect()`-triggered retry isn't wired up
+  (research.md R6 Follow-up 2) — at a scaled deployment's much longer cadence, that gap becomes a
+  real, noticeable wait rather than a cosmetic one.
 - **"Owner ... does not resolve to a known User or Group entity" for an owner you're sure
   exists.** Confirm that group is actually loaded in the catalog (check its entity page directly)
   — this error means the *catalog* doesn't know about the group yet, not that your YAML is wrong.
@@ -408,6 +441,13 @@ checks — is reused unchanged; only how bytes arrive on local disk differs.
   which looks like the discovery mechanism itself is broken. Check the backend logs for "Unable
   to read url, no matching files found" lines against your `catalog.locations` URLs first; if any
   point at a branch other than `main` or your current branch, that's almost always the real cause.
+  If the group genuinely does exist and just hasn't finished loading yet — this is expected right
+  at cold start, since discovery now runs before org-data locations are guaranteed to have loaded
+  (research.md R6 Follow-up 2) — this error is transient and self-heals: a previously-errored file
+  is always re-validated on the next cycle (research.md R6 Follow-up 3), so it should clear itself
+  within one scheduling interval once the group resolves, with no need to touch the spec file or
+  restart. If it's still erroring after several cycles, that's when to suspect a genuinely
+  unresolvable owner rather than a timing issue.
 - **An entity you expect to see is silently missing, with no error logged.** Check the backend
   logs for a `Policy check failed for api:default/<name>` warning — this means the entity was
   built and emitted, but failed Backstage's own entity-schema validation (for example,
@@ -428,3 +468,15 @@ checks — is reused unchanged; only how bytes arrive on local disk differs.
   spec file has an `x-*` object, check that the object's key matches `xNamespace` exactly —
   `x-examplecorp` in config but `x-example-corp` (extra hyphen) in the spec file will silently
   fall through to defaults rather than error, since an absent `x-*` object is valid input.
+- **No API entities load at all — not even hand-authored ones — and startup logs show a
+  `ConflictError`.** This is a backend module *init* failure, not a discovery/mapping problem: if
+  you see an error like `Task ... is currently running` thrown while `auto-api-registration` is
+  starting up, it means the module's startup call to `scheduler.triggerTask(...)` (used to force
+  the first discovery cycle to run immediately at boot, see "Scaling to a Real Mono-Repo" below)
+  lost a race against the scheduler's own background worker loop, which had already claimed that
+  task's first run. An uncaught error at this point in a backend module's `init()` fails the whole
+  `catalog` plugin's initialization, which is why the symptom looks like "the entire catalog is
+  broken" rather than something scoped to this module. This is different from the
+  `AutoApiRegistrationErrorProcessor` warnings above, which are per-entity and never take down the
+  catalog itself. The fix is to treat that specific `ConflictError` as expected (the run we wanted
+  was already happening) rather than letting it propagate.

@@ -1,0 +1,502 @@
+# Lab 6 — Museum API, version 1.
+#
+# This is a content-identical copy of Lab 1's museum openapi.yaml
+# (labs/lab-01-base-backstage/apis/museum/openapi.yaml), kept as its own local file so Lab 4's
+# file-glob autoApiRegistration provider (labs/lab-04-auto-registration/code/packages/backend/src/
+# extensions/autoApiRegistration.ts) can discover it — that provider only scans local files, and
+# this repository's constitution/plan forbid editing Lab 1's already-committed file. The only
+# addition is the `x-examplecorp` block below; every path, schema, and response is unchanged. See
+# labs/lab-06-api-lifecycle-management/README.md for why v1 is auto-registered rather than
+# hand-authored as a catalog-info.yaml.
+openapi: 3.1.0
+info:
+  # Titled "Museum API v1", not just "Museum API" — autoApiRegistration.ts names each catalog
+  # entity from a slug of info.title (labs/lab-04-.../autoApiRegistration.ts's `slugify`), so two
+  # versions of the same logical API need distinguishable titles or they'd collide on one entity
+  # name. `apiBasename` below (not the title) is what actually says "these are the same API".
+  title: Museum API v1
+  description: >
+    An API for getting information about the museum, its special events, and purchasing
+    tickets. This is a sample API used in the Backstage API Portal Lab to demonstrate
+    OpenAPI catalog registration.
+  version: 1.0.0
+  contact:
+    name: Museum Support
+    email: support@example.museum
+  # Lab 6: read by autoApiRegistration.ts's x-<namespace> extraction (source config below sets
+  # xNamespace: examplecorp). `apiBasename` groups every major version of this API under one
+  # System entity, synthesized automatically — no hand-authored system.yaml. `lifecycle` is the
+  # one field edited during the Step 6-8 walkthrough to advance/deprecate/retire this version.
+  x-examplecorp:
+    owner: group:default/museum-team
+    visibility: private
+    lifecycle: production
+    apiBasename: museum-api
+
+servers:
+  - url: https://api.example.museum/v1
+    description: Production server
+
+tags:
+  - name: Operations
+    description: Museum operating information
+  - name: Events
+    description: Special events at the museum
+  - name: Tickets
+    description: Ticket purchasing and management
+
+paths:
+  /museum-hours:
+    get:
+      summary: Get museum hours
+      description: >
+        Returns the opening hours for the museum. Hours may vary on public holidays —
+        check the special events endpoint for closures.
+      operationId: getMuseumHours
+      tags:
+        - Operations
+      parameters:
+        - name: startDate
+          in: query
+          description: The start date to retrieve hours from (inclusive). Defaults to today.
+          schema:
+            type: string
+            format: date
+            example: "2024-02-01"
+        - name: page
+          in: query
+          description: The page number to retrieve.
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: The number of days per page.
+          schema:
+            type: integer
+            default: 7
+            minimum: 1
+            maximum: 30
+      responses:
+        "200":
+          description: Museum opening hours returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetMuseumHoursResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /special-events:
+    get:
+      summary: List special events
+      description: >
+        Returns a paginated list of special events at the museum. Events are sorted by
+        start date, most recent first.
+      operationId: listSpecialEvents
+      tags:
+        - Events
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 30
+      responses:
+        "200":
+          description: List of special events returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSpecialEventsResponse"
+
+    post:
+      summary: Create a special event
+      description: >
+        Creates a new special event. The event is created in draft status and must be
+        published before it appears in the public listing.
+      operationId: createSpecialEvent
+      tags:
+        - Events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSpecialEventRequest"
+      responses:
+        "201":
+          description: Special event created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpecialEventResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /special-events/{eventId}:
+    parameters:
+      - name: eventId
+        in: path
+        required: true
+        description: Unique identifier for the special event.
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get a special event
+      operationId: getSpecialEvent
+      tags:
+        - Events
+      responses:
+        "200":
+          description: Special event details returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpecialEventResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      summary: Update a special event
+      operationId: updateSpecialEvent
+      tags:
+        - Events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSpecialEventRequest"
+      responses:
+        "200":
+          description: Special event updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpecialEventResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      summary: Delete a special event
+      operationId: deleteSpecialEvent
+      tags:
+        - Events
+      responses:
+        "204":
+          description: Special event deleted successfully.
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /special-events/{eventId}/publish:
+    post:
+      summary: Publish a special event
+      description: >
+        Publishes a draft special event, making it visible in the public listing.
+        Published events cannot be unpublished, only deleted.
+      operationId: publishSpecialEvent
+      tags:
+        - Events
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "202":
+          description: Special event published successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpecialEventResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /tickets:
+    post:
+      summary: Buy museum tickets
+      description: >
+        Purchases one or more tickets for a museum visit or special event. Returns a
+        ticket ID that can be used to retrieve a QR code for entry.
+      operationId: buyMuseumTickets
+      tags:
+        - Tickets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuyMuseumTicketsRequest"
+      responses:
+        "201":
+          description: Tickets purchased successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuyMuseumTicketsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /tickets/{ticketId}/qr:
+    get:
+      summary: Get ticket QR code
+      description: >
+        Returns a QR code image for the specified ticket. Present this at the museum
+        entrance for admission.
+      operationId: getTicketQrCode
+      tags:
+        - Tickets
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: QR code image returned successfully.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  schemas:
+    MuseumDayHours:
+      type: object
+      description: Opening hours for a single day.
+      properties:
+        date:
+          type: string
+          format: date
+          description: The date these hours apply to.
+          example: "2024-02-01"
+        timeOpen:
+          type: string
+          description: Opening time (24-hour format).
+          example: "09:00"
+        timeClose:
+          type: string
+          description: Closing time (24-hour format).
+          example: "17:00"
+      required:
+        - date
+        - timeOpen
+        - timeClose
+
+    GetMuseumHoursResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/MuseumDayHours"
+
+    SpecialEventResponse:
+      type: object
+      description: A special event at the museum.
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Unique identifier for the event.
+        name:
+          type: string
+          description: The name of the event.
+          example: "Mermaid Legends"
+        location:
+          type: string
+          description: Where the event takes place within the museum.
+          example: "Section D"
+        eventDescription:
+          type: string
+          description: A description of the event.
+        dates:
+          type: array
+          description: Dates on which the event takes place.
+          items:
+            type: string
+            format: date
+        price:
+          type: number
+          format: float
+          description: Ticket price in USD.
+          example: 25.00
+        status:
+          type: string
+          enum: [draft, published]
+          description: Publication status of the event.
+      required:
+        - eventId
+        - name
+        - location
+        - dates
+        - price
+        - status
+
+    ListSpecialEventsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpecialEventResponse"
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+
+    CreateSpecialEventRequest:
+      type: object
+      required:
+        - name
+        - location
+        - dates
+        - price
+      properties:
+        name:
+          type: string
+          example: "Mermaid Legends"
+        location:
+          type: string
+          example: "Section D"
+        eventDescription:
+          type: string
+        dates:
+          type: array
+          items:
+            type: string
+            format: date
+        price:
+          type: number
+          format: float
+          example: 25.00
+
+    UpdateSpecialEventRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        location:
+          type: string
+        eventDescription:
+          type: string
+        dates:
+          type: array
+          items:
+            type: string
+            format: date
+        price:
+          type: number
+          format: float
+
+    BuyMuseumTicketsRequest:
+      type: object
+      required:
+        - ticketType
+        - ticketDate
+        - email
+      properties:
+        ticketType:
+          type: string
+          enum: [general, special]
+          description: Type of ticket — general admission or a special event.
+        ticketDate:
+          type: string
+          format: date
+          description: The date the ticket is valid for.
+        eventId:
+          type: string
+          format: uuid
+          description: Required when ticketType is "special".
+        email:
+          type: string
+          format: email
+          description: Email address to send the ticket confirmation to.
+
+    BuyMuseumTicketsResponse:
+      type: object
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: Unique ticket identifier. Use this to retrieve the QR code.
+        ticketType:
+          type: string
+          enum: [general, special]
+        ticketDate:
+          type: string
+          format: date
+        confirmationCode:
+          type: string
+          example: "ticket-ABC123"
+      required:
+        - ticketId
+        - ticketType
+        - ticketDate
+        - confirmationCode
+
+    Error:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+      required:
+        - type
+        - title
+        - status
+
+  responses:
+    BadRequest:
+      description: Bad request — invalid input parameters.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    NotFound:
+      description: Resource not found.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Error"

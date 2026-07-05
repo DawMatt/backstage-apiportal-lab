@@ -33,6 +33,7 @@ import type {
   DatabaseService,
   LoggerService,
   RootConfigService,
+  SchedulerService,
 } from '@backstage/backend-plugin-api';
 import {
   ANNOTATION_LOCATION,
@@ -41,9 +42,10 @@ import {
   stringifyEntityRef,
 } from '@backstage/catalog-model';
 import type { Entity } from '@backstage/catalog-model';
-import { InputError } from '@backstage/errors';
+import { ConflictError, InputError } from '@backstage/errors';
 import type { Knex } from 'knex';
 import * as scanStateCacheMigration from './autoApiRegistrationMigrations/001_scan_state_cache';
+import * as systemSlugMigration from './autoApiRegistrationMigrations/002_add_system_slug';
 
 // ---------------------------------------------------------------------------------------------
 // Config
@@ -118,9 +120,16 @@ export function normalizeConfig(rootConfig: RootConfigService): SourceConfig[] {
       );
     }
 
+    const rawRootPath = entry.getOptionalString('rootPath');
     return {
       id,
-      rootPath: entry.getOptionalString('rootPath') ?? defaultRootPath(),
+      // A relative rootPath is resolved against this backend package's own directory, not the
+      // process's cwd (which varies by how `yarn start` was invoked) — same anchor
+      // defaultRootPath() itself uses, so every source's `rootPath` behaves consistently
+      // regardless of where the dev server happens to be launched from.
+      rootPath: rawRootPath
+        ? path.resolve(resolvePackagePath('backend'), rawRootPath)
+        : defaultRootPath(),
       patterns: entry.getOptionalStringArray('patterns') ?? DEFAULT_PATTERNS,
       ignore: entry.getOptionalStringArray('ignore') ?? DEFAULT_IGNORE,
       mode: (entry.getOptionalString('mode') as 'poll' | 'watch') ?? 'poll',
@@ -217,6 +226,9 @@ export function slugify(title: string): string {
 interface MappingResult {
   entity: Entity;
   entityName: string;
+  // Lab 6: set only on a successful (non-error) mapping that declares an apiBasename — error/
+  // marker entities never contribute a System, since they aren't real registrations.
+  systemSlug?: string;
   error?: string;
 }
 
@@ -243,6 +255,7 @@ function buildEntity(opts: {
   owner: string;
   lifecycle: string;
   visibility: string;
+  system?: string;
   registrationError?: string;
 }): Entity {
   const annotations: Record<string, string> = {
@@ -273,7 +286,33 @@ function buildEntity(opts: {
       type: opts.parsed.kind,
       lifecycle: opts.lifecycle,
       owner: opts.owner,
+      ...(opts.system ? { system: opts.system } : {}),
       definition: opts.contents,
+    },
+  };
+}
+
+// Lab 6: builds the System entity representing an apiBasename — one instance per distinct slug,
+// synthesized purely from spec files, never hand-authored (see runCycle()'s per-cycle
+// resynchronization).
+function buildSystemEntity(providerName: string, slug: string, owner: string): Entity {
+  // Needs the same location annotations the API entities get: without one, the catalog's
+  // orphan-cleanup task treats a location-less entity as unowned and deletes it on its own
+  // schedule, regardless of the EntityProvider re-asserting it every cycle.
+  const location = `synthetic:${providerName}`;
+  return {
+    apiVersion: 'backstage.io/v1alpha1',
+    kind: 'System',
+    metadata: {
+      name: slug,
+      annotations: {
+        [ANNOTATION_LOCATION]: location,
+        [ANNOTATION_ORIGIN_LOCATION]: location,
+        [MANAGED_BY_ANNOTATION]: providerName,
+      },
+    },
+    spec: {
+      owner,
     },
   };
 }
@@ -300,6 +339,10 @@ function mapCandidate(opts: {
   const lifecycle = xField(parsed.raw, source.xNamespace, 'lifecycle') ?? 'experimental';
   const rawVisibility = xField(parsed.raw, source.xNamespace, 'visibility');
   const visibility = rawVisibility ?? source.defaultVisibility;
+  // Lab 6: x-<namespace>.apiBasename groups every major version of the same logical API under one
+  // System, slugified the same way entity names are so it's a valid catalog entity name.
+  const rawApiBasename = xField(parsed.raw, source.xNamespace, 'apiBasename');
+  const systemSlug = rawApiBasename ? slugify(rawApiBasename) : undefined;
 
   // Rule: an unrecognized-but-present visibility value is a marker/error entity, never silently
   // defaulted.
@@ -364,6 +407,7 @@ function mapCandidate(opts: {
 
   return {
     entityName: baseSlug,
+    systemSlug,
     entity: buildEntity({
       providerName,
       filePath,
@@ -373,6 +417,7 @@ function mapCandidate(opts: {
       owner,
       lifecycle,
       visibility,
+      system: systemSlug,
     }),
   };
 }
@@ -388,6 +433,9 @@ interface CacheRow {
   content_hash: string;
   entity_name: string;
   last_error: string | null;
+  // Lab 6: the slugified info.x-<namespace>.apiBasename this file last resolved to, or null if
+  // the file doesn't declare one. Drives System entity synthesis in runCycle().
+  system_slug: string | null;
 }
 
 class ScanStateCache {
@@ -400,17 +448,25 @@ class ScanStateCache {
     // `knex_migrations` table here would validate our one-migration `migrationSource` against the
     // real catalog plugin's own (much longer) applied-migrations history and fail with
     // "migration directory is corrupt".
+    interface MigrationModule {
+      up(knex: Knex): Promise<void>;
+      down(knex: Knex): Promise<void>;
+    }
+    const migrations: Record<string, MigrationModule> = {
+      '001_scan_state_cache': scanStateCacheMigration,
+      '002_add_system_slug': systemSlugMigration,
+    };
     await knex.migrate.latest({
       tableName: 'auto_api_registration_migrations',
       migrationSource: {
         async getMigrations() {
-          return ['001_scan_state_cache'];
+          return Object.keys(migrations);
         },
         getMigrationName(migration: string) {
           return migration;
         },
-        async getMigration() {
-          return scanStateCacheMigration;
+        async getMigration(migration: string) {
+          return migrations[migration];
         },
       },
     });
@@ -468,6 +524,13 @@ async function mapLimit<T, R>(
 class AutoApiRegistrationEntityProvider implements EntityProvider {
   private connection?: EntityProviderConnection;
   private hasRunOnce = false;
+  // Dedups concurrent callers of runCycle() into a single in-flight execution. Two independent
+  // triggers can legitimately race to run the *first* cycle — the scheduler's startup
+  // `triggerTask` call (research.md R6 Corollary) and connect() below (fired the moment the
+  // catalog engine actually wires this provider up, in case connect() happens after that trigger
+  // already found `this.connection` unset and skipped) — without this, both could kick off a
+  // full scan/mutation at once.
+  private inFlightCycle?: Promise<void>;
 
   constructor(
     private readonly source: SourceConfig,
@@ -483,9 +546,29 @@ class AutoApiRegistrationEntityProvider implements EntityProvider {
 
   async connect(connection: EntityProviderConnection): Promise<void> {
     this.connection = connection;
+    if (!this.hasRunOnce) {
+      // The scheduler's own startup trigger may have already fired and found no connection yet
+      // (logged as "skipped a cycle"); rather than let that mean waiting for the next scheduled
+      // cadence — a real problem once a scaled-up deployment schedules this hourly rather than
+      // every 30s (research.md R6) — run the first cycle as soon as the provider is actually
+      // able to, driven by this authoritative connect() signal instead of a timing race.
+      this.runCycle().catch(error =>
+        this.logger.error(`auto-api-registration:${this.source.id}: initial cycle failed`, error as Error),
+      );
+    }
   }
 
   async runCycle(): Promise<void> {
+    if (this.inFlightCycle) {
+      return this.inFlightCycle;
+    }
+    this.inFlightCycle = this.doRunCycle().finally(() => {
+      this.inFlightCycle = undefined;
+    });
+    return this.inFlightCycle;
+  }
+
+  private async doRunCycle(): Promise<void> {
     if (!this.connection) {
       this.logger.warn(
         `auto-api-registration:${this.source.id}: skipped a cycle — provider not yet connected`,
@@ -506,6 +589,14 @@ class AutoApiRegistrationEntityProvider implements EntityProvider {
     const changedPaths = [...currentPaths].filter(filePath => {
       const cached = existingByPath.get(filePath);
       if (!cached) return true;
+      // A previous registration error (e.g. an owner that didn't resolve to a known User/Group
+      // yet) can be caused by catalog state that has nothing to do with this file's own content —
+      // most commonly, this cycle running before the org-data location (teams.yaml/users.yaml)
+      // has finished loading, which the R6 cold-start fixes make more likely, not less. Without
+      // this, an errored file's unchanged mtime/hash would make it permanently invisible to
+      // `changedPaths`, so it would never get re-validated once the catalog state that caused the
+      // error resolves itself — the error becomes sticky until the file itself is touched.
+      if (cached.last_error) return true;
       const stat = fs.statSync(filePath);
       return stat.mtimeMs !== cached.mtime_ms;
     });
@@ -521,8 +612,10 @@ class AutoApiRegistrationEntityProvider implements EntityProvider {
       const contents = fs.readFileSync(filePath, 'utf8');
       const hash = sha1(contents);
 
-      if (cached && cached.content_hash === hash) {
-        // mtime touched, content unchanged — refresh mtime only, no mutation needed.
+      if (cached && cached.content_hash === hash && !cached.last_error) {
+        // mtime touched, content unchanged, and this file registered cleanly last time —
+        // refresh mtime only, no mutation needed. A previously-errored row falls through to full
+        // re-validation below even with an unchanged hash (see the `changedPaths` filter above).
         upserts.push({ ...cached, mtime_ms: stat.mtimeMs });
         return;
       }
@@ -584,6 +677,7 @@ class AutoApiRegistrationEntityProvider implements EntityProvider {
         content_hash: hash,
         entity_name: mapped.entityName,
         last_error: mapped.error ?? null,
+        system_slug: mapped.systemSlug ?? null,
       });
     });
 
@@ -594,14 +688,36 @@ class AutoApiRegistrationEntityProvider implements EntityProvider {
       }
     }
 
+    // Lab 6: recompute the full set of System entities this source currently implies, from every
+    // file's last-known system_slug (not just the ones that changed this cycle) — cheap (in-memory
+    // over the cache rows already loaded) and re-declaring an unchanged System is a harmless
+    // upsert, so this stays correct even across a backend restart's first cycle.
+    const deletedPaths = new Set(deletes);
+    const finalRows: CacheRow[] = [...upserts];
+    for (const [filePath, row] of existingByPath) {
+      if (currentPaths.has(filePath) && !changedPaths.includes(filePath) && !deletedPaths.has(filePath)) {
+        finalRows.push(row);
+      }
+    }
+    const systemSlugs = new Set(
+      finalRows.map(row => row.system_slug).filter((slug): slug is string => !!slug),
+    );
+    const systemEntities: DeferredEntity[] = [...systemSlugs].map(slug => ({
+      entity: buildSystemEntity(
+        this.getProviderName(),
+        slug,
+        resolveOwnerRef(undefined, this.source.defaultOwner),
+      ),
+    }));
+
     if (!this.hasRunOnce) {
       // First run: establish the baseline with one `full` mutation.
-      await this.connection.applyMutation({ type: 'full', entities: added });
+      await this.connection.applyMutation({ type: 'full', entities: [...added, ...systemEntities] });
       this.hasRunOnce = true;
     } else if (added.length > 0 || removedRefs.length > 0) {
       await this.connection.applyMutation({
         type: 'delta',
-        added,
+        added: [...added, ...systemEntities],
         removed: removedRefs.map(entityRef => ({ entityRef })),
       });
     }
@@ -655,6 +771,27 @@ class AutoApiRegistrationErrorProcessor implements CatalogProcessor {
   }
 }
 
+// Forces a just-registered task's first run to happen immediately instead of waiting out a
+// `next_run_start_at` persisted from a previous process (research.md R6 Corollary). On a
+// brand-new task, the scheduler's own worker loop may already have claimed the run before this
+// call reaches the database — that's a benign lost race (the run we wanted is already happening),
+// surfaced as `ConflictError`, and must not be allowed to fail backend module init.
+async function triggerTaskIgnoringConflict(
+  scheduler: SchedulerService,
+  taskId: string,
+  logger: LoggerService,
+): Promise<void> {
+  try {
+    await scheduler.triggerTask(taskId);
+  } catch (error) {
+    if (error instanceof ConflictError) {
+      logger.debug(`auto-api-registration: ${taskId} was already running when triggered at startup`);
+      return;
+    }
+    throw error;
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Backend module registration (following packages/backend/src/extensions/permissionPolicy.ts)
 // ---------------------------------------------------------------------------------------------
@@ -694,8 +831,9 @@ export default createBackendModule({
           const provider = providers[index];
 
           if (source.mode === 'poll') {
+            const taskId = `auto-api-registration:${source.id}:poll`;
             await scheduler.scheduleTask({
-              id: `auto-api-registration:${source.id}:poll`,
+              id: taskId,
               frequency: { seconds: source.scheduleFrequencySeconds },
               timeout: { seconds: Math.max(source.scheduleFrequencySeconds * 2, 30) },
               fn: async () => {
@@ -706,13 +844,22 @@ export default createBackendModule({
                 }
               },
             });
+            // The scheduler persists `next_run_start_at` across restarts, so a backend restart
+            // within one `scheduleFrequencySeconds` window of the last run would otherwise wait
+            // out the remainder of that persisted timer before the first cycle fires. Force an
+            // immediate run so entities are visible right after cold start. On a brand-new task,
+            // `triggerTask` can lose a race against the scheduler's own worker loop (which already
+            // scheduled the first run for "now") and throw `ConflictError` — that just means the
+            // run we wanted already started, so it's swallowed rather than failing catalog init.
+            await triggerTaskIgnoringConflict(scheduler, taskId, logger);
           } else {
             // Steady-state discovery signal at real-world scale: a watcher triggers a rescan of
             // just this source on add/change/unlink, coalesced by chokidar's own event batching.
             // `schedule.frequencySeconds` is ignored in watch mode in favor of the much longer
             // `reconciliation.frequencySeconds` safety-net sweep below.
+            const taskId = `auto-api-registration:${source.id}:reconciliation`;
             await scheduler.scheduleTask({
-              id: `auto-api-registration:${source.id}:reconciliation`,
+              id: taskId,
               frequency: { seconds: source.reconciliationFrequencySeconds },
               timeout: { seconds: Math.max(source.reconciliationFrequencySeconds / 2, 60) },
               fn: async () => {
@@ -723,6 +870,9 @@ export default createBackendModule({
                 }
               },
             });
+            // Same cold-start rationale as the poll-mode task above: don't wait out a persisted
+            // reconciliation timer before the first sweep runs.
+            await triggerTaskIgnoringConflict(scheduler, taskId, logger);
 
             const watcher = chokidar.watch(source.patterns, {
               cwd: source.rootPath,

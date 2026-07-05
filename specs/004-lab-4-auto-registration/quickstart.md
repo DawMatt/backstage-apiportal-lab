@@ -67,6 +67,15 @@ The README includes a "Scaling to a real mono-repo" note pointing learners at:
 - That restart behavior at scale relies on the persisted cache, not a full re-scan — this is
   called out explicitly since it's the part most likely to surprise a learner who scales this
   lab up and then wonders why a restart is instant instead of taking minutes.
+- That the cache alone isn't sufficient for a *visibly instant* restart: the discovery cycle is
+  still driven by `scheduler.scheduleTask`, and Backstage's scheduler persists each task's
+  `next_run_start_at` across restarts. Without an explicit `scheduler.triggerTask(taskId)` call
+  right after registering the task, a backend restarted within one scheduling interval of its
+  last run would sit idle — entities visibly missing — until that old persisted timer elapses,
+  even though the cache-validated scan behind it would have been instant. `triggerTask` is what
+  actually makes the first cycle run at boot (research.md R6 Corollary); this is why the lab's own
+  cold start now shows auto-registered APIs immediately instead of ~30s after the app-config
+  locations appear.
 
 A second "Scaling to multiple source repositories" note (research.md R7) covers:
 - The `autoApiRegistration.sources[]` config list — the lab's own `app-config.yaml` uses the flat
