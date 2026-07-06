@@ -177,9 +177,15 @@ prevent by tearing down the whole session the moment the gateway exits.
 
 ## Step 5 — Add the `apiMocking` Frontend Module
 
+### Step 5a — Copy the module file
+
 Copy [`code/packages/app/src/modules/apiMocking/index.tsx`](code/packages/app/src/modules/apiMocking/index.tsx)
-to `packages/app/src/modules/apiMocking/index.tsx`, then register it in `packages/app/src/App.tsx`
-alongside Lab 3's modules:
+to `packages/app/src/modules/apiMocking/index.tsx`.
+
+### Step 5b — Register the module in `App.tsx`
+
+In `packages/app/src/App.tsx`, add the import and module to the `features` array alongside
+Lab 3's modules:
 
 ```ts
 import { apiMockingModule } from './modules/apiMocking';
@@ -214,8 +220,11 @@ confirmed by reading its source rather than assumed:
   `<SwaggerUI>`, *after* its own internal `spec={definitionString}` — so an extra `spec` prop
   passed through the widget wins over the string-derived one.
 
-This new config key also needs to be declared visible to the frontend bundle. Add
-`packages/app/config.d.ts`:
+This new config key also needs to be declared visible to the frontend bundle.
+
+### Step 5c — Create `packages/app/config.d.ts`
+
+Add `packages/app/config.d.ts`:
 
 ```ts
 export interface Config {
@@ -230,7 +239,9 @@ export interface Config {
 }
 ```
 
-and add `"configSchema": "config.d.ts"` to `packages/app/package.json`. Without both, Backstage's
+### Step 5d — Declare the config schema in `packages/app/package.json`
+
+Add `"configSchema": "config.d.ts"` to `packages/app/package.json`. Without both Steps 5c and 5d, Backstage's
 config-visibility filter silently strips `mocking.defaultCredential` before it reaches the
 browser — `configApi.getOptional(...)` will just return `undefined`, with no error anywhere. This
 was found by checking the `<script type="backstage.io/config">` payload the backend actually

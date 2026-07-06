@@ -307,7 +307,7 @@ This step also demonstrates Backstage's declarative frontend extension system:
 No new packages are required — all imports are already installed in the Backstage instance
 from Lab 1.
 
-#### Create the module directory
+#### Step 2b.1 — Create the module directory
 
 | Platform | Command |
 |----------|---------|
@@ -317,7 +317,7 @@ from Lab 1.
 Run this command from inside your Backstage root directory
 (`labs/lab-01-base-backstage/backstage/`).
 
-#### Create `ApiVisibilityCard.tsx`
+#### Step 2b.2 — Create `ApiVisibilityCard.tsx`
 
 Create `packages/app/src/modules/apiVisibility/ApiVisibilityCard.tsx` — its full content is
 committed alongside this README at
@@ -326,7 +326,7 @@ copy it in as-is. It reads the `example.com/visibility` annotation off the entit
 "Shared"/"Private" chip, with a fallback message when the annotation is absent (treated as
 private by the permission policy).
 
-#### Create `index.ts`
+#### Step 2b.3 — Create `index.ts`
 
 Create `packages/app/src/modules/apiVisibility/index.ts` — its full content is committed at
 [`code/packages/app/src/modules/apiVisibility/index.ts`](./code/packages/app/src/modules/apiVisibility/index.ts);
@@ -340,7 +340,7 @@ it into a `createFrontendModule`.
 > but it is stable enough for this lab and follows the same pattern Backstage itself uses
 > internally.
 
-#### Update `App.tsx`
+#### Step 2b.4 — Update `App.tsx`
 
 Open `packages/app/src/App.tsx` and update it as follows:
 
