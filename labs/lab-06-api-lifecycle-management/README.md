@@ -62,20 +62,22 @@ By the end of this lab you will have:
 
 ---
 
-## Step 1 — Add the Two Museum API Spec Files
+## Step 1 — Review the Museum API Spec Files
 
-Unlike Labs 2–5's catalog-info.yaml-based registrations, there is no catalog YAML to author here
-at all. This lab adds two local OpenAPI files, already in place at
-[`apis/museum-v1/museum-v1-openapi.yaml`](apis/museum-v1/museum-v1-openapi.yaml) and
-[`apis/museum-v2/museum-v2-openapi.yaml`](apis/museum-v2/museum-v2-openapi.yaml):
+Unlike Labs 2–5's catalog-info.yaml-based registrations, this lab registers API versions via
+auto-discovery — no catalog YAML to author. The two OpenAPI spec files are already committed
+to the repository; no files need to be created in this step. Review them below before
+proceeding to Step 2:
 
-- **`museum-v1-openapi.yaml`** is a content-identical copy of Lab 1's `museum/openapi.yaml`
+- **[`apis/museum-v1/museum-v1-openapi.yaml`](apis/museum-v1/museum-v1-openapi.yaml)** — a
+  content-identical copy of Lab 1's `museum/openapi.yaml`
   (Lab 1's own committed file is never edited — see "Why Supersede Lab 2's Entry, Not Edit It"
   below for why a local copy, not a `$text` reference, is required here). Titled
   **"Museum API v1"**, not just "Museum API" — see the file's own `info.title` comment for why.
-- **`museum-v2-openapi.yaml`** is a new spec, titled **"Museum API v2"**, with two deliberate
-  breaking changes vs. v1: the `/special-events/{eventId}` path parameter is renamed to `{id}`,
-  and `GET /tickets/{ticketId}/qr` is renamed to `GET /tickets/{ticketId}/qr-code`. Both changes
+- **[`apis/museum-v2/museum-v2-openapi.yaml`](apis/museum-v2/museum-v2-openapi.yaml)** — a
+  new spec, titled **"Museum API v2"**, with two deliberate breaking changes vs. v1: the
+  `/special-events/{eventId}` path parameter is renamed to `{id}`, and
+  `GET /tickets/{ticketId}/qr` is renamed to `GET /tickets/{ticketId}/qr-code`. Both changes
   are called out in the spec's own `info.description`.
 
 Both specs carry an `info.x-examplecorp` block — the same `x-<namespace>` extension mechanism Lab 4
@@ -97,18 +99,31 @@ it exists and how the provider turns it into a `System` entity with no catalog Y
 ## Step 2 — Update the Shared Auto-Registration Module, Then Register a Second Source
 
 This lab's `apiBasename` → `System` behavior is an additive change to Lab 4's own
-`autoApiRegistration.ts`, not new code of its own. Copy the updated
+`autoApiRegistration.ts`, not new code of its own.
+
+### Step 2a — Copy the updated auto-registration module
+
+Copy the updated
 [`labs/lab-04-auto-registration/code/packages/backend/src/extensions/autoApiRegistration.ts`](../lab-04-auto-registration/code/packages/backend/src/extensions/autoApiRegistration.ts)
 over your Lab 4 copy at
-`packages/backend/src/extensions/autoApiRegistration.ts`, and add the new migration file
+`packages/backend/src/extensions/autoApiRegistration.ts`.
+
+### Step 2b — Add the new database migration
+
+Copy the new migration file
 [`002_add_system_slug.ts`](../lab-04-auto-registration/code/packages/backend/src/extensions/autoApiRegistrationMigrations/002_add_system_slug.ts)
 alongside Lab 4's existing `001_scan_state_cache.ts` in
-`packages/backend/src/extensions/autoApiRegistrationMigrations/` — copy both in as-is, same as
-Lab 4's own Step 2. Skipping this step is the single most common way to stall on Step 4 below: the
-frontend module renders, but every API's "API Versions" card reports "not part of a System,"
-because `spec.system` and the synthesized `System` entity only exist once this file is updated.
+`packages/backend/src/extensions/autoApiRegistrationMigrations/` — copy it in as-is, the
+same way Lab 4's own Step 2 did for the first migration.
 
-Then convert `app-config.yaml`'s `autoApiRegistration` config from Lab 4's single-source shorthand
+> **Skipping Steps 2a or 2b is the single most common way to stall on Step 4:** the frontend
+> module renders, but every API's "API Versions" card reports "not part of a System," because
+> `spec.system` and the synthesized `System` entity only exist once the updated file and migration
+> are both in place.
+
+### Step 2c — Convert `app-config.yaml` to the multi-source form
+
+Convert `app-config.yaml`'s `autoApiRegistration` config from Lab 4's single-source shorthand
 to the explicit multi-source form (see
 [`labs/lab-04-auto-registration/README.md`'s "Scaling to Multiple Source Repositories"](../lab-04-auto-registration/README.md#scaling-to-multiple-source-repositories)):
 
@@ -138,9 +153,21 @@ to Backstage or "the API Portal" specifically. Every team at `examplecorp` uses 
 regardless of which repo or catalog source picks their specs up; introducing a per-tool namespace
 (e.g. `x-apiportal`) would wrongly imply the metadata exists *for* Backstage, when other systems
 (a CLI linter, an internal API gateway, a docs generator) are equally valid consumers of the same
-`x-examplecorp` block. Lab 2's original single "Museum REST API" `catalog.locations` entry has
-also been **removed** — this lab's two auto-registered versions supersede it (see "Why Supersede
-Lab 2's Entry, Not Edit It" below).
+`x-examplecorp` block.
+
+### Step 2d — Remove Lab 2's original Museum API catalog location
+
+In `app-config.yaml`, remove the original Lab 2 entry for the single `museum-api` entity —
+this lab's two auto-registered versions supersede it (see "Why Supersede Lab 2's Entry, Not
+Edit It" below):
+
+```yaml
+    # --- Lab 2: Museum REST API (private — museum-team only) ---    ← remove this entry
+    - type: url
+      target: https://raw.githubusercontent.com/.../labs/lab-02-users-roles/catalog/apis/museum-api.yaml
+      rules:
+        - allow: [API]
+```
 
 ## Step 3 — Add the API Versions Frontend Module
 

@@ -228,6 +228,8 @@ Replace `<user>` and `<branch>` with your GitHub username and branch name.
 
 ## Step 7 — Install the Spectral Linter Plugin
 
+### Step 7a — Run the install command
+
 Unlike the api-grade plugins, `@dweber019/backstage-plugin-api-docs-spectral-linter` IS
 published to npm and can be installed directly:
 
@@ -238,7 +240,7 @@ yarn --cwd packages/app add @dweber019/backstage-plugin-api-docs-spectral-linter
 No source build is required. The package is compatible with React 18 and react-router-dom 6,
 both already present in this Backstage instance.
 
-### Dedupe two Spectral libraries so linting works in the browser (required)
+### Step 7b — Dedupe conflicting Spectral libraries (required)
 
 The Spectral linter (`0.5.2`) pins **exact** versions of two `@stoplight` libraries, so yarn
 installs a second, *nested* copy of each under the plugin's own `node_modules`. Both nested
@@ -337,10 +339,16 @@ mode. Importing it directly sidesteps the incompatibility entirely instead of wo
 it.
 
 Because this subpath has no TypeScript declaration file, add a small ambient module
-declaration. Create `packages/app/src/modules/spectralLinter/spectral-linter-content.d.ts` — its
+declaration.
+
+### Step 8a — Create `spectral-linter-content.d.ts`
+
+Create `packages/app/src/modules/spectralLinter/spectral-linter-content.d.ts` — its
 full content is committed alongside this README at
 [`code/packages/app/src/modules/spectralLinter/spectral-linter-content.d.ts`](./code/packages/app/src/modules/spectralLinter/spectral-linter-content.d.ts);
 copy it in as-is.
+
+### Step 8b — Create `SpectralLinterContent.tsx`
 
 Create the file `packages/app/src/modules/spectralLinter/SpectralLinterContent.tsx` — its full
 content is committed at
@@ -454,9 +462,9 @@ for `group:default/platform-team`'s member list. Since the group entity is defin
 second `platform-team` Group descriptor in Lab 3 would produce a duplicate entity error in
 the catalog.
 
-The Lab 2 file at `labs/lab-02-users-roles/catalog/teams.yaml` has already been updated to
-add `eve` to `platform-team`'s members list. Backstage will pick this up on the next catalog
-refresh.
+The Lab 2 file at `labs/lab-02-users-roles/catalog/teams.yaml` already includes `eve` in
+`platform-team`'s `members` list — no changes are needed to that file. Backstage will pick
+up the updated membership on the next catalog refresh.
 
 Add the following catalog location to `app-config.yaml`:
 
@@ -478,7 +486,7 @@ Replace `<user>` and `<branch>` with your GitHub username and branch name.
 
 ---
 
-## Step 12a — Grant the Platform Team Catalog Read Access
+## Step 13 — Grant the Platform Team Catalog Read Access
 
 **Why this step is needed**: Registering Eve as a `platform-team` member (Step 12) and
 configuring `apiGrade.visibility.groups` (Step 6) are not enough on their own. Lab 2's
@@ -677,7 +685,7 @@ verify Charlie is not a member of platform-team
 her in the APIs catalog list and search  
 **Fail (Museum/Streetlights don't appear in the APIs catalog list or search for Eve, or her
 entity-page requests 404)**: This is a catalog *read* permission problem, not an `apiGrade`
-display problem — Eve can't reach the entity at all. Confirm Step 12a's platform-team rule was
+display problem — Eve can't reach the entity at all. Confirm Step 13's platform-team rule was
 added to `permissionPolicy.ts` and that it checks `user.info.ownershipEntityRefs` (populated
 from Eve's `memberOf: [platform-team]`) before falling through to the ownership-only
 conditional decision; restart the backend after editing  
@@ -744,7 +752,7 @@ condition. Because Backstage can't even load a private entity a user isn't allow
 it never appears in the catalog list, search, or a direct-link entity page — and `apiGrade`'s
 own summary/detail visibility split never gets a chance to run.
 
-**Fix**: Add the platform-team check to `permissionPolicy.ts` from Step 12a: before falling
+**Fix**: Add the platform-team check to `permissionPolicy.ts` from Step 13: before falling
 through to the existing `anyOf` conditional decision, unconditionally allow `catalog-entity`
 reads when `user.info.ownershipEntityRefs` includes `group:default/platform-team`. Restart
 the backend after editing — permission policy changes require a backend restart to take

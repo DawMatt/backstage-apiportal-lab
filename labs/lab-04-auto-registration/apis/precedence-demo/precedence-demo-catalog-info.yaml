@@ -18,4 +18,4 @@ spec:
   lifecycle: production
   owner: group:default/museum-team
   definition:
-    $text: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/004-lab-4-auto-registration/labs/lab-04-auto-registration/apis/precedence-demo/precedence-demo-openapi.yaml
+    $text: https://raw.githubusercontent.com/DawMatt/backstage-apiportal-lab/main/labs/lab-04-auto-registration/apis/precedence-demo/precedence-demo-openapi.yaml

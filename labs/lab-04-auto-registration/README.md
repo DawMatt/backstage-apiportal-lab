@@ -106,6 +106,8 @@ this provider, the provider skips its own auto-sourced candidate for that name e
 lets you hand-author precise metadata for a specific API — pinning an owner, tightening
 visibility — without the auto-registration mechanism fighting you for it every cycle.
 
+### Step 2a — Create the database migration file
+
 Create the database migration first, at
 `packages/backend/src/extensions/autoApiRegistrationMigrations/001_scan_state_cache.ts`. Its full
 content is committed alongside this README —
@@ -115,6 +117,8 @@ content is committed alongside this README —
 `migrationSource` (see the module below) rather than a filesystem `directory` migration source,
 since this file lives alongside the module's TypeScript source rather than in a package-level
 `migrations/` folder resolved at runtime.
+
+### Step 2b — Create the auto-registration module
 
 Now the module itself, at `packages/backend/src/extensions/autoApiRegistration.ts` — this is the
 heart of the lab. Its full content (~750 lines: config normalization, filesystem discovery and
@@ -167,10 +171,11 @@ or vendor namespace it never opted into.
 
 ---
 
-## Step 5 — Add the Sample API Files
+## Step 5 — Review the Sample API Files and Register the Precedence Demo
 
-Two sample files are already committed alongside this README (nothing to create in this step —
-just take a look):
+Two sample files are already committed alongside this README — review them to understand
+the auto-discovery and precedence concepts, then register the precedence demo's hand-authored
+catalog entry as described below:
 
 - **`apis/galaxy/galaxy-openapi.yaml`** — a vendored copy of the MIT-licensed
   [Scalar Galaxy API](https://github.com/scalar/scalar), with an `info.x-examplecorp` object
@@ -181,6 +186,8 @@ just take a look):
   `visibility: private`) that deliberately differs from the spec file's own `x-examplecorp`
   values (owner `platform-team`, `visibility: shared`). This demonstrates the precedence rule:
   the hand-authored file wins.
+
+### Step 5a — Register the precedence demo catalog location
 
 The hand-authored `precedence-demo-catalog-info.yaml` needs its own catalog location, the same way
 Lab 2/3's hand-authored files do — add it to `app-config.yaml`'s `catalog.locations`, replacing

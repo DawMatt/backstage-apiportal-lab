@@ -87,24 +87,41 @@ const MAX_CACHED_SPECS = gatewayConfig.maxCachedSpecs ?? 100;
 
 const DEFAULT_IGNORE_DIRS = new Set(['node_modules', '.git', 'dist', 'build']);
 
-// Lab 4's own discovery convention (`autoApiRegistration.rootPath`/`patterns`) is the single
-// source of truth for which files are auto-registered in the catalog — reused here rather than
-// duplicated, so "what's registered" and "what's mockable" can't drift apart (research.md R3).
-// `rootPath` mirrors the same default Lab 4's backend module resolves to when left unset.
+// Lab 4's own discovery convention (`autoApiRegistration.rootPath`/`patterns`, or Lab 6's
+// multi-source `autoApiRegistration.sources[]` extension of it) is the single source of truth
+// for which files are auto-registered in the catalog — reused here rather than duplicated, so
+// "what's registered" and "what's mockable" can't drift apart (research.md R3). `rootPath`
+// mirrors the same default Lab 4's backend module resolves to when left unset.
 const autoApiRegistrationConfig = appConfig.autoApiRegistration ?? {};
 const DEFAULT_LAB4_ROOT = path.resolve(BACKSTAGE_DIR, '../../lab-04-auto-registration/apis');
 const DEFAULT_LAB4_PATTERNS = ['**/*-openapi.yaml'];
+// autoApiRegistration.ts's normalizeConfig() resolves each source's relative `rootPath` against
+// `resolvePackagePath('backend')` (packages/backend of the running Backstage instance), not
+// against BACKSTAGE_DIR itself — mirrored here so a rootPath like
+// "../../../../lab-06-api-lifecycle-management/apis" resolves to the exact same directory in
+// both places.
+const BACKEND_PACKAGE_DIR = path.join(BACKSTAGE_DIR, 'packages', 'backend');
 
-const lab4Source = {
-  rootPath: autoApiRegistrationConfig.rootPath
-    ? path.resolve(BACKSTAGE_DIR, autoApiRegistrationConfig.rootPath)
-    : DEFAULT_LAB4_ROOT,
-  // AsyncAPI mocking is explicitly out of scope for this lab (FR-005) even though Lab 4 also
-  // auto-registers `*-asyncapi.yaml` files, so that half of Lab 4's pattern list is dropped here.
-  patterns: (autoApiRegistrationConfig.patterns ?? DEFAULT_LAB4_PATTERNS).filter(
-    pattern => !pattern.includes('asyncapi'),
-  ),
-};
+function toLab4Source(entry) {
+  return {
+    rootPath: entry.rootPath
+      ? path.resolve(BACKEND_PACKAGE_DIR, entry.rootPath)
+      : DEFAULT_LAB4_ROOT,
+    // AsyncAPI mocking is explicitly out of scope for this lab (FR-005) even though Lab 4 also
+    // auto-registers `*-asyncapi.yaml` files, so that half of Lab 4's pattern list is dropped here.
+    patterns: (entry.patterns ?? DEFAULT_LAB4_PATTERNS).filter(
+      pattern => !pattern.includes('asyncapi'),
+    ),
+  };
+}
+
+// Lab 6 extended Lab 4's config from a single flat source to a `sources: []` array (one entry
+// per independently-configured source repo, e.g. the default Lab 4 apis/ plus Lab 6's own
+// museum-v1/v2 apis/) — both shapes are supported here so this stays in sync regardless of which
+// one a given lab's app-config.yaml uses.
+const lab4Sources = Array.isArray(autoApiRegistrationConfig.sources)
+  ? autoApiRegistrationConfig.sources.map(toLab4Source)
+  : [toLab4Source(autoApiRegistrationConfig)];
 
 // Lab 1's Museum API predates Lab 4's `*-openapi.yaml` convention: it's committed as a plain
 // `openapi.yaml` and is catalogued by hand (a committed catalog-info.yaml), not by Lab 4's
@@ -123,7 +140,23 @@ const additionalSources = (gatewayConfig.additionalSources ?? DEFAULT_ADDITIONAL
   }),
 );
 
-const discoverySources = [lab4Source, ...additionalSources];
+const discoverySources = [...lab4Sources, ...additionalSources];
+
+// Lab 2's Train Travel API (and any other hand-authored catalog `kind: API` entity) has no local
+// OpenAPI file at all — its `spec.definition` is a remote `$text` URL (e.g. a GitHub raw link).
+// These are scanned separately from `discoverySources` above: rather than a raw OpenAPI document,
+// each file here is a full Backstage entity, and rather than a local file path, what's discovered
+// is a remote URL for Prism to dereference at request time (see loadOperations below).
+const DEFAULT_CATALOG_ENTITY_SOURCES = [
+  { rootPath: '../../lab-02-users-roles/catalog/apis', patterns: ['**/*.yaml'] },
+];
+
+const catalogEntitySources = (gatewayConfig.catalogEntitySources ?? DEFAULT_CATALOG_ENTITY_SOURCES).map(
+  source => ({
+    rootPath: path.resolve(BACKSTAGE_DIR, source.rootPath),
+    patterns: source.patterns ?? ['**/*.yaml'],
+  }),
+);
 
 // ---------------------------------------------------------------------------------------------
 // Discovery — a cheap directory walk + filename match, not a spec parse (safe to do eagerly
@@ -179,8 +212,22 @@ function slugify(title) {
     .slice(0, 63);
 }
 
+const REMOTE_TEXT_PATTERN = /^https?:\/\//;
+
+function addDiscoveryEntry(map, slug, entry, sourceFile) {
+  const existing = map.get(slug);
+  if (existing && existing.sourceFile !== sourceFile) {
+    logger.warn(
+      `entity name slug "${slug}" is claimed by both "${existing.sourceFile}" and "${sourceFile}" — keeping the first`,
+    );
+    return;
+  }
+  map.set(slug, entry);
+}
+
 function buildDiscoveryMap() {
   const map = new Map();
+
   for (const source of discoverySources) {
     for (const filePath of discoverSpecFiles(source)) {
       let title;
@@ -194,15 +241,36 @@ function buildDiscoveryMap() {
       if (typeof title !== 'string' || title.length === 0) continue;
 
       const slug = slugify(title);
-      if (map.has(slug) && map.get(slug) !== filePath) {
-        logger.warn(
-          `entity name slug "${slug}" is claimed by both "${map.get(slug)}" and "${filePath}" — keeping the first`,
-        );
-        continue;
-      }
-      map.set(slug, filePath);
+      addDiscoveryEntry(map, slug, { type: 'file', location: filePath, sourceFile: filePath }, filePath);
     }
   }
+
+  // Hand-authored catalog `kind: API` entities whose `spec.definition` is a remote `$text` URL
+  // (e.g. Lab 2's Train Travel API) have no local OpenAPI document to walk. Unlike the
+  // auto-registered files above, there's no `info.title` to slugify here — `metadata.name` is
+  // already the exact slug Backstage itself uses for the entity, so it's used verbatim.
+  for (const source of catalogEntitySources) {
+    for (const filePath of discoverSpecFiles(source)) {
+      let doc;
+      try {
+        doc = yaml.load(fs.readFileSync(filePath, 'utf8'));
+      } catch (error) {
+        logger.warn(`could not read "${filePath}" during catalog-entity discovery: ${error.message}`);
+        continue;
+      }
+      // AsyncAPI mocking is out of scope here too (mirrors discoverySources above), and only a
+      // remote `$text` string (not an inline definition, which the plain-file scan above already
+      // covers if it's local) counts as a catalog-entity discovery target.
+      if (!doc || doc.kind !== 'API' || doc.spec?.type !== 'openapi') continue;
+      const slug = doc.metadata?.name;
+      const remoteUrl = doc.spec?.definition?.$text;
+      if (typeof slug !== 'string' || slug.length === 0) continue;
+      if (typeof remoteUrl !== 'string' || !REMOTE_TEXT_PATTERN.test(remoteUrl)) continue;
+
+      addDiscoveryEntry(map, slug, { type: 'url', location: remoteUrl, sourceFile: filePath }, filePath);
+    }
+  }
+
   return map;
 }
 
@@ -243,16 +311,19 @@ class LruCache {
 
 const specCache = new LruCache(MAX_CACHED_SPECS);
 
-async function loadOperations(slug, filePath) {
+async function loadOperations(slug, target) {
   const cached = specCache.get(slug);
   if (cached) return cached;
 
   const start = performance.now();
-  const operations = await getHttpOperationsFromSpec(filePath);
+  // $RefParser (used internally by getHttpOperationsFromSpec) accepts either a local file path or
+  // an http(s) URL as its root document — the same call resolves both `target.type`s, fetching
+  // and dereferencing remote `$text` specs over the network exactly as it would a local file.
+  const operations = await getHttpOperationsFromSpec(target.location);
   const elapsedMs = Math.round(performance.now() - start);
 
   logger.info(
-    `loading "${slug}" from "${filePath}" — ${operations.length} operation(s) converted in ${elapsedMs}ms (first request, now cached)`,
+    `loading "${slug}" from "${target.location}" — ${operations.length} operation(s) converted in ${elapsedMs}ms (first request, now cached)`,
   );
   specCache.set(slug, operations);
   return operations;
@@ -314,8 +385,8 @@ async function handleRequest(req, res) {
     return;
   }
 
-  const filePath = discoveryMap.get(slug);
-  if (!filePath) {
+  const target = discoveryMap.get(slug);
+  if (!target) {
     sendJson(res, 404, {
       error: 'Unknown mock target',
       message: `No discovered OpenAPI spec matches "${slug}".`,
@@ -326,7 +397,7 @@ async function handleRequest(req, res) {
 
   let operations;
   try {
-    operations = await loadOperations(slug, filePath);
+    operations = await loadOperations(slug, target);
   } catch (error) {
     logger.error(`failed to load/convert spec for "${slug}": ${error.stack || error.message}`);
     sendJson(res, 500, { error: 'Failed to load mock spec', message: error.message });
