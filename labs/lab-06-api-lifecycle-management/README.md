@@ -138,8 +138,8 @@ to Backstage or "the API Portal" specifically. Every team at `examplecorp` uses 
 regardless of which repo or catalog source picks their specs up; introducing a per-tool namespace
 (e.g. `x-apiportal`) would wrongly imply the metadata exists *for* Backstage, when other systems
 (a CLI linter, an internal API gateway, a docs generator) are equally valid consumers of the same
-`x-examplecorp` block. Lab 2's original single "Museum REST API" `catalog.locations` entry has
-also been **removed** — this lab's two auto-registered versions supersede it (see "Why Supersede
+`x-examplecorp` block. Lab 2's original single "Museum REST API" `catalog.locations` entry must
+also be **removed** — this lab's two auto-registered versions supersede it (see "Why Supersede
 Lab 2's Entry, Not Edit It" below).
 
 ## Step 3 — Add the API Versions Frontend Module

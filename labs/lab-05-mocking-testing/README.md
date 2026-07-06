@@ -164,7 +164,7 @@ credential below) — do not reach for this setting for a proxy target that fron
 In the root `package.json`:
 
 ```json
-"start": "concurrently -n app,mocks \"backstage-cli repo start\" \"node scripts/mock-gateway.mjs\""
+"start": "concurrently -n front,back,mocks \"yarn workspace app start\" \"yarn workspace backend start\" \"node scripts/mock-gateway.mjs\""
 ```
 
 No `wait-on` sequencing is needed — the gateway's port and proxy target are static, committed
