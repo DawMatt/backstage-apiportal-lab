@@ -19,7 +19,7 @@ Each lab is self-contained, cross-platform (Windows and macOS), and costs nothin
 | [Lab 4](labs/lab-04-auto-registration/) | Auto Registration | Auto-discover and register APIs from a Git mono-repo via a custom `EntityProvider`; source owner, lifecycle, and visibility metadata from `x-*` fields in the spec itself |
 | [Lab 5](labs/lab-05-mocking-testing/) | Mocking & Testing | Dynamically mock any registered OpenAPI API via a single lazy-loading gateway process, or exercise a real sandbox; pre-filled, overridable non-production credentials |
 | [Lab 6](labs/lab-06-api-lifecycle-management/) | API Lifecycle Management | Register multiple major versions of an API in parallel via a native `System` relation; track lifecycle state (development/test/production) and deprecation/retirement per version |
-| Lab 7 *(coming soon)* | Other Documentation | Add the Thoughtworks Tech Radar plugin; register blips to plot your API landscape |
+| [Lab 7](labs/lab-07-tech-radar/) | Other Documentation | Add the Thoughtworks Tech Radar plugin as a static, offline data source; register, move, and retire blips to plot your API landscape |
 
 Each lab builds on the one before it. Start with Lab 1 and work through them in order. See
 [GOAL.md](GOAL.md) for the full series plan and the constitution the labs are held to.
@@ -79,11 +79,15 @@ labs/
 │   └── code/
 │       ├── scripts/mock-gateway.mjs           ← single lazy-loading Prism mock gateway
 │       └── packages/app/src/modules/apiMocking/  ← apiDocsConfigRef override (mock + credentials)
-└── lab-06-api-lifecycle-management/
-    ├── README.md                  ← continue here after Lab 5
-    ├── catalog/                   ← System entity + museum-api-v1/v2, incl. the new v2 spec
+├── lab-06-api-lifecycle-management/
+│   ├── README.md                  ← continue here after Lab 5
+│   ├── catalog/                   ← System entity + museum-api-v1/v2, incl. the new v2 spec
+│   └── code/
+│       └── packages/app/src/modules/apiVersions/  ← versions/latest/lifecycle/retirement card
+└── lab-07-tech-radar/
+    ├── README.md                  ← continue here after Lab 6
     └── code/
-        └── packages/app/src/modules/apiVersions/  ← versions/latest/lifecycle/retirement card
+        └── packages/app/src/modules/techRadar/    ← radarData.json (content) + api override
 ```
 
 ---
@@ -98,14 +102,16 @@ backstage-apiportal-lab/
 │   ├── lab-03-api-quality/
 │   ├── lab-04-auto-registration/
 │   ├── lab-05-mocking-testing/
-│   └── lab-06-api-lifecycle-management/
+│   ├── lab-06-api-lifecycle-management/
+│   └── lab-07-tech-radar/
 ├── specs/                         ← SDD artifacts (spec, plan, tasks per lab)
 │   ├── 001-lab-1-base-backstage/
 │   ├── 002-lab-2-users-roles/
 │   ├── 003-lab-3-api-quality/
 │   ├── 004-lab-4-auto-registration/
 │   ├── 005-lab-5-mocking-testing/
-│   └── 006-api-lifecycle-management/
+│   ├── 006-api-lifecycle-management/
+│   └── 007-lab-7-tech-radar/
 ├── .specify/                      ← Speckit configuration and templates
 ├── GOAL.md                        ← high-level goals for the full lab series
 ├── CONTRIBUTING.md                ← how to contribute new labs

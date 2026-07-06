@@ -1,0 +1,149 @@
+{
+  "quadrants": [
+    { "id": "techniques", "name": "Techniques" },
+    { "id": "tools", "name": "Tools" },
+    { "id": "platforms", "name": "Platforms" },
+    { "id": "languages-frameworks", "name": "Languages & Frameworks" }
+  ],
+  "rings": [
+    {
+      "id": "adopt",
+      "name": "ADOPT",
+      "color": "#5BA300",
+      "description": "We recommend using this for every relevant new project. Proven in production, low risk."
+    },
+    {
+      "id": "trial",
+      "name": "TRIAL",
+      "color": "#009EB0",
+      "description": "Worth pursuing. It's important to understand how to build up this capability. Try it on a project that can handle the risk."
+    },
+    {
+      "id": "assess",
+      "name": "ASSESS",
+      "color": "#C7BA00",
+      "description": "Worth exploring, with the goal of understanding how it will affect your organization. Not yet proven enough to trial."
+    },
+    {
+      "id": "hold",
+      "name": "HOLD",
+      "color": "#E09B96",
+      "description": "Proceed with caution. Either avoid for new work, or actively plan to migrate away from it."
+    }
+  ],
+  "entries": [
+    {
+      "id": "design-first-openapi",
+      "key": "design-first-openapi",
+      "title": "Design-first OpenAPI",
+      "quadrant": "techniques",
+      "description": "Writing the OpenAPI spec before any implementation code, as demonstrated across this lab series, keeps the contract as the single source of truth and lets Backstage catalog the API before a single line of backend code exists.",
+      "timeline": [
+        {
+          "ringId": "adopt",
+          "date": "2026-01-12",
+          "description": "Adopted from Lab 1 onward for every sample API in this series."
+        }
+      ]
+    },
+    {
+      "id": "spectral-linting-ci",
+      "key": "spectral-linting-ci",
+      "title": "Spectral linting in CI",
+      "quadrant": "techniques",
+      "description": "Automated OpenAPI/AsyncAPI linting against a shared ruleset (Lab 3's api-grade and Spectral plugins), run continuously rather than only reviewed by eye.",
+      "links": [
+        { "url": "https://github.com/DawMatt/api-grade", "title": "api-grade plugin" }
+      ],
+      "timeline": [
+        {
+          "ringId": "assess",
+          "date": "2026-02-02",
+          "description": "First evaluated alongside Lab 3's api-grade plugin."
+        },
+        {
+          "ringId": "trial",
+          "date": "2026-04-20",
+          "moved": 1,
+          "description": "Promoted after Lab 3 showed the shared ruleset catching real issues with no false positives worth blocking a merge over."
+        }
+      ]
+    },
+    {
+      "id": "backstage-software-catalog",
+      "key": "backstage-software-catalog",
+      "title": "Backstage Software Catalog",
+      "quadrant": "tools",
+      "description": "The catalog itself, as the single place API ownership, visibility, quality, and lifecycle state are recorded and discovered (Labs 1, 2, 6).",
+      "timeline": [
+        {
+          "ringId": "adopt",
+          "date": "2026-01-12",
+          "description": "Adopted as this series' base platform from Lab 1."
+        }
+      ]
+    },
+    {
+      "id": "prism-mock-servers",
+      "key": "prism-mock-servers",
+      "title": "Prism mock servers",
+      "quadrant": "tools",
+      "description": "On-demand mock implementations generated directly from an API's own OpenAPI spec (Lab 5), avoiding hand-written stubs that drift from the real contract.",
+      "timeline": [
+        {
+          "ringId": "trial",
+          "date": "2026-05-18",
+          "description": "Trialed in Lab 5 as the lazy-loading mock gateway's underlying engine."
+        }
+      ]
+    },
+    {
+      "id": "self-hosted-backstage",
+      "key": "self-hosted-backstage",
+      "title": "Self-hosted Backstage",
+      "quadrant": "platforms",
+      "description": "Running Backstage locally (this series' approach throughout) keeps the whole lab series at zero cost, with no hosted-platform account required.",
+      "timeline": [
+        {
+          "ringId": "adopt",
+          "date": "2026-01-12",
+          "description": "The only platform this series uses, by design (Constitution Principle V)."
+        }
+      ]
+    },
+    {
+      "id": "asyncapi-3",
+      "key": "asyncapi-3",
+      "title": "AsyncAPI 3.0",
+      "quadrant": "languages-frameworks",
+      "description": "The event-driven counterpart to OpenAPI, used for this series' Streetlights sample (Lab 1). Still earning full confidence across the plugin ecosystem compared to OpenAPI's maturity.",
+      "timeline": [
+        {
+          "ringId": "assess",
+          "date": "2026-01-20",
+          "description": "Assessed alongside Lab 1's AsyncAPI sample; tooling support is improving but younger than OpenAPI's."
+        }
+      ]
+    },
+    {
+      "id": "soap-wsdl-new-apis",
+      "key": "soap-wsdl-new-apis",
+      "title": "SOAP/WSDL for new APIs",
+      "quadrant": "languages-frameworks",
+      "description": "Building brand-new APIs on SOAP/WSDL rather than a modern REST/OpenAPI or AsyncAPI approach. Kept only as a reference point for what this series deliberately avoids (Constitution Principle VII).",
+      "timeline": [
+        {
+          "ringId": "trial",
+          "date": "2026-01-12",
+          "description": "Historically trialed industry-wide; not this series' recommendation even at the outset."
+        },
+        {
+          "ringId": "hold",
+          "date": "2026-03-10",
+          "moved": -1,
+          "description": "Moved to Hold once this series established OpenAPI/AsyncAPI + design-first practices as the taught default (Labs 1-3) — new APIs should not start here."
+        }
+      ]
+    }
+  ]
+}
