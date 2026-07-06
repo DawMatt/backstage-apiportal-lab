@@ -87,24 +87,41 @@ const MAX_CACHED_SPECS = gatewayConfig.maxCachedSpecs ?? 100;
 
 const DEFAULT_IGNORE_DIRS = new Set(['node_modules', '.git', 'dist', 'build']);
 
-// Lab 4's own discovery convention (`autoApiRegistration.rootPath`/`patterns`) is the single
-// source of truth for which files are auto-registered in the catalog — reused here rather than
-// duplicated, so "what's registered" and "what's mockable" can't drift apart (research.md R3).
-// `rootPath` mirrors the same default Lab 4's backend module resolves to when left unset.
+// Lab 4's own discovery convention (`autoApiRegistration.rootPath`/`patterns`, or Lab 6's
+// multi-source `autoApiRegistration.sources[]` extension of it) is the single source of truth
+// for which files are auto-registered in the catalog — reused here rather than duplicated, so
+// "what's registered" and "what's mockable" can't drift apart (research.md R3). `rootPath`
+// mirrors the same default Lab 4's backend module resolves to when left unset.
 const autoApiRegistrationConfig = appConfig.autoApiRegistration ?? {};
 const DEFAULT_LAB4_ROOT = path.resolve(BACKSTAGE_DIR, '../../lab-04-auto-registration/apis');
 const DEFAULT_LAB4_PATTERNS = ['**/*-openapi.yaml'];
+// autoApiRegistration.ts's normalizeConfig() resolves each source's relative `rootPath` against
+// `resolvePackagePath('backend')` (packages/backend of the running Backstage instance), not
+// against BACKSTAGE_DIR itself — mirrored here so a rootPath like
+// "../../../../lab-06-api-lifecycle-management/apis" resolves to the exact same directory in
+// both places.
+const BACKEND_PACKAGE_DIR = path.join(BACKSTAGE_DIR, 'packages', 'backend');
 
-const lab4Source = {
-  rootPath: autoApiRegistrationConfig.rootPath
-    ? path.resolve(BACKSTAGE_DIR, autoApiRegistrationConfig.rootPath)
-    : DEFAULT_LAB4_ROOT,
-  // AsyncAPI mocking is explicitly out of scope for this lab (FR-005) even though Lab 4 also
-  // auto-registers `*-asyncapi.yaml` files, so that half of Lab 4's pattern list is dropped here.
-  patterns: (autoApiRegistrationConfig.patterns ?? DEFAULT_LAB4_PATTERNS).filter(
-    pattern => !pattern.includes('asyncapi'),
-  ),
-};
+function toLab4Source(entry) {
+  return {
+    rootPath: entry.rootPath
+      ? path.resolve(BACKEND_PACKAGE_DIR, entry.rootPath)
+      : DEFAULT_LAB4_ROOT,
+    // AsyncAPI mocking is explicitly out of scope for this lab (FR-005) even though Lab 4 also
+    // auto-registers `*-asyncapi.yaml` files, so that half of Lab 4's pattern list is dropped here.
+    patterns: (entry.patterns ?? DEFAULT_LAB4_PATTERNS).filter(
+      pattern => !pattern.includes('asyncapi'),
+    ),
+  };
+}
+
+// Lab 6 extended Lab 4's config from a single flat source to a `sources: []` array (one entry
+// per independently-configured source repo, e.g. the default Lab 4 apis/ plus Lab 6's own
+// museum-v1/v2 apis/) — both shapes are supported here so this stays in sync regardless of which
+// one a given lab's app-config.yaml uses.
+const lab4Sources = Array.isArray(autoApiRegistrationConfig.sources)
+  ? autoApiRegistrationConfig.sources.map(toLab4Source)
+  : [toLab4Source(autoApiRegistrationConfig)];
 
 // Lab 1's Museum API predates Lab 4's `*-openapi.yaml` convention: it's committed as a plain
 // `openapi.yaml` and is catalogued by hand (a committed catalog-info.yaml), not by Lab 4's
@@ -123,7 +140,7 @@ const additionalSources = (gatewayConfig.additionalSources ?? DEFAULT_ADDITIONAL
   }),
 );
 
-const discoverySources = [lab4Source, ...additionalSources];
+const discoverySources = [...lab4Sources, ...additionalSources];
 
 // ---------------------------------------------------------------------------------------------
 // Discovery — a cheap directory walk + filename match, not a spec parse (safe to do eagerly
