@@ -64,13 +64,12 @@ scale dimension applies (contrast with Lab 6's catalog-query performance concern
 **Constraints**: Zero cost; cross-platform; no external network access at run time (research.md
 R1 — this is the specific reason the optional backend package is deliberately not used); does not
 edit any previously-committed file from Labs 1–6 (purely additive: one new dependency, one new
-module directory, one `App.tsx` feature-array entry, one `app-config.yaml` extension-override
-entry); does not require Labs 1–6 to be redone.
+module directory, one `App.tsx` feature-array entry); does not require Labs 1–6 to be redone.
 
 **Scale/Scope**: Lab demo: 1 new frontend dependency; 1 new frontend module (3 files:
-`techRadarApi.ts`, `index.ts`, `radarData.json`); 1 `App.tsx` change (new feature-array entry); 1
-`app-config.yaml` change (disable the plugin's default API extension); 0 new backend modules; 0
-new catalog entities. Designed-for scale: adding more blips, quadrants, or rings to a real-world
+`techRadarApi.ts`, `index.ts`, `radarData.json`); 1 `App.tsx` change (two new feature-array
+entries: the plugin's own default export plus this lab's override module); 0 new backend
+modules; 0 new catalog entities. Designed-for scale: adding more blips, quadrants, or rings to a real-world
 radar is purely a `radarData.json` content change — no code or architecture change as the dataset
 grows (Principle VIII's scale requirement is met trivially here since the entire mechanism is
 already just "add more array entries" with no per-entry infrastructure cost).
@@ -154,10 +153,12 @@ packages/app/
     │                                # day-to-day radar content changes
     ├── techRadarApi.ts
     └── index.ts
-app-config.yaml                       # Modified: disables the plugin's default (backend-calling)
-                                       # API extension so this lab's static techRadarApi is used
-                                       # instead (research.md R5)
 ```
+
+No `app-config.yaml` change is needed: the plugin's own `.override()` mechanism (research.md R5,
+confirmed at implementation time against the installed `@backstage-community/plugin-tech-radar`
+package) replaces the default API's factory in place via a `createFrontendModule`/`App.tsx`
+change alone.
 
 **Structure Decision**: Tutorial-documentation layout, consistent with Labs 1–6. All
 student-facing content lives under `labs/lab-07-tech-radar/`; the new frontend module (plugin

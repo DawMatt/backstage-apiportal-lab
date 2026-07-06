@@ -74,19 +74,26 @@ description addressing spec User Story 3 / FR-008.
 
 - **FR-002 / FR-009**: every `RadarQuadrant.id` and `RadarRing.id` in the fixed sets above MUST
   have at least one `RadarEntry` referencing it (directly, or via its latest `timeline.ringId`).
-- **Shape validation (structural)**: `techRadarApi.ts` runs the imported `radarData.json` through
-  `TechRadarLoaderResponseParser.parse(...)` before returning it to the plugin. A missing required
-  field, wrong type, or malformed date string throws a Zod validation error, visible in the
-  browser console / dev overlay when the Tech Radar page loads — this is the "resulting error and
-  how to fix it" required by spec FR-007, and it fires for *any* structurally malformed
-  `radarData.json`, not just quadrant/ring typos.
-- **Edge case (invalid quadrant/ring id)**: `TechRadarLoaderResponseParser` validates that
-  `quadrant`/`ringId` are strings, but does **not** cross-check that the string matches an actual
-  `id` in `quadrants[]`/`rings[]` (confirmed from the parser's schema — it has no such rule). A
-  misspelled `quadrant`/`ringId` therefore passes validation silently and the blip simply fails to
-  render in the expected place (or at all) — no thrown error. The lab's Troubleshooting section
-  documents this explicitly as a manual check ("does every `quadrant`/`ringId` in your entry match
-  an `id` declared in the `quadrants`/`rings` arrays?"), since it is not caught automatically.
+- **Shape validation (structural) — confirmed by live testing**: `techRadarApi.ts` runs the
+  imported `radarData.json` through `TechRadarLoaderResponseParser.parse(...)` before returning it
+  to the plugin. A missing required field (tested: removing an entry's `title`) throws a Zod
+  validation error that the plugin surfaces as a visible in-app error panel on the Tech Radar page
+  itself — e.g. `[{"code":"invalid_type","expected":"string","received":"undefined","path":
+  ["entries",0,"title"],"message":"Required"}]` — naming the exact field and array index at fault.
+  This is the "resulting error and how to fix it" required by spec FR-007, and it fires for *any*
+  structurally malformed `radarData.json`, not just quadrant/ring typos.
+- **Edge case (invalid quadrant/ring id) — corrected by live testing**: `TechRadarLoaderResponseParser`
+  validates that `quadrant`/`ringId` are strings but does not cross-check that the string matches
+  an actual `id` in `quadrants[]`/`rings[]`. However, this is **not** a silent failure as originally
+  assumed during planning — the plugin's own rendering logic (`adjustEntries` in
+  `@backstage-community/plugin-tech-radar`'s `Radar/utils`) throws an uncaught error when it can't
+  resolve an entry's quadrant/ring, which crashes the *entire* radar page (not just the one blip)
+  to a full-page dev error overlay reading `Unknown quadrant undefined for entry <id>!` (or
+  `Unknown ring undefined for entry <id>!`) — confirmed by deliberately adding an entry with a
+  bogus `quadrant`/`ringId` and observing the crash. This is louder and more disruptive than a
+  single missing blip, so the lab's Troubleshooting section documents it as "the whole radar goes
+  blank with an error overlay if any one entry's `quadrant`/`ringId` doesn't match a declared
+  `id`" rather than the originally-planned "silently fails to render."
 - **Edge case (duplicate blip names)**: no uniqueness constraint on `title` is enforced by the
   plugin, the parser, or this lab — `id`/`key` must still be unique per the plugin's own React
   key usage, but a duplicate `id` in JSON is not itself a parse error either, so the lab's

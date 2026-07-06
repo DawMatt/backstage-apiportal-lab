@@ -70,19 +70,25 @@ parser the optional backend package already uses) instead of inventing new valid
 consistent with Constitution Principle I (named, concrete Backstage feature, not a bespoke
 mechanism).
 
-**Consequence for the edge-case/error-handling story (was: TS compile-time error)**: Because the
-data is now JSON parsed at runtime, malformed *shape* (e.g. a missing required field) now surfaces
-as a Zod validation error in the browser console / error boundary when the page loads, not a build
-failure. More importantly — confirmed from the parser's schema — `TechRadarLoaderResponseParser`
-validates that `quadrant` and `ringId` are *strings*, but does **not** cross-check that the string
-actually matches one of the `quadrants[]`/`rings[]` ids declared in the same file. An entry with a
-misspelled `quadrant`/`ringId` therefore passes validation silently and simply fails to render
-where expected (or not at all) — this is now a "silent" pitfall like the existing duplicate-`id`
-case, not a thrown error. data-model.md and the lab's Troubleshooting section are updated to
-document this as a manual check ("does every `quadrant`/`ringId` value in your entry match an id
-in the `quadrants`/`rings` arrays above?") rather than promising an automatic error message for
-this specific case; genuine shape errors (missing fields, wrong types) still fail loudly via the
-Zod parser.
+**Consequence for the edge-case/error-handling story — confirmed by live testing against the
+running app (both cases turned out louder than planned)**: Because the data is now JSON parsed at
+runtime, malformed *shape* (e.g. a missing required field) surfaces as a Zod validation error. Live
+testing (deliberately deleting an entry's `title`) showed this renders as a visible in-app error
+panel on the Tech Radar page itself, naming the exact field and array index:
+`[{"code":"invalid_type","expected":"string","received":"undefined","path":["entries",0,"title"],
+"message":"Required"}]`.
+
+For the quadrant/ring case, the original plan assumed `TechRadarLoaderResponseParser`'s lack of a
+cross-reference check (it validates `quadrant`/`ringId` are strings, but not that they match a
+declared `quadrants[]`/`rings[]` id) would mean a misspelled id silently fails to render — **this
+was wrong, corrected by live testing**. Deliberately adding an entry with a bogus `quadrant`
+(and separately, a bogus `ringId`) showed the plugin's own rendering code
+(`adjustEntries` in `@backstage-community/plugin-tech-radar`'s `Radar/utils`) throws an uncaught
+error — `Unknown quadrant undefined for entry <id>!` / `Unknown ring undefined for entry <id>!` —
+which crashes the *entire* radar page to a full-page dev error overlay, not just omitting the one
+bad blip. Both edge cases are therefore loud, just via two different mechanisms (an in-page Zod
+error panel vs. a page-crashing render error) — data-model.md and the lab's Troubleshooting section
+are corrected accordingly.
 
 **Alternatives considered**:
 - Keep the `.ts` module (original decision): rejected per explicit user feedback — content edits
@@ -128,14 +134,21 @@ scoped to the plugin itself rather than nav plumbing.
 
 ## R5: Overriding the plugin's default (backend-calling) `TechRadarApi`
 
-**Decision**: Register our own `ApiBlueprint` for `techRadarApiRef` in a `createFrontendModule`
-targeting `pluginId: 'tech-radar'`, and disable the plugin's own built-in API extension via
-`app-config.yaml`'s `app.extensions` list (the same override mechanism the new frontend system
-uses generally — confirmed pattern, exact extension id to be verified against the installed
-package version at implementation time, since the plugin's `alpha.tsx` declares the default API
-extension without an explicit `name`). This mirrors, in spirit, the existing
-`spectralLinterApiPlugin`/`convertLegacyPlugin` precedent in this repo (Lab 3) for wiring a
-non-default API implementation into the new frontend system.
+**Decision (confirmed at implementation time)**: The plugin's `/alpha` extensions
+(`techRadarPage`, `techRadarApi`) are typed as `OverridableExtensionDefinition`s — they expose a
+built-in `.override({ params: ... })` method (from `@backstage/frontend-plugin-api`) that replaces
+an extension's factory in place, keeping the same extension id. No `app-config.yaml` change is
+needed at all — the originally-planned "disable the default via `app.extensions`, then
+re-register" approach was unnecessary once this was checked against the installed package
+(`@backstage-community/plugin-tech-radar@1.20.0`)'s actual type declarations. The lab's
+`techRadar/index.ts` calls `techRadarApi.override({ params: defineParams => defineParams({ api:
+techRadarApiRef, deps: {}, factory: () => new StaticTechRadarApi() }) })` and registers the
+resulting extension in its own `createFrontendModule({ pluginId: 'tech-radar', extensions:
+[staticTechRadarApi] })`, installed in `App.tsx` alongside the plugin's own unmodified
+`techRadarPlugin` default export (which still supplies the page/routing). This is simpler than
+the `spectralLinterApiPlugin`/`convertLegacyPlugin` precedent (Lab 3) needed, precisely because
+this plugin was built natively for the new frontend system with overriding in mind, unlike Lab
+3's legacy-plugin-compat case.
 
 **Rationale**: The default `DefaultTechRadarApi.load()` calls
 `discoveryApi.getBaseUrl('tech-radar')` + `fetch(.../data)`, i.e. it always expects the backend

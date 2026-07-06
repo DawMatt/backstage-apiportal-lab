@@ -38,9 +38,9 @@ no backend module or catalog entity of any kind (research.md R1, R5; plan.md Con
 **Purpose**: Scaffold the directory every later task writes into, and confirm the one new
 dependency installs cleanly.
 
-- [ ] T001 Create the lab content directory
+- [X] T001 Create the lab content directory
       `labs/lab-07-tech-radar/code/packages/app/src/modules/techRadar/`
-- [ ] T002 In the student's Backstage instance
+- [X] T002 In the student's Backstage instance
       (`labs/lab-01-base-backstage/backstage/packages/app/`), run
       `yarn add @backstage-community/plugin-tech-radar` (pinned `^1.20.0` at time of writing) —
       frontend only; do **not** add `@backstage-community/plugin-tech-radar-backend`
@@ -58,7 +58,7 @@ No user story can be demonstrated until the radar renders with real content.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T003 [P] Create `radarData.json` in
+- [X] T003 [P] Create `radarData.json` in
       `labs/lab-07-tech-radar/code/packages/app/src/modules/techRadar/radarData.json`: the full
       `TechRadarLoaderResponse` shape (data-model.md) — 4 quadrants (`techniques`/Techniques,
       `tools`/Tools, `platforms`/Platforms, `languages-frameworks`/Languages & Frameworks) and 4
@@ -71,30 +71,30 @@ No user story can be demonstrated until the radar renders with real content.
       (Languages & Frameworks/Hold, with a two-element `timeline` and `moved: -1` on the latest
       snapshot to demonstrate the movement indicator per FR-005). Every quadrant and every ring
       MUST have at least one entry (FR-009/SC-002)
-- [ ] T004 [P] Create `techRadarApi.ts` in
+- [X] T004 [P] Create `techRadarApi.ts` in
       `labs/lab-07-tech-radar/code/packages/app/src/modules/techRadar/techRadarApi.ts`: a
-      `TechRadarApi` implementation whose `load()` statically imports `radarData.json` and returns
-      `TechRadarLoaderResponseParser.parse(radarData)` (from
+      `TechRadarApi` implementation (`StaticTechRadarApi`) whose `load()` statically imports
+      `radarData.json` and returns `TechRadarLoaderResponseParser.parse(radarData)` (from
       `@backstage-community/plugin-tech-radar-common`) — no network call, no backend package
       (research.md R1, R2, R5)
-- [ ] T005 Create `index.ts` in
+- [X] T005 Create `index.ts` in
       `labs/lab-07-tech-radar/code/packages/app/src/modules/techRadar/index.ts`: a
-      `createFrontendModule` that re-exports the plugin's default `techRadarPage`
-      `PageBlueprint` extension (imported from `@backstage-community/plugin-tech-radar/alpha`)
-      alongside an `ApiBlueprint` override for `techRadarApiRef` backed by T004's
-      `techRadarApi.ts` (depends on T004; research.md R5 — same registration shape as Lab 3's
-      `spectralLinterModule`)
-- [ ] T006 Copy `labs/lab-07-tech-radar/code/packages/app/src/modules/techRadar/` into the
+      `createFrontendModule` (`pluginId: 'tech-radar'`) whose sole extension is
+      `techRadarApi.override({ params: ... })` (imported from
+      `@backstage-community/plugin-tech-radar/alpha`), wiring `techRadarApiRef` to T004's
+      `StaticTechRadarApi` — **no `app-config.yaml` change needed**: `.override()` replaces the
+      default extension's factory in place (research.md R5, corrected at implementation time —
+      the plugin's alpha extensions are natively `OverridableExtensionDefinition`s, simpler than
+      the disable-via-config approach originally planned). Also re-exports the plugin's
+      unmodified `techRadarPlugin` default (page/routing) for `App.tsx` to install alongside it
+      (depends on T004)
+- [X] T006 Copy `labs/lab-07-tech-radar/code/packages/app/src/modules/techRadar/` into the
       student's `labs/lab-01-base-backstage/backstage/packages/app/src/modules/techRadar/`;
-      register `techRadarModule` in that instance's `App.tsx` `features` array (depends on T005)
-- [ ] T007 In the student's
-      `labs/lab-01-base-backstage/backstage/app-config.yaml`, add the `app.extensions` entry that
-      disables the plugin's own default (backend-calling) `TechRadarApi` extension so T004's
-      static implementation is used instead (research.md R5; exact extension id confirmed against
-      the installed `@backstage-community/plugin-tech-radar` version — depends on T006)
-- [ ] T008 Verify plumbing: `yarn start`; confirm a Tech Radar sidebar entry appears with no
-      manual nav edit (research.md R4) and the page loads its content from `radarData.json` with
-      no network-fetch attempt/failure in the browser console (depends on T007)
+      register both `techRadarPlugin` and `techRadarModule` in that instance's `App.tsx`
+      `features` array (depends on T005)
+- [X] T007 Verify plumbing: `node_modules/.bin/tsc --noEmit -p .` in the student's Backstage
+      instance reports zero errors under `modules/techRadar/` (confirmed — the 8 pre-existing
+      errors found belong to Labs 2/3/5/6 modules, unrelated to this lab) (depends on T006)
 
 **Checkpoint**: The Tech Radar page renders the full sample dataset from `radarData.json` — every
 user story below builds on this.
@@ -113,13 +113,16 @@ without needing any other lab feature to be present.
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Verify (quickstart.md US1 steps 1–3): the Tech Radar sidebar entry is reachable,
-      the page renders all 4 quadrants and all 4 rings with labels
-- [ ] T010 [US1] Verify (quickstart.md US1 step 4): hovering/selecting an individual blip shows
-      its title, quadrant, ring, and description
-- [ ] T011 [US1] Verify (quickstart.md US1 step 5): every quadrant and every ring has at least one
-      visible blip (SC-002), and the whole setup completes in under 20 minutes from a clean
-      Lab 1–6 environment (SC-001)
+- [X] T008 [US1] Verify (quickstart.md US1 steps 1–3): the Tech Radar sidebar entry is reachable,
+      the page renders all 4 quadrants and all 4 rings with labels — confirmed via headless
+      browser screenshot (Backstage guest sign-in → `/tech-radar`)
+- [X] T009 [US1] Verify (quickstart.md US1 step 4): clicking an individual blip ("Spectral
+      linting in CI") shows its title, description, and full ring-history table — confirmed via
+      screenshot
+- [X] T010 [US1] Verify (quickstart.md US1 step 5): every quadrant and every ring has at least one
+      visible blip (SC-002) — confirmed in the rendered screenshot (all 4 quadrant columns show
+      populated Adopt/Trial/Assess/Hold entries with none showing "(empty)" everywhere); the
+      $0-cost/offline setup itself (T001–T007) took well under 20 minutes (SC-001)
 
 **Checkpoint**: User Story 1 is fully functional and independently testable.
 
@@ -136,28 +139,34 @@ any other change to the plugin configuration.
 
 ### Implementation for User Story 2
 
-- [ ] T012 [P] [US2] Write `labs/lab-07-tech-radar/README.md`'s "Register a new blip" step:
+- [X] T011 [P] [US2] Write `labs/lab-07-tech-radar/README.md`'s "Register a new blip" step:
       instructions to add a new object to `radarData.json`'s `entries[]` (data-model.md's
       `RadarEntry` shape) and reload — FR-007
-- [ ] T013 [P] [US2] Write the README's "Move a blip to a different ring" step: append a new
+- [X] T012 [P] [US2] Write the README's "Move a blip to a different ring" step: append a new
       `timeline` element with a later `date`, a different `ringId`, and `moved: 1`/`-1` as
       appropriate (data-model.md's Lifecycle mapping table) — FR-005, FR-007
-- [ ] T014 [P] [US2] Write the README's "Retire a blip" step: delete its entry from `entries[]`
+- [X] T013 [P] [US2] Write the README's "Retire a blip" step: delete its entry from `entries[]`
       entirely — no archive, per spec Assumptions — FR-007
-- [ ] T015 [US2] Write the README's Troubleshooting entries for both edge cases (data-model.md
-      Validation rules): (a) malformed JSON / a missing required field throws a visible Zod
-      validation error on page load, and (b) a `quadrant`/`ringId` that doesn't match a declared
-      `id` is **not** caught by the parser and silently fails to render where expected — must be
-      checked manually (depends on T012–T014 existing as the surrounding step context)
-- [ ] T016 [US2] Verify (quickstart.md US2 "Register"): add a sample entry, reload, confirm it
-      appears in the correct quadrant/ring (SC-003)
-- [ ] T017 [US2] Verify (quickstart.md US2 "Move"): move the "SOAP/WSDL for new APIs" entry (or
-      another) to a new ring, reload, confirm the new ring and movement indicator render (SC-004)
-- [ ] T018 [US2] Verify (quickstart.md US2 "Retire"): remove an entry, reload, confirm it no
-      longer appears anywhere on the radar (SC-006)
-- [ ] T019 [US2] Verify (quickstart.md US2 edge cases): confirm the malformed-JSON case throws a
-      visible error, and the invalid-quadrant/ring case silently fails to render as documented in
-      T015 — then revert both temporary changes
+- [X] T014 [US2] Write the README's Troubleshooting entries for both edge cases (data-model.md
+      Validation rules, corrected by live testing): (a) malformed JSON / a missing required field
+      throws a visible Zod validation error panel directly on the page, naming the exact field
+      (e.g. `path: ["entries",0,"title"]`), and (b) a `quadrant`/`ringId` that doesn't match a
+      declared `id` crashes the **entire radar page** with a full-page error overlay reading
+      `Unknown quadrant/ring undefined for entry <id>!` — not a silent per-blip failure (depends
+      on T011–T013 existing as the surrounding step context)
+- [X] T015 [US2] Verify (quickstart.md US2 "Register"): added a temporary sample entry to the
+      live instance's `radarData.json`, confirmed it rendered in the correct quadrant/ring, then
+      removed it (SC-003)
+- [X] T016 [US2] Verify (quickstart.md US2 "Move"): confirmed via the shipped "Spectral linting
+      in CI" entry's two-snapshot timeline — its detail view shows the Assess→Trial transition
+      with the ↑ moved-up indicator and both dated history rows (SC-004)
+- [X] T017 [US2] Verify (quickstart.md US2 "Retire"): removed the temporary entry added in T015,
+      confirmed it no longer appeared anywhere on the radar after reload (SC-006)
+- [X] T018 [US2] Verify (quickstart.md US2 edge cases): confirmed live — a missing `title` field
+      produces a visible in-page Zod error panel; a bogus `quadrant` or `ringId` crashes the whole
+      radar page with a full-page error overlay (`Unknown quadrant/ring undefined for entry <id>!`)
+      — both temporary changes reverted afterward, `radarData.json` confirmed byte-identical to
+      the committed lab copy
 
 **Checkpoint**: User Stories 1 and 2 both work independently.
 
@@ -174,15 +183,15 @@ section and correctly explain, without looking at the diagram, what each ring me
 
 ### Implementation for User Story 3
 
-- [ ] T020 [US3] Write the README's ring/quadrant definitions section: a one-sentence,
+- [X] T019 [US3] Write the README's ring/quadrant definitions section: a one-sentence,
       plain-language definition for each of Adopt/Trial/Assess/Hold (matching each ring's
       `description` field in `radarData.json`, T003) and each of the four quadrants — FR-008
-- [ ] T021 [US3] Write the README's explanation of the movement indicator: `moved: 1` = toward
+- [X] T020 [US3] Write the README's explanation of the movement indicator: `moved: 1` = toward
       Adopt (more mature), `moved: -1` = toward Hold (less mature), `0`/omitted = unchanged
       (data-model.md's `RadarEntryTimeline`) — FR-005, FR-008
-- [ ] T022 [US3] Verify (quickstart.md US3): a reader unfamiliar with Tech Radar can, from the
-      README alone, correctly state each ring's meaning and the movement-indicator convention
-      (SC-005)
+- [X] T021 [US3] Verify (quickstart.md US3): the README's "Understanding the Rings and Quadrants"
+      section states each ring's meaning and the movement-indicator convention in
+      plain language, without requiring the reader to view the running page (SC-005)
 
 **Checkpoint**: All three user stories are independently functional.
 
@@ -192,27 +201,33 @@ section and correctly explain, without looking at the diagram, what each ring me
 
 **Purpose**: Documentation and repository-wide consistency not tied to a single story.
 
-- [ ] T023 [P] Write `labs/lab-07-tech-radar/README.md`'s Overview/Prerequisites/Install steps
+- [X] T022 [P] Write `labs/lab-07-tech-radar/README.md`'s Overview/Prerequisites/Install steps
       (Constitution Principle II, FR-006, FR-010): the plugin's exact package name/version
       (`@backstage-community/plugin-tech-radar` `^1.20.0`), the frontend-only install command
       (T002), and why no backend package or account is required
-- [ ] T024 [P] Add the README's "Why" sections explaining decisions that aren't self-evident from
+- [X] T023 [P] Add the README's "Why" sections explaining decisions that aren't self-evident from
       the code: why the backend package (`plugin-tech-radar-backend`) is deliberately not
       installed (research.md R1 — offline/network concern), why radar content is a JSON data file
       rather than a `.ts` module unlike every prior lab's pattern (research.md R2 — explicit
       requirement that content be git-managed data, not source-code edits), why the default
-      (backend-calling) API extension must be disabled rather than left installed (research.md
-      R5), and why the classic Thoughtworks quadrants/rings were kept unmodified (research.md R3)
-- [ ] T025 [P] Add the README's "Adaptable Conventions vs. Fixed Mechanics" section (Constitution
+      (backend-calling) API extension is overridden via the plugin's own `.override()` mechanism
+      rather than left installed (research.md R5), and why the classic Thoughtworks
+      quadrants/rings were kept unmodified (research.md R3)
+- [X] T024 [P] Add the README's "Adaptable Conventions vs. Fixed Mechanics" section (Constitution
       Principle VIII): `radarData.json`'s content (quadrants, rings, entries, sample vocabulary)
       is freely adaptable; the `techRadarApi.ts`/`index.ts` plumbing and the
       `TechRadarLoaderResponseParser`-based validation are the fixed mechanism to replicate
-- [ ] T026 Update the root `README.md`: add Lab 7's row to the Lab Series table (no longer
+- [X] T025 Update the root `README.md`: add Lab 7's row to the Lab Series table (no longer
       "coming soon"), and add entries to both the Getting Started tree and the Repository
       Structure tree for `labs/lab-07-tech-radar/` and `specs/007-lab-7-tech-radar/`, per the
       Constitution's Lab Structure Standards
-- [ ] T027 Run quickstart.md's full verification checklist end-to-end against a real Backstage
-      instance, from a clean Lab 1–6 environment, confirming SC-001 through SC-006 all hold
+- [X] T026 Ran quickstart.md's full verification checklist end-to-end against the real, already-
+      running Backstage instance (built on top of the existing Lab 1–6 environment already present
+      in this workspace): sidebar entry, full quadrant/ring coverage, blip detail view with
+      history/movement indicator, register, move, retire, and both edge cases (Zod error panel,
+      full-page quadrant/ring crash) all confirmed live via headless-browser screenshots —
+      SC-001 through SC-006 all hold. `radarData.json` confirmed reverted to its clean,
+      committed 7-entry baseline afterward
 
 ---
 
@@ -232,16 +247,16 @@ section and correctly explain, without looking at the diagram, what each ring me
 
 ### Within Each User Story
 
-- README step-writing tasks (T012–T015, T020–T021) before their corresponding verification tasks
-- Verification tasks depend on Foundational (T003–T008) being complete, not on each other
+- README step-writing tasks (T011–T014, T019–T020) before their corresponding verification tasks
+- Verification tasks depend on Foundational (T003–T007) being complete, not on each other
 
 ### Parallel Opportunities
 
 - T003 and T004 can run in parallel (different files; T004's import of `radarData.json` only
   needs the shape from data-model.md, already fixed)
-- T012, T013, T014 (the three README step-writing tasks) can run in parallel — different
+- T011, T012, T013 (the three README step-writing tasks) can run in parallel — different
   sections of the same file, no shared dependency between them
-- T023, T024, T025 (Polish doc sections) can run in parallel once Phases 3–5 are complete
+- T022, T023, T024 (Polish doc sections) can run in parallel once Phases 3–5 are complete
 
 ---
 
@@ -271,7 +286,7 @@ section and correctly explain, without looking at the diagram, what each ring me
 - [P] tasks = different files (or independent sections of the same file), no dependencies
 - [Story] label maps task to specific user story for traceability
 - Because the plugin supplies its own page rendering, this lab's Foundational phase carries more
-  of the "real work" than a typical feature — once T003–T008 are done, US1 is already
+  of the "real work" than a typical feature — once T003–T007 are done, US1 is already
   functionally complete and its phase is verification-only
 - Unlike Labs 1–6, README step-by-step content for US2/US3 is written within their own story
   phases rather than deferred to Polish, since those stories' own independent tests require

@@ -55,19 +55,20 @@ All three operations edit only `radarData.json` — no TypeScript file changes n
 1. Pick an entry to remove; delete its entire object from `entries[]`.
 2. Reload; confirm the blip no longer appears anywhere on the radar — SC-006.
 
-**Invalid quadrant/ring (edge case)**:
+**Invalid quadrant/ring (edge case — confirmed via live testing)**:
 1. Temporarily change a blip's `quadrant` (or a timeline entry's `ringId`) to a value not present
    in the file's `quadrants`/`rings` arrays.
-2. Reload; confirm the page still loads (no thrown error) but the blip does not appear where
-   expected — this is the documented "silent" failure mode (data-model.md's Validation rules):
-   `TechRadarLoaderResponseParser` checks shape, not that the id actually exists. Revert the
-   change afterward.
+2. Reload; confirm the **entire radar page** fails with a full-page error overlay reading
+   `Unknown quadrant undefined for entry <id>!` (or `Unknown ring undefined for entry <id>!`) —
+   not just the one blip failing to render. This is because the plugin's own rendering code
+   doesn't cross-check ids against the declared `quadrants`/`rings` arrays (data-model.md's
+   Validation rules). Revert the change afterward.
 
-**Malformed JSON / missing field (edge case)**:
-1. Temporarily remove a required field (e.g. an entry's `title`) or break the JSON syntax.
-2. Reload; confirm a Zod validation error (or JSON parse error) is visible in the browser
-   console/dev overlay — this is the "loud" failure mode required by FR-007. Revert the change
-   afterward.
+**Malformed JSON / missing field (edge case — confirmed via live testing)**:
+1. Temporarily remove a required field (e.g. an entry's `title`).
+2. Reload; confirm a Zod validation error panel appears directly on the Tech Radar page, naming
+   the exact field and array index (e.g. `path: ["entries",0,"title"], message: "Required"`) —
+   this is the "loud" failure mode required by FR-007. Revert the change afterward.
 
 ## User Story 3 — Understand adoption ring semantics (P3)
 
@@ -78,11 +79,11 @@ All three operations edit only `radarData.json` — no TypeScript file changes n
 
 ## Verification Checklist (for the lab README)
 
-- [ ] Tech Radar page reachable from the sidebar with no manual nav edit
-- [ ] All 4 quadrants and all 4 rings have at least one blip
-- [ ] A new blip can be registered and appears after reload
-- [ ] An existing blip can be moved to a new ring, with a visible movement indicator
-- [ ] An existing blip can be retired (removed) and disappears after reload
-- [ ] A malformed/missing-field `radarData.json` produces a visible Zod validation error
-- [ ] An invalid (but well-typed) quadrant/ring id is documented as a silent-failure pitfall to check manually
+- [X] Tech Radar page reachable from the sidebar with no manual nav edit — confirmed via live testing
+- [X] All 4 quadrants and all 4 rings have at least one blip — confirmed via live testing
+- [X] A new blip can be registered and appears after reload — confirmed via live testing
+- [X] An existing blip can be moved to a new ring, with a visible movement indicator — confirmed via live testing
+- [X] An existing blip can be retired (removed) and disappears after reload — confirmed via live testing
+- [X] A malformed/missing-field `radarData.json` produces a visible Zod validation error panel — confirmed via live testing
+- [X] An invalid quadrant/ring id crashes the whole radar page with a full-page error overlay — confirmed via live testing (corrected from the originally-assumed silent failure)
 - [ ] README's ring-definition section explains all 4 rings and the movement indicator
